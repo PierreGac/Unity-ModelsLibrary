@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+﻿
 using System;
 
 namespace ModelLibrary.Editor.Utils
@@ -111,6 +111,6 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-#endif
+
 
 

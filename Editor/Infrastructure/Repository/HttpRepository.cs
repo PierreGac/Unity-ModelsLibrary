@@ -1,5 +1,4 @@
-﻿#if UNITY_EDITOR
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
@@ -74,6 +73,3 @@ namespace ModelLibrary.Editor.Repository
         public Task DownloadFileAsync(string relativePath, string localAbsolutePath) => Task.CompletedTask;
     }
 }
-#endif
-
-

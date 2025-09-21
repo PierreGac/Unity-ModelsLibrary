@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+﻿
 using UnityEditor;
 using UnityEngine;
 
@@ -52,6 +52,6 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-#endif
+
 
 

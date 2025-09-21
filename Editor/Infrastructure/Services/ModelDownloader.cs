@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+﻿
 using System.Threading.Tasks;
 using ModelLibrary.Editor.Repository;
 
@@ -11,6 +11,6 @@ namespace ModelLibrary.Editor.Services
         public Task<(string versionRoot, Data.ModelMeta meta)> DownloadAsync(string id, string version) => _service.DownloadModelVersionAsync(id, version);
     }
 }
-#endif
+
 
 

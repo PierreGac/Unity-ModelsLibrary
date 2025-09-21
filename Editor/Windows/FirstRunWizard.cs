@@ -1,5 +1,4 @@
-﻿#if UNITY_EDITOR
-using ModelLibrary.Editor.Identity;
+﻿using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Settings;
 using UnityEditor;
 using UnityEngine;
@@ -78,6 +77,5 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-#endif
 
 

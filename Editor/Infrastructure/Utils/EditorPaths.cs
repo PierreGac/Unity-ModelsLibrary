@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+﻿
 using System.IO;
 using UnityEngine;
 
@@ -10,6 +10,6 @@ namespace ModelLibrary.Editor.Utils
         public static string LibraryPath(string sub) => PathUtils.SanitizePathSeparator(Path.Combine(projectRoot, sub));
     }
 }
-#endif
+
 
 

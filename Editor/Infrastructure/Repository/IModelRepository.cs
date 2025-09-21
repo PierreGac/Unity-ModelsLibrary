@@ -1,5 +1,4 @@
-﻿#if UNITY_EDITOR
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 
@@ -56,6 +55,4 @@ namespace ModelLibrary.Editor.Repository
         string Root { get; }
     }
 }
-#endif
-
 

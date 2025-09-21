@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+﻿
 using UnityEditor;
 using UnityEngine;
 
@@ -22,6 +22,6 @@ namespace ModelLibrary.Editor.Identity
         public void SetUserName(string name) => EditorPrefs.SetString(Key, string.IsNullOrWhiteSpace(name) ? DefaultName : name.Trim());
     }
 }
-#endif
+
 
 

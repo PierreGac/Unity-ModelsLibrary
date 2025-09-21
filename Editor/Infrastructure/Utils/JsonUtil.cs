@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+﻿
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Utils
@@ -28,6 +28,6 @@ namespace ModelLibrary.Editor.Utils
         public static T FromJson<T>(string json) => JsonUtility.FromJson<T>(json);
     }
 }
-#endif
+
 
 
