@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace ModelLibrary.Data
@@ -16,7 +16,7 @@ namespace ModelLibrary.Data
         /// Examples: "medieval", "weapon", "low-poly", "sci-fi", "character", "environment"
         /// Tags are case-sensitive and should be consistent across the project.
         /// </summary>
-        public List<string> Values = new List<string>();
+        public List<string> values = new List<string>();
     }
 }
 

@@ -345,7 +345,7 @@ namespace ModelLibrary.Editor.Services
             ModelIndex.Entry entry = index.Get(meta.identity.id);
             long timestamp = meta.updatedTimeTicks <= 0 ? DateTime.Now.Ticks : meta.updatedTimeTicks;
             long releaseTimestamp = meta.uploadTimeTicks <= 0 ? timestamp : meta.uploadTimeTicks;
-            List<string> tags = meta.tags?.Values != null ? new List<string>(meta.tags.Values) : new List<string>();
+            List<string> tags = meta.tags?.values != null ? new List<string>(meta.tags.values) : new List<string>();
             List<string> projectScopes = meta.projectTags != null ? new List<string>(meta.projectTags) : new List<string>();
 
             if (entry == null)

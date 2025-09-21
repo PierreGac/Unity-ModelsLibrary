@@ -60,7 +60,7 @@ namespace ModelLibrary.Editor.Windows
             _meta = await _service.GetMetaAsync(_modelId, _version);
             _baselineMetaJson = JsonUtil.ToJson(_meta);
             _editedDescription = _meta.description;
-            _editableTags = new List<string>(_meta.tags?.Values ?? new List<string>());
+            _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
             _editingTags = false;
             Repaint();
         }
@@ -87,7 +87,7 @@ namespace ModelLibrary.Editor.Windows
                 string tagButtonLabel = _editingTags ? "Cancel" : "Edit";
                 if (GUILayout.Button(tagButtonLabel, GUILayout.Width(60)))
                 {
-                    _editableTags = new List<string>(_meta.tags?.Values ?? new List<string>());
+                    _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
                     _editingTags = !_editingTags;
                 }
             }
@@ -117,7 +117,7 @@ namespace ModelLibrary.Editor.Windows
             }
             else
             {
-                EditorGUILayout.LabelField(string.Join(", ", _meta.tags?.Values.ToArray() ?? Array.Empty<string>()));
+                EditorGUILayout.LabelField(string.Join(", ", _meta.tags?.values.ToArray() ?? Array.Empty<string>()));
             }
             EditorGUILayout.Space();
             using (new EditorGUILayout.HorizontalScope())
@@ -271,7 +271,7 @@ namespace ModelLibrary.Editor.Windows
 
             if (_editingTags)
             {
-                _meta.tags.Values = new List<string>(_editableTags);
+                _meta.tags.values = new List<string>(_editableTags);
                 _editingTags = false;
             }
 
@@ -283,7 +283,7 @@ namespace ModelLibrary.Editor.Windows
             if (string.IsNullOrEmpty(summary))
             {
                 EditorUtility.DisplayDialog("No Changes", "There are no metadata changes to save.", "OK");
-                _editableTags = new List<string>(_meta.tags?.Values ?? new List<string>());
+                _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
                 return;
             }
 
@@ -322,8 +322,8 @@ namespace ModelLibrary.Editor.Windows
                 parts.Add("Description updated");
             }
 
-            HashSet<string> beforeTags = new HashSet<string>(before?.tags?.Values ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
-            HashSet<string> afterTags = new HashSet<string>(after.tags?.Values ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            HashSet<string> beforeTags = new HashSet<string>(before?.tags?.values ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+            HashSet<string> afterTags = new HashSet<string>(after.tags?.values ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
 
             List<string> added = new List<string>();
             foreach (string tag in afterTags)

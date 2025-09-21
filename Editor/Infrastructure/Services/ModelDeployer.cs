@@ -183,7 +183,7 @@ namespace ModelLibrary.Editor.Services
             meta.imageRelativePaths = imagePaths?.Select(p => $"images/{Path.GetFileName(p)}").ToList() ?? new List<string>();
 
             // Add tags
-            meta.tags.Values = tags?.ToList() ?? new List<string>();
+            meta.tags.values = tags?.ToList() ?? new List<string>();
             meta.vertexCount = totalVertices;
             meta.triangleCount = totalTriangles;
 

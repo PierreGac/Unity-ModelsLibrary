@@ -281,7 +281,7 @@ namespace ModelLibrary.Editor.Windows
                 _latestSelectedMeta = await _service.GetMetaAsync(entry.id, entry.latestVersion);
                 _name = entry.name;
                 _description = _latestSelectedMeta?.description ?? string.Empty;
-                _tags = new List<string>(_latestSelectedMeta?.tags?.Values ?? new List<string>());
+                _tags = new List<string>(_latestSelectedMeta?.tags?.values ?? new List<string>());
                 _projectTags = new List<string>(_latestSelectedMeta?.projectTags ?? new List<string>());
                 _installPath = _latestSelectedMeta?.installPath ?? DefaultInstallPath();
                 _relativePath = _latestSelectedMeta?.relativePath ?? GetDefaultRelativePath();
