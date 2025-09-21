@@ -56,7 +56,9 @@ namespace ModelLibrary.Editor.Services
                 }
 
                 string ext = Path.GetExtension(path).ToLowerInvariant();
-                if (ext == ".fbx" || ext == ".obj" || ext == ".png" || ext == ".tga" || ext == ".jpg" || ext == ".jpeg" || ext == ".mat")
+                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ || 
+                    ext == FileExtensions.PNG || ext == FileExtensions.TGA || ext == FileExtensions.JPG || ext == FileExtensions.JPEG || ext == FileExtensions.PSD || 
+                    ext == FileExtensions.MAT)
                 {
                     // In the version folder the payload is placed under payload/<filename>
                     string fileName = Path.GetFileName(path);
@@ -90,7 +92,7 @@ namespace ModelLibrary.Editor.Services
                 }
 
                 // Capture model importer settings for FBX/OBJ
-                if (ext == ".fbx" || ext == ".obj")
+                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ)
                 {
                     ModelImporter imp = AssetImporter.GetAtPath(path) as ModelImporter;
                     if (imp != null)
@@ -121,7 +123,7 @@ namespace ModelLibrary.Editor.Services
                     {
                         // Filter out shader-related files
                         string dext = Path.GetExtension(dep).ToLowerInvariant();
-                        if (dext == ".shader" || dext == ".shadervariants" || dext == ".shadergraph" || dext == ".shadersubgraph" || dext == ".cginc" || dext == ".hlsl" || dext == ".cs")
+                        if (FileExtensions.IsNotAllowedFileExtension(dext))
                         {
                             continue;
                         }
@@ -253,7 +255,7 @@ namespace ModelLibrary.Editor.Services
                 }
 
                 string ext = Path.GetExtension(path).ToLowerInvariant();
-                if (ext == ".fbx" || ext == ".obj" || ext == ".prefab")
+                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ || ext == FileExtensions.PREFAB)
                 {
                     return guid;
                 }
@@ -470,10 +472,10 @@ namespace ModelLibrary.Editor.Services
                     string src = AssetDatabase.GUIDToAssetPath(guid);
                     string dst = Path.Combine(destinationAbsoluteFolder, "payload", fileName);
                     File.Copy(src, dst, overwrite: true);
-                    string srcMeta = src + ".meta";
+                    string srcMeta = src + FileExtensions.META;
                     if (File.Exists(srcMeta))
                     {
-                        File.Copy(srcMeta, dst + ".meta", overwrite: true);
+                        File.Copy(srcMeta, dst + FileExtensions.META, overwrite: true);
                     }
                 }
             }
@@ -492,17 +494,17 @@ namespace ModelLibrary.Editor.Services
                 string name = Path.GetFileName(src);
                 string dst = Path.Combine(depsDir, name);
                 string dext = Path.GetExtension(src).ToLowerInvariant();
-                if (dext == ".shader" || dext == ".shadervariants" || dext == ".shadergraph" || dext == ".shadersubgraph" || dext == ".cginc" || dext == ".hlsl")
+                if (FileExtensions.IsNotAllowedFileExtension(dext))
                 {
-                    continue; // don't include shaders in the package
+                    continue; // don't include shaders and scripts in the package
                 }
                 if (File.Exists(src))
                 {
                     File.Copy(src, dst, overwrite: true);
-                    string srcMeta = src + ".meta";
+                    string srcMeta = src + FileExtensions.META;
                     if (File.Exists(srcMeta))
                     {
-                        File.Copy(srcMeta, dst + ".meta", overwrite: true);
+                        File.Copy(srcMeta, dst + FileExtensions.META, overwrite: true);
                     }
                 }
             }

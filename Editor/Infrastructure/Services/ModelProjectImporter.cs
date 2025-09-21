@@ -50,16 +50,16 @@ namespace ModelLibrary.Editor.Services
                     string fileName = Path.GetFileName(file);
                     string target = Path.Combine(destAbs, fileName);
                     string ext = Path.GetExtension(file).ToLowerInvariant();
-                    if (ext == ".meta") { continue; }
-                    if (ext == ".shader" || ext == ".shadervariants" || ext == ".shadergraph" || ext == ".shadersubgraph" || ext == ".cginc" || ext == ".hlsl" || ext == ".cs")
+                    if (ext == FileExtensions.META) { continue; }
+                    if (FileExtensions.IsNotAllowedFileExtension(ext))
                     {
                         continue;
                     }
                     File.Copy(file, target, overwrite: true);
-                    string srcMeta = file + ".meta";
+                    string srcMeta = file + FileExtensions.META;
                     if (File.Exists(srcMeta))
                     {
-                        File.Copy(srcMeta, target + ".meta", overwrite: true);
+                        File.Copy(srcMeta, target + FileExtensions.META, overwrite: true);
                     }
                 }
             }
@@ -72,8 +72,8 @@ namespace ModelLibrary.Editor.Services
                     string fileName = Path.GetFileName(file);
                     string target = Path.Combine(destAbs, fileName);
                     string ext = Path.GetExtension(file).ToLowerInvariant();
-                    if (ext == ".meta") { continue; }
-                    if (ext == ".shader" || ext == ".shadervariants" || ext == ".shadergraph" || ext == ".shadersubgraph" || ext == ".cginc" || ext == ".hlsl" || ext == ".cs")
+                    if (ext == FileExtensions.META) { continue; }
+                    if (FileExtensions.IsNotAllowedFileExtension(ext))
                     {
                         continue;
                     }
@@ -82,10 +82,10 @@ namespace ModelLibrary.Editor.Services
                         continue;
                     }
                     File.Copy(file, target, overwrite: true);
-                    string srcMeta = file + ".meta";
+                    string srcMeta = file + FileExtensions.META;
                     if (File.Exists(srcMeta))
                     {
-                        File.Copy(srcMeta, target + ".meta", overwrite: true);
+                        File.Copy(srcMeta, target + FileExtensions.META, overwrite: true);
                     }
                 }
             }
@@ -101,11 +101,11 @@ namespace ModelLibrary.Editor.Services
             foreach (string file in Directory.GetFiles(destAbs, "*", SearchOption.TopDirectoryOnly))
             {
                 string ext = Path.GetExtension(file).ToLowerInvariant();
-                if (ext == ".fbx" || ext == ".obj")
+                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ)
                 {
                     string fileName = Path.GetFileName(file);
                     string payloadRel = $"payload/{fileName}";
-                    bool hasMeta = File.Exists(file + ".meta");
+                    bool hasMeta = File.Exists(file + FileExtensions.META);
                     if (!hasMeta && meta.modelImporters != null && meta.modelImporters.TryGetValue(payloadRel, out ModelImporterSettings settings) && settings != null)
                     {
                         string assetPath = PathUtils.SanitizePathSeparator(Path.Combine(destRel, fileName));

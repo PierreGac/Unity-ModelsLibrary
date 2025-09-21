@@ -217,9 +217,9 @@ namespace ModelLibrary.Editor.Windows
                 string ext = System.IO.Path.GetExtension(fileName).ToLowerInvariant();
                 string icon = ext switch
                 {
-                    ".fbx" or ".obj" => "🎯",
-                    ".png" or ".jpg" or ".jpeg" or ".tga" => "🖼️",
-                    ".mat" => "🎨",
+                    FileExtensions.FBX or FileExtensions.OBJ => "🎯",
+                    FileExtensions.PNG or FileExtensions.JPG or FileExtensions.JPEG or FileExtensions.TGA or FileExtensions.PSD => "🖼️",
+                    FileExtensions.MAT => "🎨",
                     _ => "📄"
                 };
                 EditorGUILayout.LabelField($"  {icon} {fileName}");
