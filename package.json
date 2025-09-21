@@ -1,0 +1,32 @@
+{
+  "name": "com.models-library",
+  "displayName": "Models Library",
+  "version": "0.1.0",
+  "unity": "6000.2",
+  "description": "Editor tools and data for managing a models library in Unity.",
+  "keywords": [
+    "models",
+    "library",
+    "editor",
+    "assets",
+    "tools"
+  ],
+  "category": "Editor",
+  "type": "library",
+  "author": {
+    "name": "Pierre Gac",
+    "url": "https://github.com/PierreGac"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PierreGac/Unity-ModelsLibrary.git"
+  },
+  "documentationUrl": "https://github.com/PierreGac/Unity-ModelsLibrary#readme",
+  "changelogUrl": "https://github.com/PierreGac/Unity-ModelsLibrary/releases",
+  "bugs": {
+    "url": "https://github.com/PierreGac/Unity-ModelsLibrary/issues"
+  },
+  "samples": [],
+  "dependencies": {}
+}
+
