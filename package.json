@@ -11,8 +11,6 @@
     "assets",
     "tools"
   ],
-  "category": "Editor",
-  "type": "library",
   "author": {
     "name": "Pierre Gac",
     "url": "https://github.com/PierreGac"
