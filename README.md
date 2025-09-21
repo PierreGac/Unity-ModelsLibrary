@@ -143,7 +143,7 @@ Please open an issue to discuss significant changes before submitting a PR.
 
 ## License
 
-This repository is intended for public use. Add a `LICENSE` file (e.g., MIT, Apache‑2.0) and reference it here.
+MIT License
 
 ## Acknowledgements
 
