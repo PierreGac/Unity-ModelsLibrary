@@ -33,8 +33,8 @@ namespace ModelLibrary.Editor.Windows
         private bool _editingTags = false;
         private bool _isSavingMetadata = false;
         private List<string> _editableTags = new();
-        private string _newTag = "";
-        private string _newNoteMessage = "";
+        private string _newTag = string.Empty;
+        private string _newNoteMessage = string.Empty;
         private string _newNoteTag = "remarks";
         private readonly string[] _noteTags = { "bugfix", "improvements", "remarks", "question", "praise" };
 
@@ -69,7 +69,7 @@ namespace ModelLibrary.Editor.Windows
         {
             if (_meta == null) { GUILayout.Label("Loading meta..."); return; }
 
-            EditorGUILayout.LabelField(_meta.identity.Name, EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(_meta.identity.name, EditorStyles.boldLabel);
             EditorGUILayout.LabelField($"v{_meta.version} by {_meta.author}");
             EditorGUILayout.Space();
 
@@ -100,7 +100,7 @@ namespace ModelLibrary.Editor.Windows
                     if (GUILayout.Button("Add", GUILayout.Width(50)) && !string.IsNullOrWhiteSpace(_newTag))
                     {
                         _editableTags.Add(_newTag.Trim());
-                        _newTag = "";
+                        _newTag = string.Empty;
                     }
                 }
                 for (int i = _editableTags.Count - 1; i >= 0; i--)
@@ -179,15 +179,16 @@ namespace ModelLibrary.Editor.Windows
                 }
                 else
                 {
-                    foreach (Data.ModelNote n in _meta.notes.OrderByDescending(n => n.CreatedUtc))
+                    foreach (Data.ModelNote n in _meta.notes.OrderByDescending(n => n.createdTimeTicks))
                     {
                         using (new EditorGUILayout.VerticalScope("box"))
                         {
-                            EditorGUILayout.LabelField($"{n.Author} — {n.CreatedUtc} [{n.Tag}]", EditorStyles.miniBoldLabel);
-                            EditorGUILayout.LabelField(n.Message, EditorStyles.wordWrappedLabel);
-                            if (!string.IsNullOrEmpty(n.Context))
+                            DateTime dateTime = new DateTime(n.createdTimeTicks);
+                            EditorGUILayout.LabelField($"{n.author} — {dateTime.ToString(CultureInfo.CurrentCulture)} [{n.tag}]", EditorStyles.miniBoldLabel);
+                            EditorGUILayout.LabelField(n.message, EditorStyles.wordWrappedLabel);
+                            if (!string.IsNullOrEmpty(n.context))
                             {
-                                EditorGUILayout.LabelField("Context:", n.Context);
+                                EditorGUILayout.LabelField("Context:", n.context);
                             }
                         }
                     }
@@ -381,15 +382,15 @@ namespace ModelLibrary.Editor.Windows
             {
                 Data.ModelNote note = new Data.ModelNote
                 {
-                    Author = new Identity.SimpleUserIdentityProvider().GetUserName(),
-                    Message = _newNoteMessage,
-                    CreatedUtc = DateTime.UtcNow.ToString("o"),
-                    Tag = _newNoteTag
+                    author = new Identity.SimpleUserIdentityProvider().GetUserName(),
+                    message = _newNoteMessage,
+                    createdTimeTicks = DateTime.Now.Ticks,
+                    tag = _newNoteTag
                 };
 
                 _meta.notes.Add(note);
                 await SaveMeta();
-                _newNoteMessage = "";
+                _newNoteMessage = string.Empty;
                 Repaint();
             }
             catch (Exception ex)
@@ -412,7 +413,7 @@ namespace ModelLibrary.Editor.Windows
                 EditorUtility.DisplayProgressBar("Importing Model", "Copying to Assets...", 0.5f);
                 await ModelProjectImporter.ImportFromCacheAsync(cacheRoot, meta, cleanDestination: true);
                 EditorUtility.ClearProgressBar();
-                EditorUtility.DisplayDialog("Import Complete", $"Imported '{meta.identity.Name}' v{meta.version} into Assets.", "OK");
+                EditorUtility.DisplayDialog("Import Complete", $"Imported '{meta.identity.name}' v{meta.version} into Assets.", "OK");
             }
             catch (Exception ex)
             {

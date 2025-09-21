@@ -98,7 +98,7 @@ namespace ModelLibrary.Editor.Services
         {
             ModelIndex index = await GetIndexAsync();
             // Gather all asset GUIDs present in project
-            string[] allGuids = UnityEditor.AssetDatabase.FindAssets("");
+            string[] allGuids = UnityEditor.AssetDatabase.FindAssets(string.Empty);
             HashSet<string> guidSet = new HashSet<string>(allGuids);
 
             List<(ModelIndex.Entry, bool, string)> results = new List<(ModelIndex.Entry, bool, string)>();
@@ -195,9 +195,9 @@ namespace ModelLibrary.Editor.Services
             }
 
             meta.identity ??= new ModelIdentity();
-            if (string.IsNullOrWhiteSpace(meta.identity.Id))
+            if (string.IsNullOrWhiteSpace(meta.identity.id))
             {
-                meta.identity.Id = Guid.NewGuid().ToString("N");
+                meta.identity.id = Guid.NewGuid().ToString("N");
             }
 
             if (string.IsNullOrWhiteSpace(meta.version))
@@ -216,7 +216,7 @@ namespace ModelLibrary.Editor.Services
             meta.author = author;
             EnsureChangelogEntry(meta, string.IsNullOrWhiteSpace(changeSummary) ? "Initial submission" : changeSummary, author, meta.version, nowUtc);
 
-            string versionRootRel = Path.Combine(meta.identity.Id, meta.version).Replace('\\', '/');
+            string versionRootRel = Path.Combine(meta.identity.id, meta.version).Replace('\\', '/');
             await _repo.EnsureDirectoryAsync(versionRootRel);
             foreach (string file in Directory.GetFiles(localVersionRoot, "*", SearchOption.AllDirectories))
             {
@@ -228,7 +228,7 @@ namespace ModelLibrary.Editor.Services
                 await _repo.UploadFileAsync(versionRootRel + "/" + rel, file);
             }
 
-            await _repo.SaveMetaAsync(meta.identity.Id, meta.version, meta);
+            await _repo.SaveMetaAsync(meta.identity.id, meta.version, meta);
             await UpdateIndexWithLatestMetaAsync(meta);
             return versionRootRel;
         }
@@ -240,7 +240,7 @@ namespace ModelLibrary.Editor.Services
                 throw new ArgumentNullException(nameof(updatedMeta));
             }
 
-            if (updatedMeta.identity == null || string.IsNullOrWhiteSpace(updatedMeta.identity.Id))
+            if (updatedMeta.identity == null || string.IsNullOrWhiteSpace(updatedMeta.identity.id))
             {
                 throw new InvalidOperationException("Model identity required for metadata update.");
             }
@@ -275,8 +275,8 @@ namespace ModelLibrary.Editor.Services
 
             EnsureChangelogEntry(updatedMeta, string.IsNullOrWhiteSpace(changeSummary) ? "Metadata updated" : changeSummary, resolvedAuthor, newVersion, nowUtc);
 
-            await CloneVersionFilesAsync(updatedMeta.identity.Id, sourceVersion, newVersion);
-            await _repo.SaveMetaAsync(updatedMeta.identity.Id, newVersion, updatedMeta);
+            await CloneVersionFilesAsync(updatedMeta.identity.id, sourceVersion, newVersion);
+            await _repo.SaveMetaAsync(updatedMeta.identity.id, newVersion, updatedMeta);
             await UpdateIndexWithLatestMetaAsync(updatedMeta);
             return updatedMeta;
         }
@@ -342,7 +342,7 @@ namespace ModelLibrary.Editor.Services
         private async Task UpdateIndexWithLatestMetaAsync(ModelMeta meta)
         {
             ModelIndex index = await GetIndexAsync();
-            ModelIndex.Entry entry = index.Get(meta.identity.Id);
+            ModelIndex.Entry entry = index.Get(meta.identity.id);
             long timestamp = meta.updatedTimeTicks <= 0 ? DateTime.Now.Ticks : meta.updatedTimeTicks;
             long releaseTimestamp = meta.uploadTimeTicks <= 0 ? timestamp : meta.uploadTimeTicks;
             List<string> tags = meta.tags?.Values != null ? new List<string>(meta.tags.Values) : new List<string>();
@@ -352,8 +352,8 @@ namespace ModelLibrary.Editor.Services
             {
                 entry = new ModelIndex.Entry
                 {
-                    id = meta.identity.Id,
-                    name = meta.identity.Name,
+                    id = meta.identity.id,
+                    name = meta.identity.name,
                     description = meta.description,
                     latestVersion = meta.version,
                     updatedTimeTicks = timestamp,
@@ -376,7 +376,7 @@ namespace ModelLibrary.Editor.Services
                     entry.latestVersion = meta.version;
                     entry.releaseTimeTicks = releaseTimestamp;
                 }
-                entry.name = meta.identity.Name;
+                entry.name = meta.identity.name;
                 entry.description = meta.description;
                 entry.updatedTimeTicks = timestamp;
                 entry.tags = tags;

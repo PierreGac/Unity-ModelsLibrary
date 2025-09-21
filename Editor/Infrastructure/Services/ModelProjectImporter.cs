@@ -27,7 +27,7 @@ namespace ModelLibrary.Editor.Services
             }
             else
             {
-                string safeName = meta.identity.Name;
+                string safeName = meta.identity.name;
                 destRel = $"Assets/Models/{safeName}";
             }
             string destAbs = Path.GetFullPath(destRel);

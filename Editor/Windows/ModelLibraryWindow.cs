@@ -20,7 +20,7 @@ namespace ModelLibrary.Editor.Windows
         /// Main browser window to list models from the repository and perform actions.
         /// </summary>
         private ModelLibraryService _service;
-        private string _search = "";
+        private string _search = string.Empty;
         private Vector2 _scroll;
         private Dictionary<string, bool> _expanded = new();
         private readonly Dictionary<string, ModelMeta> _metaCache = new();
@@ -31,8 +31,11 @@ namespace ModelLibrary.Editor.Windows
         private readonly HashSet<string> _loadingThumbnails = new();
         private string _projectName;
         private bool _showTagFilter;
-        private HashSet<string> _selectedTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _selectedTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private Vector2 _tagScroll;
+        private readonly Dictionary<string, int> _tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> _sortedTags = new List<string>();
+        private ModelIndex _tagSource;
         [MenuItem("Tools/Model Library/Browser")]
         public static void Open()
         {
@@ -57,6 +60,14 @@ namespace ModelLibrary.Editor.Windows
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
                 _search = GUILayout.TextField(_search, EditorStyles.toolbarSearchField);
+                using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(_search)))
+                {
+                    if (GUILayout.Button("Clear", EditorStyles.toolbarButton, GUILayout.Width(60)))
+                    {
+                        _search = string.Empty;
+                        GUI.FocusControl(null);
+                    }
+                }
                 if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(70)))
                 {
                     _ = _service.RefreshIndexAsync();
@@ -70,84 +81,42 @@ namespace ModelLibrary.Editor.Windows
                     UserSettingsWindow.Open();
                 }
             }
-            // Tag filter foldout
-            using (new EditorGUILayout.VerticalScope("box"))
-            {
-                _showTagFilter = EditorGUILayout.Foldout(_showTagFilter, "Filter by Tags", true);
-                if (_showTagFilter)
-                {
-                    // Build available tags from visible entries
-                    Task<ModelIndex> ttmp = _service.GetIndexAsync();
-                    if (ttmp.IsCompleted && ttmp.Result != null)
-                    {
-                        Dictionary<string, int> tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                        foreach (ModelIndex.Entry e in ttmp.Result.entries)
-                        {
-                            if (!IsVisibleForCurrentProject(e) || e?.tags == null)
-                            {
-                                continue;
-                            }
-
-                            foreach (string tag in e.tags)
-                            {
-                                if (string.IsNullOrWhiteSpace(tag))
-                                {
-                                    continue;
-                                }
-
-                                tagCounts[tag] = tagCounts.TryGetValue(tag, out int c) ? c + 1 : 1;
-                            }
-                        }
-                        List<string> sorted = tagCounts.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
-
-                        using (new EditorGUILayout.HorizontalScope())
-                        {
-                            if (GUILayout.Button("Clear Tags", GUILayout.Width(90)))
-                            {
-                                _selectedTags.Clear();
-                            }
-                            GUILayout.FlexibleSpace();
-                        }
-
-                        _tagScroll = EditorGUILayout.BeginScrollView(_tagScroll, GUILayout.MaxHeight(140));
-                        foreach (string tag in sorted)
-                        {
-                            bool sel = _selectedTags.Contains(tag);
-                            bool newSel = EditorGUILayout.ToggleLeft($"{tag} ({tagCounts[tag]})", sel);
-                            if (newSel != sel)
-                            {
-                                if (newSel)
-                                {
-                                    _selectedTags.Add(tag);
-                                }
-                                else
-                                {
-                                    _selectedTags.Remove(tag);
-                                }
-                            }
-                        }
-                        EditorGUILayout.EndScrollView();
-                    }
-                    else
-                    {
-                        EditorGUILayout.LabelField("Loading tags...", EditorStyles.miniLabel);
-                    }
-                }
-            }
             Task<ModelIndex> indexTask = _service.GetIndexAsync();
+            ModelIndex index = indexTask.IsCompleted ? indexTask.Result : null;
+
+            DrawTagFilter(index);
             if (!indexTask.IsCompleted)
             {
                 GUILayout.Label("Loading index...");
                 return;
             }
-            ModelIndex index = indexTask.Result;
-            List<ModelIndex.Entry> q = string.IsNullOrWhiteSpace(_search)
-                ? index.entries
-                : index.entries.Where(e => e.name.ToLowerInvariant().Contains(_search.ToLowerInvariant()) || e.tags.Any(t => t.ToLowerInvariant().Contains(_search.ToLowerInvariant()))).ToList();
-            q = q.Where(IsVisibleForCurrentProject).ToList();
-            if (_selectedTags != null && _selectedTags.Count > 0)
+            if (index == null || index.entries == null)
             {
-                q = q.Where(e => e.tags != null && _selectedTags.All(tag => e.tags.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)))).ToList();
+                GUILayout.Label("No models available.");
+                return;
+            }
+
+            IEnumerable<ModelIndex.Entry> query = index.entries;
+            string trimmedSearch = string.IsNullOrWhiteSpace(_search) ? null : _search.Trim();
+            if (!string.IsNullOrEmpty(trimmedSearch))
+            {
+                query = query.Where(e => EntryMatchesSearch(e, trimmedSearch));
+            }
+
+            query = query.Where(IsVisibleForCurrentProject);
+
+            if (_selectedTags.Count > 0)
+            {
+                query = query.Where(EntryHasAllSelectedTags);
+            }
+
+            List<ModelIndex.Entry> q = query.ToList();
+
+            DrawFilterSummary(index.entries.Count, q.Count);
+            if (q.Count == 0)
+            {
+                EditorGUILayout.HelpBox("No models match the current filters.", MessageType.Info);
+                return;
             }
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             foreach (ModelIndex.Entry e in q)
@@ -155,6 +124,193 @@ namespace ModelLibrary.Editor.Windows
                 DrawEntry(e);
             }
             EditorGUILayout.EndScrollView();
+        }
+
+        private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_search) || _selectedTags.Count > 0;
+
+        private static bool EntryMatchesSearch(ModelIndex.Entry entry, string term)
+        {
+            if (entry == null || string.IsNullOrEmpty(term))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(entry.name) && entry.name.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            if (entry.tags != null)
+            {
+                foreach (string tag in entry.tags)
+                {
+                    if (!string.IsNullOrEmpty(tag) && tag.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private bool EntryHasAllSelectedTags(ModelIndex.Entry entry)
+        {
+            if (entry?.tags == null || entry.tags.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (string tag in _selectedTags)
+            {
+                bool match = entry.tags.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase));
+                if (!match)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void DrawFilterSummary(int totalCount, int filteredCount)
+        {
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+            {
+                GUILayout.Label($"{filteredCount} of {totalCount} models", EditorStyles.boldLabel);
+
+                if (!string.IsNullOrWhiteSpace(_search))
+                {
+                    GUILayout.Label($"Search: \"{_search.Trim()}\"", EditorStyles.miniLabel);
+                }
+
+                if (_selectedTags.Count > 0)
+                {
+                    string tagPreview = string.Join(", ", _selectedTags.Take(3));
+                    if (_selectedTags.Count > 3)
+                    {
+                        tagPreview += $" (+{_selectedTags.Count - 3})";
+                    }
+                    GUILayout.Label($"Tags: {tagPreview}", EditorStyles.miniLabel);
+                }
+
+                GUILayout.FlexibleSpace();
+
+                using (new EditorGUI.DisabledScope(!HasActiveFilters))
+                {
+                    if (GUILayout.Button("Clear Filters", GUILayout.Width(110)))
+                    {
+                        _search = string.Empty;
+                        _selectedTags.Clear();
+                        GUI.FocusControl(null);
+                    }
+                }
+            }
+        }
+
+        private void DrawTagFilter(ModelIndex index)
+        {
+            using (new EditorGUILayout.VerticalScope("box"))
+            {
+                _showTagFilter = EditorGUILayout.Foldout(_showTagFilter, "Filter by Tags", true);
+                if (!_showTagFilter)
+                {
+                    return;
+                }
+
+                if (index == null)
+                {
+                    EditorGUILayout.LabelField("Loading tags...", EditorStyles.miniLabel);
+                    return;
+                }
+
+                if (!ReferenceEquals(index, _tagSource))
+                {
+                    UpdateTagCache(index);
+                    _tagSource = index;
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    using (new EditorGUI.DisabledScope(_selectedTags.Count == 0))
+                    {
+                        if (GUILayout.Button("Clear Tags", GUILayout.Width(90)))
+                        {
+                            _selectedTags.Clear();
+                            GUI.FocusControl(null);
+                        }
+                    }
+
+                    GUILayout.FlexibleSpace();
+                }
+
+                if (_sortedTags.Count == 0)
+                {
+                    EditorGUILayout.LabelField("No tags available.", EditorStyles.miniLabel);
+                    return;
+                }
+
+                _tagScroll = EditorGUILayout.BeginScrollView(_tagScroll, GUILayout.MaxHeight(140));
+                foreach (string tag in _sortedTags)
+                {
+                    bool sel = _selectedTags.Contains(tag);
+                    bool newSel = EditorGUILayout.ToggleLeft($"{tag} ({_tagCounts[tag]})", sel);
+                    if (newSel != sel)
+                    {
+                        if (newSel)
+                        {
+                            _selectedTags.Add(tag);
+                        }
+                        else
+                        {
+                            _selectedTags.Remove(tag);
+                        }
+                    }
+                }
+                EditorGUILayout.EndScrollView();
+            }
+        }
+
+        private void UpdateTagCache(ModelIndex index)
+        {
+            _tagCounts.Clear();
+            _sortedTags.Clear();
+
+            if (index?.entries == null)
+            {
+                return;
+            }
+
+            foreach (ModelIndex.Entry entry in index.entries)
+            {
+                if (!IsVisibleForCurrentProject(entry) || entry?.tags == null)
+                {
+                    continue;
+                }
+
+                foreach (string tag in entry.tags)
+                {
+                    if (string.IsNullOrWhiteSpace(tag))
+                    {
+                        continue;
+                    }
+
+                    if (_tagCounts.TryGetValue(tag, out int count))
+                    {
+                        _tagCounts[tag] = count + 1;
+                    }
+                    else
+                    {
+                        _tagCounts[tag] = 1;
+                    }
+                }
+            }
+
+            if (_tagCounts.Count > 0)
+            {
+                _sortedTags.AddRange(_tagCounts.Keys);
+                _sortedTags.Sort(StringComparer.OrdinalIgnoreCase);
+            }
         }
 
         private bool IsVisibleForCurrentProject(ModelIndex.Entry entry)
@@ -355,7 +511,7 @@ namespace ModelLibrary.Editor.Windows
 
         private string DetermineInstallPath(ModelMeta meta)
         {
-            string modelName = meta?.identity?.Name ?? "Model";
+            string modelName = meta?.identity?.name ?? "Model";
             string candidate;
             
             // First try the relative path from meta
@@ -468,7 +624,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         string json = File.ReadAllText(manifestPath);
                         ModelMeta parsed = JsonUtil.FromJson<ModelMeta>(json);
-                        if (parsed != null && parsed.identity != null && string.Equals(parsed.identity.Id, entry.id, StringComparison.OrdinalIgnoreCase))
+                        if (parsed != null && parsed.identity != null && string.Equals(parsed.identity.id, entry.id, StringComparison.OrdinalIgnoreCase))
                         {
                             _localInstallCache[entry.id] = parsed;
                             meta = parsed;
@@ -486,7 +642,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 try
                 {
-                    string[] allGuids = AssetDatabase.FindAssets("");
+                    string[] allGuids = AssetDatabase.FindAssets(string.Empty);
                     HashSet<string> set = new HashSet<string>(allGuids);
                     bool any = latestMeta.assetGuids != null && latestMeta.assetGuids.Any(g => set.Contains(g));
                     if (any)
@@ -494,7 +650,7 @@ namespace ModelLibrary.Editor.Windows
                         // We can't know the exact local version from GUIDs alone; mark as installed with unknown version.
                         ModelMeta minimal = new ModelMeta
                         {
-                            identity = new ModelIdentity { Id = entry.id, Name = entry.name },
+                            identity = new ModelIdentity { id = entry.id, name = entry.name },
                             version = "(unknown)"
                         };
                         _localInstallCache[entry.id] = minimal;
@@ -547,7 +703,7 @@ namespace ModelLibrary.Editor.Windows
 
                 int choice = EditorUtility.DisplayDialogComplex(
                     isUpgrade ? "Update Model" : "Import Model",
-                    $"Select an install location for '{meta.identity.Name}'.\nStored path: {defaultInstallPath}",
+                    $"Select an install location for '{meta.identity.name}'.\nStored path: {defaultInstallPath}",
                     "Use Stored Path",
                     "Choose Folder...",
                     "Cancel");
@@ -573,8 +729,8 @@ namespace ModelLibrary.Editor.Windows
                 _localInstallCache[id] = meta;
 
                 string message = isUpgrade && !string.IsNullOrEmpty(previousVersion)
-                    ? $"Updated '{meta.identity.Name}' from v{previousVersion} to v{meta.version} at {chosenInstallPath}."
-                    : $"Imported '{meta.identity.Name}' v{meta.version} to {chosenInstallPath}.";
+                    ? $"Updated '{meta.identity.name}' from v{previousVersion} to v{meta.version} at {chosenInstallPath}."
+                    : $"Imported '{meta.identity.name}' v{meta.version} to {chosenInstallPath}.";
                 EditorUtility.DisplayDialog(isUpgrade ? "Update Complete" : "Import Complete", message, "OK");
                 Repaint();
             }

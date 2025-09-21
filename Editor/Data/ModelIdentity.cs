@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace ModelLibrary.Data
 {
@@ -15,14 +15,14 @@ namespace ModelLibrary.Data
         /// This never changes once assigned - it's the permanent "fingerprint" of the model.
         /// Format: 32-character hex string (e.g., "a1b2c3d4e5f6789012345678901234567890abcd")
         /// </summary>
-        public string Id;
+        public string id;
         
         /// <summary>
         /// Human-readable name for the model (e.g., "Medieval Sword", "Sci-Fi Spaceship").
         /// This can be updated between versions but should remain recognizable.
         /// Used for display in UI and search functionality.
         /// </summary>
-        public string Name;
+        public string name;
     }
 }
 

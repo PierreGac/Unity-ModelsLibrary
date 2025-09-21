@@ -34,14 +34,14 @@ namespace ModelLibrary.Editor.Windows
 
         private string _name = "New Model";
         private string _version = "1.0.0";
-        private string _description = "";
+        private string _description = string.Empty;
         private string _installPath;
         private string _relativePath;
         private List<string> _imageAbsPaths = new();
         private List<string> _tags = new();
         private List<string> _projectTags = new();
-        private string _newTag = "";
-        private string _newProjectTag = "";
+        private string _newTag = string.Empty;
+        private string _newProjectTag = string.Empty;
         private readonly IUserIdentityProvider _idProvider = new SimpleUserIdentityProvider();
 
         [MenuItem("Tools/Model Library/Submit Model")]

@@ -14,7 +14,7 @@ namespace ModelLibrary.Editor.Services
     {
         public static async Task<Dictionary<string, string>> FindInstalledModelVersionsAsync(IEnumerable<ModelIndex.Entry> entries, System.Func<string, Task<ModelMeta>> metaLoader)
         {
-            string[] all = AssetDatabase.FindAssets("");
+            string[] all = AssetDatabase.FindAssets(string.Empty);
             HashSet<string> set = new HashSet<string>(all);
             Dictionary<string, string> map = new Dictionary<string, string>(); // modelId → localVersion
 

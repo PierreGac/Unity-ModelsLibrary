@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace ModelLibrary.Data
 {
@@ -14,35 +14,33 @@ namespace ModelLibrary.Data
         /// Username of the person who wrote this note.
         /// Retrieved from the user identity provider (usually stored in EditorPrefs).
         /// </summary>
-        public string Author;
+        public string author;
         
         /// <summary>
         /// The actual feedback message content.
         /// Can be multiple lines and should be descriptive about the issue or suggestion.
         /// Examples: "The pivot point is off-center", "Great work on the texturing!", "Can we add more detail to the handle?"
         /// </summary>
-        public string Message;
+        public string message;
         
         /// <summary>
-        /// When this note was created, in ISO8601 format (e.g., "2024-01-15T14:30:00Z").
-        /// Using UTC avoids timezone confusion when team members are in different locations.
-        /// Format: YYYY-MM-DDTHH:mm:ssZ
+        /// When this note was created
         /// </summary>
-        public string CreatedUtc;
+        public long createdTimeTicks;
         
         /// <summary>
         /// Optional context about what part of the model this note refers to.
         /// Examples: "pivot", "naming", "texture-resolution", "poly-count", "materials"
         /// Helps modelers understand which specific aspect needs attention.
         /// </summary>
-        public string Context;
+        public string context;
         
         /// <summary>
         /// Category/type of note to help organize feedback.
         /// Predefined values: "bugfix", "improvements", "remarks", "question", "praise"
         /// This helps filter and prioritize different types of feedback.
         /// </summary>
-        public string Tag;
+        public string tag;
     }
 }
 

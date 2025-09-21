@@ -27,7 +27,7 @@ namespace ModelLibrary.Editor.Services
             string resolvedId = string.IsNullOrWhiteSpace(identityId) ? Guid.NewGuid().ToString("N") : identityId;
             ModelMeta meta = new ModelMeta
             {
-                identity = new ModelIdentity { Id = resolvedId, Name = identityName },
+                identity = new ModelIdentity { id = resolvedId, name = identityName },
                 version = version,
                 description = description,
                 author = idProvider.GetUserName(),
@@ -140,14 +140,14 @@ namespace ModelLibrary.Editor.Services
                     meta.dependenciesDetailed.Add(new DependencyRef
                     {
                         guid = d,
-                        type = depType != null ? depType.Name : "",
-                        name = string.IsNullOrEmpty(depPath) ? "" : Path.GetFileNameWithoutExtension(depPath)
+                        type = depType != null ? depType.Name : string.Empty,
+                        name = string.IsNullOrEmpty(depPath) ? string.Empty : Path.GetFileNameWithoutExtension(depPath)
                     });
                     // Also add to materials/textures if recognizable
                     if (!string.IsNullOrEmpty(depPath))
                     {
                         string depExt = Path.GetExtension(depPath).ToLowerInvariant();
-                        if (depExt == ".fbx" || depExt == ".obj")
+                        if (depExt == FileExtensions.FBX || depExt == FileExtensions.OBJ)
                         {
                             AccumulateMeshStats(depPath, processedMeshIds, ref totalVertices, ref totalTriangles);
                         }

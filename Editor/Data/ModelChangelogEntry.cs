@@ -24,7 +24,7 @@ namespace ModelLibrary.Data
         public string author;
 
         /// <summary>
-        /// When the change was performed, stored as ISO8601 UTC.
+        /// When the change was performed, stored as tick.
         /// </summary>
         public long timestamp = 0;
     }
