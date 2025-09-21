@@ -45,7 +45,7 @@ namespace ModelLibrary.Editor.Repository
 
         public async Task<ModelMeta> LoadMetaAsync(string modelId, string version)
         {
-            using UnityWebRequest req = UnityWebRequest.Get(Url(modelId, version, "model.json"));
+            using UnityWebRequest req = UnityWebRequest.Get(Url(modelId, version, ModelMeta.MODEL_JSON));
             await req.SendWebRequest();
             if (req.result != UnityWebRequest.Result.Success)
             {
@@ -58,7 +58,7 @@ namespace ModelLibrary.Editor.Repository
         public async Task SaveMetaAsync(string modelId, string version, ModelMeta meta)
         {
             string json = JsonUtil.ToJson(meta);
-            using UnityWebRequest req = new UnityWebRequest(Url(modelId, version, "model.json"), UnityWebRequest.kHttpVerbPUT);
+            using UnityWebRequest req = new UnityWebRequest(Url(modelId, version, ModelMeta.MODEL_JSON), UnityWebRequest.kHttpVerbPUT);
             req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
             req.downloadHandler = new DownloadHandlerBuffer();
             req.SetRequestHeader("Content-Type", "application/json");

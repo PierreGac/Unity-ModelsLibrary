@@ -158,7 +158,7 @@ namespace ModelLibrary.Editor.Services
             Directory.CreateDirectory(cacheRoot);
 
             // Save meta too (for quick access)
-            string localMetaPath = Path.Combine(cacheRoot, "model.json");
+            string localMetaPath = Path.Combine(cacheRoot, ModelMeta.MODEL_JSON);
             File.WriteAllText(localMetaPath, JsonUtil.ToJson(meta));
 
             // Pull all files present in the repository under id/version (payload, deps, images, etc.)
@@ -173,7 +173,7 @@ namespace ModelLibrary.Editor.Services
                     continue;
                 }
                 string subRel = rel[prefix.Length..];
-                if (string.Equals(subRel, "model.json", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(subRel, ModelMeta.MODEL_JSON, StringComparison.OrdinalIgnoreCase))
                 {
                     continue; // already wrote meta locally
                 }
@@ -216,12 +216,12 @@ namespace ModelLibrary.Editor.Services
             meta.author = author;
             EnsureChangelogEntry(meta, string.IsNullOrWhiteSpace(changeSummary) ? "Initial submission" : changeSummary, author, meta.version, nowUtc);
 
-            string versionRootRel = Path.Combine(meta.identity.id, meta.version).Replace('\\', '/');
+            string versionRootRel = PathUtils.SanitizePathSeparator(Path.Combine(meta.identity.id, meta.version));
             await _repo.EnsureDirectoryAsync(versionRootRel);
             foreach (string file in Directory.GetFiles(localVersionRoot, "*", SearchOption.AllDirectories))
             {
                 string rel = PathUtils.SanitizePathSeparator(file[localVersionRoot.Length..].TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-                if (string.Equals(rel, "model.json", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(rel, ModelMeta.MODEL_JSON, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -312,7 +312,7 @@ namespace ModelLibrary.Editor.Services
                     }
 
                     string subRel = normalized[prefix.Length..];
-                    if (string.Equals(subRel, "model.json", StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(subRel, ModelMeta.MODEL_JSON, StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }

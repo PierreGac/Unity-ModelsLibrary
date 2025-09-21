@@ -28,7 +28,7 @@ namespace ModelLibrary.Data
         public string materialName;       // enum name
     }
     /// <summary>
-    /// The complete metadata for a model version - this is the "model.json" file stored with each version.
+    /// The complete metadata for a model version - this is the <see cref="MODEL_JSON"/> file stored with each version.
     /// This is the central data structure that describes everything about a model: what files it contains,
     /// who made it, when, what it looks like, and any feedback from users.
     /// 
@@ -37,6 +37,8 @@ namespace ModelLibrary.Data
     [Serializable]
     public class ModelMeta
     {
+        public const string MODEL_JSON = "model.json";
+
         /// <summary>
         /// Basic identity information (ID and name) that identifies this model family.
         /// All versions of the same model share the same identity.

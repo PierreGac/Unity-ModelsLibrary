@@ -80,7 +80,7 @@ namespace ModelLibrary.Editor.Repository
         public async Task<ModelMeta> LoadMetaAsync(string modelId, string version)
         {
             // Build the path to the model.json file: <root>/<modelId>/<version>/model.json
-            string path = Join(Root, Join(modelId, Join(version, "model.json")));
+            string path = Join(Root, Join(modelId, Join(version, ModelMeta.MODEL_JSON)));
 
             // If the metadata file doesn't exist, throw an exception
             if (!File.Exists(path))
@@ -99,7 +99,7 @@ namespace ModelLibrary.Editor.Repository
         public async Task SaveMetaAsync(string modelId, string version, ModelMeta meta)
         {
             // Build the path to the model.json file: <root>/<modelId>/<version>/model.json
-            string path = Join(Root, Join(modelId, Join(version, "model.json")));
+            string path = Join(Root, Join(modelId, Join(version, ModelMeta.MODEL_JSON)));
 
             // Ensure the directory structure exists
             Directory.CreateDirectory(Path.GetDirectoryName(path));

@@ -511,7 +511,7 @@ namespace ModelLibrary.Editor.Services
 
             // Images are not in project necessarily; skip here (handled by Submit window which copies them first)
             // Write meta.json to the folder for debugging
-            File.WriteAllText(Path.Combine(destinationAbsoluteFolder, "model.json"), JsonUtility.ToJson(meta, true));
+            File.WriteAllText(Path.Combine(destinationAbsoluteFolder, ModelMeta.MODEL_JSON), JsonUtility.ToJson(meta, true));
             return await Task.FromResult(destinationAbsoluteFolder);
         }
     }
