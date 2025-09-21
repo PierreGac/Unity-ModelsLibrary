@@ -75,7 +75,7 @@ namespace ModelLibrary.Editor.Services
                 return null;
             }
 
-            byte[] data = File.ReadAllBytes(localPath);
+            byte[] data = await File.ReadAllBytesAsync(localPath);
             Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
             {
                 hideFlags = HideFlags.HideAndDontSave
@@ -86,6 +86,8 @@ namespace ModelLibrary.Editor.Services
                 UnityEngine.Object.DestroyImmediate(texture);
                 return null;
             }
+
+            texture.Apply();
 
             _previewCache[key] = texture;
             return texture;
