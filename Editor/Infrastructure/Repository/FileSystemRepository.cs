@@ -52,7 +52,7 @@ namespace ModelLibrary.Editor.Repository
             }
 
             // Read the JSON file asynchronously to avoid blocking the UI thread
-            string json = await Task.Run(() => File.ReadAllText(path));
+            string json = await File.ReadAllTextAsync(path);
 
             // Parse the JSON into a ModelIndex object, or return empty if parsing fails
             return JsonUtil.FromJson<ModelIndex>(json) ?? new ModelIndex();
@@ -71,7 +71,7 @@ namespace ModelLibrary.Editor.Repository
             string json = JsonUtil.ToJson(index);
 
             // Write the JSON file asynchronously to avoid blocking the UI thread
-            await Task.Run(() => File.WriteAllText(path, json));
+            await File.WriteAllTextAsync(path, json);
         }
 
         /// <inheritdoc />
@@ -87,7 +87,7 @@ namespace ModelLibrary.Editor.Repository
             }
 
             // Read the JSON file asynchronously
-            string json = await Task.Run(() => File.ReadAllText(path));
+            string json = await File.ReadAllTextAsync(path);
 
             // Parse and return the metadata
             return JsonUtil.FromJson<ModelMeta>(json);
@@ -106,7 +106,7 @@ namespace ModelLibrary.Editor.Repository
             string json = JsonUtil.ToJson(meta);
 
             // Write the JSON file asynchronously
-            await Task.Run(() => File.WriteAllText(path, json));
+            await File.WriteAllTextAsync(path, json);
         }
 
         /// <inheritdoc />
