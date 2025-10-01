@@ -150,3 +150,35 @@ MIT License
 - Unity and the Editor ecosystem
 - Contributors and teams using this workflow
 
+## Todo
+
+- [x] Manage updates (with version increment)
+- [x] Edit description (increments version)
+- [x] Investigate automatic images/thumbnails
+- [x] Test in remote mode
+- [ ] Fix async usage (performance)
+- [x] Add comments
+- [ ] Auto-upload function for the database
+- [ ] Function to check for model updates
+- [x] Filter by project name: add a project tag so only models for project "XXX" are visible; if opened from project "YYY" the model is not visible
+- [x] Add changelog to models
+- [x] Show model triangle/vertex counts
+- [x] Improve the browser by adding model images
+- [x] Notes system: a model's notes are shared across versions (and add a note on each new submission)
+- [x] Asset upload date
+- [x] Add the asset path (set a default if unspecified) with the ability to change it later
+
+- [ ] Ensure the relative path is not the Materials folder, e.g., `"RelativePath": "Models/Benne/Materials"`
+- [ ] Validate changelogs thoroughly
+- [ ] Ensure JSON files are not serialized (store elsewhere, e.g., Library)
+- [ ] Detect if an object already exists in the database and prevent saving if so
+- [ ] Issue with project tag: convert it into a normal tag
+- [ ] Differentiate account roles: "artist" vs "dev"
+- [ ] If a model has a note, show a notification in the tool
+- [ ] Notify on model updates (Meta Quest-like notifications)
+- [ ] Explore notifications without launching the tool
+- [ ] Major performance issue (likely await/async)
+- [ ] Create an image-only grid; clicking an image opens the current bundle description window (details view)
+- [ ] First-run wizard not working
+- [ ] For tags, ensure OrdinalIgnoreCase is used
+- [ ] Investigate duplicate GUID error issues
