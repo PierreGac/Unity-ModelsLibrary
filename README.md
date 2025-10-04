@@ -167,11 +167,11 @@ MIT License
 - [x] Notes system: a model's notes are shared across versions (and add a note on each new submission)
 - [x] Asset upload date
 - [x] Add the asset path (set a default if unspecified) with the ability to change it later
-
+- [x] Fixed asset location to the "resources" folder
 - [ ] Ensure the relative path is not the Materials folder, e.g., `"RelativePath": "Models/Benne/Materials"`
 - [ ] Validate changelogs thoroughly
 - [ ] Ensure JSON files are not serialized (store elsewhere, e.g., Library)
-- [ ] Detect if an object already exists in the database and prevent saving if so
+- [x] Detect if an object already exists in the database and prevent saving if so
 - [ ] Issue with project tag: convert it into a normal tag
 - [ ] Differentiate account roles: "artist" vs "dev"
 - [ ] If a model has a note, show a notification in the tool
