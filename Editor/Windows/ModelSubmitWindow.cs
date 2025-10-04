@@ -92,6 +92,18 @@ namespace ModelLibrary.Editor.Windows
             {
                 _version = EditorGUILayout.TextField("Version (SemVer)", _version);
                 _description = EditorGUILayout.TextArea(_description, GUILayout.MinHeight(60));
+                
+                // Show validation errors in real-time
+                List<string> uiValidationErrors = GetValidationErrors();
+                if (uiValidationErrors.Count > 0)
+                {
+                    EditorGUILayout.Space();
+                    EditorGUILayout.HelpBox("Validation Issues:", MessageType.Warning);
+                    foreach (string error in uiValidationErrors)
+                    {
+                        EditorGUILayout.HelpBox($"• {error}", MessageType.Warning);
+                    }
+                }
 
                 EditorGUILayout.LabelField("Tags:", EditorStyles.boldLabel);
                 using (new EditorGUILayout.HorizontalScope())
@@ -166,10 +178,18 @@ namespace ModelLibrary.Editor.Windows
             }
 
             GUILayout.FlexibleSpace();
-            bool disableSubmit = _isSubmitting || (_mode == SubmitMode.Update && (!_existingModels.Any() || _isLoadingIndex || _loadingBaseMeta || !metadataReady));
+            
+            // Enhanced submit button validation
+            List<string> validationErrors = GetValidationErrors();
+            bool hasValidationErrors = validationErrors.Count > 0;
+            bool disableSubmit = _isSubmitting || 
+                                (_mode == SubmitMode.Update && (!_existingModels.Any() || _isLoadingIndex || _loadingBaseMeta || !metadataReady)) ||
+                                hasValidationErrors;
+            
             using (new EditorGUI.DisabledScope(disableSubmit))
             {
-                if (GUILayout.Button("Submit"))
+                string buttonText = hasValidationErrors ? "Submit (Fix Issues First)" : "Submit";
+                if (GUILayout.Button(buttonText))
                 {
                     _ = Submit();
                 }
@@ -316,35 +336,12 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(_name))
+            // Final validation check (should not happen due to UI validation, but safety net)
+            List<string> validationErrors = GetValidationErrors();
+            if (validationErrors.Count > 0)
             {
-                EditorUtility.DisplayDialog("Missing Name", "Please provide a model name.", "OK");
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(_version))
-            {
-                EditorUtility.DisplayDialog("Missing Version", "Please provide a version in SemVer format.", "OK");
-                return;
-            }
-
-            if (_mode == SubmitMode.New)
-            {
-                if (_isLoadingIndex)
-                {
-                    EditorUtility.DisplayDialog("Catalog Loading", "Please wait for the model catalog to finish loading before submitting a new model.", "OK");
-                    return;
-                }
-
-                if (ModelNameExists(_name))
-                {
-                    EditorUtility.DisplayDialog("Model Already Used", $"The model '{_name}' is already used in the library. Please switch to ''Update Existing'' to submit a new version.", "OK");
-                    return;
-                }
-            }
-            if (_mode == SubmitMode.Update && (_existingModels.Count == 0 || _isLoadingIndex))
-            {
-                EditorUtility.DisplayDialog("Cannot Submit", "No model selected to update.", "OK");
+                EditorUtility.DisplayDialog("Validation Error", 
+                    "Please fix the following issues before submitting:\n\n" + string.Join("\n", validationErrors), "OK");
                 return;
             }
 
@@ -360,7 +357,7 @@ namespace ModelLibrary.Editor.Windows
 
             string identityId = null;
             string identityName = _name;
-            string previousVersion;
+            string previousVersion = null;
 
             if (_mode == SubmitMode.Update)
             {
@@ -368,20 +365,6 @@ namespace ModelLibrary.Editor.Windows
                 identityId = entry.id;
                 identityName = entry.name;
                 previousVersion = entry.latestVersion;
-
-                if (SemVer.TryParse(previousVersion, out SemVer prev) && SemVer.TryParse(_version, out SemVer next))
-                {
-                    if (next.CompareTo(prev) <= 0)
-                    {
-                        EditorUtility.DisplayDialog("Invalid Version", $"New version must be greater than {previousVersion}.", "OK");
-                        return;
-                    }
-                }
-                else if (string.Equals(previousVersion, _version, StringComparison.OrdinalIgnoreCase))
-                {
-                    EditorUtility.DisplayDialog("Invalid Version", $"New version must differ from {previousVersion}.", "OK");
-                    return;
-                }
             }
 
             string temp = null;
@@ -464,6 +447,79 @@ namespace ModelLibrary.Editor.Windows
             }
 
             return _existingModels.Any(entry => entry != null && string.Equals(entry.name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// Check if a model with the same name and version already exists.
+        /// </summary>
+        private bool ModelVersionExists(string name, string version)
+        {
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(version))
+            {
+                return false;
+            }
+
+            return _existingModels.Any(entry => 
+                entry != null && 
+                string.Equals(entry.name, name.Trim(), StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(entry.latestVersion, version.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// Get validation errors for the current form state.
+        /// </summary>
+        private List<string> GetValidationErrors()
+        {
+            List<string> errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(_name))
+            {
+                errors.Add("Model name is required");
+            }
+            else if (string.IsNullOrWhiteSpace(_version))
+            {
+                errors.Add("Version is required");
+            }
+            else if (_mode == SubmitMode.New)
+            {
+                // Check for duplicate model name
+                if (ModelNameExists(_name))
+                {
+                    errors.Add($"Model '{_name}' already exists. Switch to 'Update Existing' to submit a new version.");
+                }
+                
+                // Check for duplicate version (even for new models, in case of exact name match)
+                if (ModelVersionExists(_name, _version))
+                {
+                    errors.Add($"Version {_version} already exists for model '{_name}'");
+                }
+            }
+            else if (_mode == SubmitMode.Update)
+            {
+                if (_existingModels.Count == 0)
+                {
+                    errors.Add("No existing models available to update");
+                }
+                else
+                {
+                    ModelIndex.Entry selectedModel = _existingModels[Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1)];
+                    
+                    // Check for duplicate version
+                    if (string.Equals(selectedModel.latestVersion, _version, StringComparison.OrdinalIgnoreCase))
+                    {
+                        errors.Add($"Version {_version} already exists for model '{selectedModel.name}'");
+                    }
+                    else if (SemVer.TryParse(selectedModel.latestVersion, out SemVer prev) && SemVer.TryParse(_version, out SemVer next))
+                    {
+                        if (next.CompareTo(prev) <= 0)
+                        {
+                            errors.Add($"New version must be greater than {selectedModel.latestVersion}");
+                        }
+                    }
+                }
+            }
+
+            return errors;
         }
 
         private void AddProjectTag(string projectTag)
