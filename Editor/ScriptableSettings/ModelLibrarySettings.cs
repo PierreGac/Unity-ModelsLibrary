@@ -5,12 +5,13 @@ using UnityEngine;
 namespace ModelLibrary.Editor.Settings
 {
     /// <summary>
-    /// Project-wide settings asset stored under Assets/ModelLibrary/Editor/ScriptableSettings.
+    /// Project-wide settings asset stored in Resources folder for runtime access.
     /// Stores repository type & root URL/path.
     /// </summary>
     public class ModelLibrarySettings : ScriptableObject
     {
-        private const string kAssetPath = "Assets/ModelLibrary/Editor/ScriptableSettings/ModelLibrarySettings.asset";
+        private const string kResourcePath = "ModelLibrarySettings";
+        private const string kAssetPath = "Assets/ModelLibrary/Resources/ModelLibrarySettings.asset";
 
         public enum RepositoryKind { FileSystem, Http }
 
@@ -25,10 +26,15 @@ namespace ModelLibrary.Editor.Settings
 
         public static ModelLibrarySettings GetOrCreate()
         {
-            ModelLibrarySettings asset = AssetDatabase.LoadAssetAtPath<ModelLibrarySettings>(kAssetPath);
+            // Try to load from Resources first (works in both Editor and Runtime)
+            ModelLibrarySettings asset = Resources.Load<ModelLibrarySettings>(kResourcePath);
+            
             if (asset == null)
             {
+                // Create new instance
                 asset = CreateInstance<ModelLibrarySettings>();
+                
+                // In Editor, save to Resources folder
                 string dir = System.IO.Path.GetDirectoryName(kAssetPath);
                 if (!System.IO.Directory.Exists(dir))
                 {
@@ -38,6 +44,7 @@ namespace ModelLibrary.Editor.Settings
                 AssetDatabase.CreateAsset(asset, kAssetPath);
                 AssetDatabase.SaveAssets();
             }
+            
             return asset;
         }
     }
