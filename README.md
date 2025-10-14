@@ -1,3 +1,5 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # Model Library for Unity
 
 A Unity Editor tool that lets teams version, browse, submit, and import 3D models (FBX, materials, textures) from a shared repository. It keeps a lightweight index for fast search and tag filtering, supports per‑project visibility, and preserves Unity GUIDs to enable reliable update detection.
