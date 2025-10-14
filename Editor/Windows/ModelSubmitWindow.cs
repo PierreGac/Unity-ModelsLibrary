@@ -206,8 +206,8 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
-                EditorGUILayout.LabelField("Change Summary", EditorStyles.boldLabel);
-                _changeSummary = EditorGUILayout.TextArea(_changeSummary ?? string.Empty, GUILayout.MinHeight(__TEXT_AREA_HEIGHT_CHANGELOG));
+                // Change Summary with validation feedback
+                DrawChangelogField();
             }
 
             GUILayout.FlexibleSpace();
@@ -526,6 +526,11 @@ namespace ModelLibrary.Editor.Windows
             List<string> pathErrors = PathUtils.ValidateRelativePath(_relativePath);
             errors.AddRange(pathErrors);
 
+            // Validate changelog
+            bool isUpdateMode = (_mode == SubmitMode.Update);
+            List<string> changelogErrors = ChangelogValidator.ValidateChangelog(_changeSummary, isUpdateMode);
+            errors.AddRange(changelogErrors);
+
             if (_mode == SubmitMode.New)
             {
                 // Check for duplicate model name
@@ -747,6 +752,167 @@ namespace ModelLibrary.Editor.Windows
                 foreach (string suggestion in suggestions)
                 {
                     EditorGUILayout.LabelField(suggestion, EditorStyles.helpBox);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws the changelog field with real-time validation feedback.
+        /// </summary>
+        private void DrawChangelogField()
+        {
+            EditorGUILayout.LabelField("Change Summary", EditorStyles.boldLabel);
+
+            // Get validation errors for the current changelog
+            bool isUpdateMode = (_mode == SubmitMode.Update);
+            List<string> changelogErrors = ChangelogValidator.ValidateChangelog(_changeSummary, isUpdateMode);
+            bool hasChangelogErrors = changelogErrors.Count > 0;
+
+            // Set the text area color based on validation state
+            Color originalColor = GUI.color;
+            if (hasChangelogErrors)
+            {
+                GUI.color = Color.red;
+            }
+
+            // Draw the text area
+            string newChangeSummary = EditorGUILayout.TextArea(_changeSummary ?? string.Empty,
+                GUILayout.MinHeight(__TEXT_AREA_HEIGHT_CHANGELOG));
+
+            // Restore original color
+            GUI.color = originalColor;
+
+            // Update the field value
+            if (newChangeSummary != _changeSummary)
+            {
+                _changeSummary = newChangeSummary;
+            }
+
+            // Show validation feedback
+            if (hasChangelogErrors)
+            {
+                EditorGUILayout.Space(2);
+
+                // Show error icon and message
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(new GUIContent("⚠", "Changelog validation error"),
+                        GUILayout.Width(20));
+
+                    // Show the first error message
+                    string firstError = changelogErrors[0];
+                    EditorGUILayout.LabelField(firstError, EditorStyles.helpBox);
+                }
+
+                // If there are multiple errors, show a tooltip with all errors
+                if (changelogErrors.Count > 1)
+                {
+                    EditorGUILayout.LabelField($"... and {changelogErrors.Count - 1} more error(s)",
+                        EditorStyles.miniLabel);
+                }
+
+                // Show helpful suggestions for common issues
+                ShowChangelogValidationSuggestions(changelogErrors);
+            }
+            else if (!string.IsNullOrWhiteSpace(_changeSummary))
+            {
+                // Show success indicator for valid changelogs
+                EditorGUILayout.Space(2);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(new GUIContent("✓", "Changelog is valid"),
+                        GUILayout.Width(20));
+                    EditorGUILayout.LabelField("Changelog is valid", EditorStyles.miniLabel);
+                }
+            }
+
+            // Show character count
+            int currentLength = _changeSummary?.Length ?? 0;
+            int maxLength = 1000; // From ChangelogValidator
+            string lengthText = $"{currentLength}/{maxLength} characters";
+            Color lengthColor = currentLength > maxLength ? Color.red :
+                               currentLength < 10 ? Color.yellow : Color.green;
+
+            EditorGUILayout.Space(2);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("Character count:", EditorStyles.miniLabel);
+                GUI.color = lengthColor;
+                EditorGUILayout.LabelField(lengthText, EditorStyles.miniLabel);
+                GUI.color = originalColor;
+            }
+        }
+
+        // Changelog validation suggestion constants
+        private const string __ERROR_TYPE_REQUIRED = "required";
+        private const string __ERROR_TYPE_CHARACTERS = "characters";
+        private const string __ERROR_TYPE_AT_LEAST = "at least";
+        private const string __ERROR_TYPE_EXCEED = "exceed";
+        private const string __ERROR_TYPE_PUNCTUATION = "punctuation";
+        private const string __ERROR_TYPE_CAPITAL = "capital";
+        private const string __ERROR_TYPE_MEANINGFUL = "meaningful";
+
+        private const string __SUGGESTION_BULLET = "• ";
+        private const string __SUGGESTIONS_LABEL = "Suggestions:";
+        private const int __SUGGESTION_SPACING = 2;
+
+        /// <summary>
+        /// Shows helpful suggestions for common changelog validation errors.
+        /// </summary>
+        /// <param name="errors">List of validation errors</param>
+        private static void ShowChangelogValidationSuggestions(List<string> errors)
+        {
+            bool showSuggestions = false;
+            List<string> suggestions = new List<string>();
+
+            for (int i = 0; i < errors.Count; i++)
+            {
+                string error = errors[i];
+                if (error.Contains(__ERROR_TYPE_REQUIRED))
+                {
+                    suggestions.Add(__SUGGESTION_BULLET + "Provide a brief description of what changed");
+                    suggestions.Add(__SUGGESTION_BULLET + "Include the reason for the update");
+                    showSuggestions = true;
+                }
+                else if (error.Contains(__ERROR_TYPE_CHARACTERS))
+                {
+                    if (error.Contains(__ERROR_TYPE_AT_LEAST))
+                    {
+                        suggestions.Add(__SUGGESTION_BULLET + "Add more details about the changes made");
+                        suggestions.Add(__SUGGESTION_BULLET + "Explain the impact or benefit of the update");
+                    }
+                    else if (error.Contains(__ERROR_TYPE_EXCEED))
+                    {
+                        suggestions.Add(__SUGGESTION_BULLET + "Consider shortening the description");
+                        suggestions.Add(__SUGGESTION_BULLET + "Focus on the most important changes");
+                    }
+                    showSuggestions = true;
+                }
+                else if (error.Contains(__ERROR_TYPE_PUNCTUATION))
+                {
+                    suggestions.Add(__SUGGESTION_BULLET + "End the description with proper punctuation (. ! ?)");
+                    showSuggestions = true;
+                }
+                else if (error.Contains(__ERROR_TYPE_CAPITAL))
+                {
+                    suggestions.Add(__SUGGESTION_BULLET + "Start the description with a capital letter");
+                    showSuggestions = true;
+                }
+                else if (error.Contains(__ERROR_TYPE_MEANINGFUL))
+                {
+                    suggestions.Add(__SUGGESTION_BULLET + "Provide specific details about what was changed");
+                    suggestions.Add(__SUGGESTION_BULLET + "Include version numbers or feature names");
+                    showSuggestions = true;
+                }
+            }
+
+            if (showSuggestions)
+            {
+                EditorGUILayout.Space(__SUGGESTION_SPACING);
+                EditorGUILayout.LabelField(__SUGGESTIONS_LABEL, EditorStyles.boldLabel);
+                for (int i = 0; i < suggestions.Count; i++)
+                {
+                    EditorGUILayout.LabelField(suggestions[i], EditorStyles.helpBox);
                 }
             }
         }
