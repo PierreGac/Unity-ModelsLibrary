@@ -139,7 +139,9 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 _installPath = EditorGUILayout.TextField("Install Path", string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath);
-                _relativePath = EditorGUILayout.TextField("Relative Path", string.IsNullOrWhiteSpace(_relativePath) ? GetDefaultRelativePath() : _relativePath);
+
+                // Relative Path with validation feedback
+                DrawRelativePathField();
 
                 EditorGUILayout.LabelField("Project Visibility", EditorStyles.boldLabel);
                 using (new EditorGUILayout.HorizontalScope())
@@ -635,6 +637,118 @@ namespace ModelLibrary.Editor.Windows
             }
 
             return $"{len:0.##} {sizes[order]}";
+        }
+
+        /// <summary>
+        /// Draws the relative path field with real-time validation feedback.
+        /// </summary>
+        private void DrawRelativePathField()
+        {
+            // Get validation errors for the current relative path
+            List<string> pathErrors = PathUtils.ValidateRelativePath(_relativePath);
+            bool hasPathErrors = pathErrors.Count > 0;
+
+            // Set the text field color based on validation state
+            Color originalColor = GUI.color;
+            if (hasPathErrors)
+            {
+                GUI.color = Color.red;
+            }
+
+            // Draw the text field
+            string newRelativePath = EditorGUILayout.TextField("Relative Path",
+                string.IsNullOrWhiteSpace(_relativePath) ? GetDefaultRelativePath() : _relativePath);
+
+            // Restore original color
+            GUI.color = originalColor;
+
+            // Update the field value
+            if (newRelativePath != _relativePath)
+            {
+                _relativePath = newRelativePath;
+            }
+
+            // Show validation feedback
+            if (hasPathErrors)
+            {
+                EditorGUILayout.Space(2);
+
+                // Show error icon and message
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(new GUIContent("⚠", "Path validation error"),
+                        GUILayout.Width(20));
+
+                    // Show the first error message
+                    string firstError = pathErrors[0];
+                    EditorGUILayout.LabelField(firstError, EditorStyles.helpBox);
+                }
+
+                // If there are multiple errors, show a tooltip with all errors
+                if (pathErrors.Count > 1)
+                {
+                    EditorGUILayout.LabelField($"... and {pathErrors.Count - 1} more error(s)",
+                        EditorStyles.miniLabel);
+                }
+
+                // Show helpful suggestions for common issues
+                ShowPathValidationSuggestions(pathErrors);
+            }
+            else if (!string.IsNullOrWhiteSpace(_relativePath))
+            {
+                // Show success indicator for valid paths
+                EditorGUILayout.Space(2);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(new GUIContent("✓", "Path is valid"),
+                        GUILayout.Width(20));
+                    EditorGUILayout.LabelField("Path is valid", EditorStyles.miniLabel);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Shows helpful suggestions for common path validation errors.
+        /// </summary>
+        /// <param name="errors">List of validation errors</param>
+        private static void ShowPathValidationSuggestions(List<string> errors)
+        {
+            bool showSuggestions = false;
+            List<string> suggestions = new List<string>();
+
+            foreach (string error in errors)
+            {
+                if (error.Contains("Materials"))
+                {
+                    suggestions.Add("• Use the parent folder instead (e.g., 'Models/Benne' instead of 'Models/Benne/Materials')");
+                    showSuggestions = true;
+                }
+                else if (error.Contains("path traversal"))
+                {
+                    suggestions.Add("• Remove '..' and '~' characters from the path");
+                    showSuggestions = true;
+                }
+                else if (error.Contains("reserved folder"))
+                {
+                    suggestions.Add("• Avoid using 'Editor', 'Resources', 'StreamingAssets', or 'Plugins' in the path");
+                    showSuggestions = true;
+                }
+                else if (error.Contains("slash"))
+                {
+                    suggestions.Add("• Remove leading or trailing slashes from the path");
+                    showSuggestions = true;
+                }
+            }
+
+            if (showSuggestions)
+            {
+                EditorGUILayout.Space(2);
+                EditorGUILayout.LabelField("Suggestions:", EditorStyles.boldLabel);
+                foreach (string suggestion in suggestions)
+                {
+                    EditorGUILayout.LabelField(suggestion, EditorStyles.helpBox);
+                }
+            }
         }
 
     }
