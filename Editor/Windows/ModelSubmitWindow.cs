@@ -22,6 +22,16 @@ namespace ModelLibrary.Editor.Windows
     {
         private enum SubmitMode { New, Update }
 
+        // UI Constants
+        private const int __BUTTON_WIDTH_SMALL = 24;
+        private const int __BUTTON_WIDTH_MEDIUM = 50;
+        private const int __TEXT_AREA_HEIGHT_DESCRIPTION = 60;
+        private const int __TEXT_AREA_HEIGHT_CHANGELOG = 40;
+
+        // File Size Constants
+        private const long __MAX_IMAGE_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+        private const long __BYTES_PER_KILOBYTE = 1024;
+
         private SubmitMode _mode = SubmitMode.New;
         private ModelLibraryService _service;
         private readonly List<ModelIndex.Entry> _existingModels = new();
@@ -91,8 +101,8 @@ namespace ModelLibrary.Editor.Windows
             using (new EditorGUI.DisabledScope(_mode == SubmitMode.Update && !metadataReady))
             {
                 _version = EditorGUILayout.TextField("Version (SemVer)", _version);
-                _description = EditorGUILayout.TextArea(_description, GUILayout.MinHeight(60));
-                
+                _description = EditorGUILayout.TextArea(_description, GUILayout.MinHeight(__TEXT_AREA_HEIGHT_DESCRIPTION));
+
                 // Show validation errors in real-time
                 List<string> uiValidationErrors = GetValidationErrors();
                 if (uiValidationErrors.Count > 0)
@@ -109,7 +119,7 @@ namespace ModelLibrary.Editor.Windows
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     _newTag = EditorGUILayout.TextField("Add Tag", _newTag);
-                    if (GUILayout.Button("Add", GUILayout.Width(50)) && !string.IsNullOrWhiteSpace(_newTag))
+                    if (GUILayout.Button("Add", GUILayout.Width(__BUTTON_WIDTH_MEDIUM)) && !string.IsNullOrWhiteSpace(_newTag))
                     {
                         _tags.Add(_newTag.Trim());
                         _newTag = string.Empty;
@@ -121,7 +131,7 @@ namespace ModelLibrary.Editor.Windows
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         EditorGUILayout.LabelField("- " + _tags[i]);
-                        if (GUILayout.Button("x", GUILayout.Width(24)))
+                        if (GUILayout.Button("x", GUILayout.Width(__BUTTON_WIDTH_SMALL)))
                         {
                             _tags.RemoveAt(i);
                         }
@@ -135,7 +145,7 @@ namespace ModelLibrary.Editor.Windows
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     _newProjectTag = EditorGUILayout.TextField("Add Project", _newProjectTag);
-                    if (GUILayout.Button("Add", GUILayout.Width(50)) && !string.IsNullOrWhiteSpace(_newProjectTag))
+                    if (GUILayout.Button("Add", GUILayout.Width(__BUTTON_WIDTH_MEDIUM)) && !string.IsNullOrWhiteSpace(_newProjectTag))
                     {
                         AddProjectTag(_newProjectTag);
                         _newProjectTag = string.Empty;
@@ -146,7 +156,7 @@ namespace ModelLibrary.Editor.Windows
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         EditorGUILayout.LabelField("- " + _projectTags[i]);
-                        if (GUILayout.Button("x", GUILayout.Width(24)))
+                        if (GUILayout.Button("x", GUILayout.Width(__BUTTON_WIDTH_SMALL)))
                         {
                             _projectTags.RemoveAt(i);
                         }
@@ -155,37 +165,58 @@ namespace ModelLibrary.Editor.Windows
 
                 if (GUILayout.Button("Add Images..."))
                 {
-                    string chosen = EditorUtility.OpenFilePanel("Choose images", Application.dataPath, "png,jpg,jpeg");
+                    string chosen = EditorUtility.OpenFilePanelWithFilters("Choose images", Application.dataPath,
+                        new string[] { "Image files", "png,jpg,jpeg,tga,psd", "All files", "*" });
                     if (!string.IsNullOrEmpty(chosen))
                     {
-                        _imageAbsPaths.Add(chosen);
+                        if (IsValidImageFile(chosen))
+                        {
+                            if (!_imageAbsPaths.Contains(chosen))
+                            {
+                                _imageAbsPaths.Add(chosen);
+                            }
+                            else
+                            {
+                                Debug.LogWarning($"Image '{Path.GetFileName(chosen)}' is already selected.");
+                            }
+                        }
+                        else
+                        {
+                            Debug.LogError($"Invalid image file: {Path.GetFileName(chosen)}");
+                        }
                     }
                 }
-                for (int i = _imageAbsPaths.Count - 1; i >= 0; i--)
+                if (_imageAbsPaths.Count > 0)
                 {
-                    using (new EditorGUILayout.HorizontalScope())
+                    EditorGUILayout.LabelField($"Selected Images ({_imageAbsPaths.Count}):", EditorStyles.boldLabel);
+                    for (int i = _imageAbsPaths.Count - 1; i >= 0; i--)
                     {
-                        EditorGUILayout.LabelField(Path.GetFileName(_imageAbsPaths[i]));
-                        if (GUILayout.Button("x", GUILayout.Width(24)))
+                        using (new EditorGUILayout.HorizontalScope())
                         {
-                            _imageAbsPaths.RemoveAt(i);
+                            string fileName = Path.GetFileName(_imageAbsPaths[i]);
+                            string fileSize = GetFileSizeString(_imageAbsPaths[i]);
+                            EditorGUILayout.LabelField($"• {fileName} ({fileSize})");
+                            if (GUILayout.Button("x", GUILayout.Width(__BUTTON_WIDTH_SMALL)))
+                            {
+                                _imageAbsPaths.RemoveAt(i);
+                            }
                         }
                     }
                 }
 
                 EditorGUILayout.LabelField("Change Summary", EditorStyles.boldLabel);
-                _changeSummary = EditorGUILayout.TextArea(_changeSummary ?? string.Empty, GUILayout.MinHeight(40));
+                _changeSummary = EditorGUILayout.TextArea(_changeSummary ?? string.Empty, GUILayout.MinHeight(__TEXT_AREA_HEIGHT_CHANGELOG));
             }
 
             GUILayout.FlexibleSpace();
-            
+
             // Enhanced submit button validation
             List<string> validationErrors = GetValidationErrors();
             bool hasValidationErrors = validationErrors.Count > 0;
-            bool disableSubmit = _isSubmitting || 
+            bool disableSubmit = _isSubmitting ||
                                 (_mode == SubmitMode.Update && (!_existingModels.Any() || _isLoadingIndex || _loadingBaseMeta || !metadataReady)) ||
                                 hasValidationErrors;
-            
+
             using (new EditorGUI.DisabledScope(disableSubmit))
             {
                 string buttonText = hasValidationErrors ? "Submit (Fix Issues First)" : "Submit";
@@ -340,7 +371,7 @@ namespace ModelLibrary.Editor.Windows
             List<string> validationErrors = GetValidationErrors();
             if (validationErrors.Count > 0)
             {
-                EditorUtility.DisplayDialog("Validation Error", 
+                EditorUtility.DisplayDialog("Validation Error",
                     "Please fix the following issues before submitting:\n\n" + string.Join("\n", validationErrors), "OK");
                 return;
             }
@@ -383,8 +414,16 @@ namespace ModelLibrary.Editor.Windows
 
                 foreach (string abs in _imageAbsPaths)
                 {
-                    string dst = Path.Combine(temp, "images", Path.GetFileName(abs));
-                    File.Copy(abs, dst, overwrite: true);
+                    try
+                    {
+                        string dst = Path.Combine(temp, "images", Path.GetFileName(abs));
+                        File.Copy(abs, dst, overwrite: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"Failed to copy image '{Path.GetFileName(abs)}': {ex.Message}");
+                        throw new Exception($"Failed to copy image '{Path.GetFileName(abs)}': {ex.Message}");
+                    }
                 }
 
                 EditorUtility.DisplayProgressBar(progressTitle, "Uploading...", 0.8f);
@@ -459,8 +498,8 @@ namespace ModelLibrary.Editor.Windows
                 return false;
             }
 
-            return _existingModels.Any(entry => 
-                entry != null && 
+            return _existingModels.Any(entry =>
+                entry != null &&
                 string.Equals(entry.name, name.Trim(), StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(entry.latestVersion, version.Trim(), StringComparison.OrdinalIgnoreCase));
         }
@@ -487,7 +526,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     errors.Add($"Model '{_name}' already exists. Switch to 'Update Existing' to submit a new version.");
                 }
-                
+
                 // Check for duplicate version (even for new models, in case of exact name match)
                 if (ModelVersionExists(_name, _version))
                 {
@@ -503,7 +542,7 @@ namespace ModelLibrary.Editor.Windows
                 else
                 {
                     ModelIndex.Entry selectedModel = _existingModels[Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1)];
-                    
+
                     // Check for duplicate version
                     if (string.Equals(selectedModel.latestVersion, _version, StringComparison.OrdinalIgnoreCase))
                     {
@@ -534,6 +573,63 @@ namespace ModelLibrary.Editor.Windows
             {
                 _projectTags.Add(trimmed);
             }
+        }
+
+        /// <summary>
+        /// Validates if the selected file is a valid image file.
+        /// </summary>
+        /// <param name="filePath">Path to the file to validate</param>
+        /// <returns>True if the file is a valid image, false otherwise</returns>
+        private static bool IsValidImageFile(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                return false;
+            }
+
+            // Check file extension
+            string extension = Path.GetExtension(filePath).ToLowerInvariant();
+            string[] validExtensions = { ".png", ".jpg", ".jpeg", ".tga", ".psd" };
+            if (!validExtensions.Contains(extension))
+            {
+                return false;
+            }
+
+            // Check file size (max 50MB)
+            FileInfo fileInfo = new FileInfo(filePath);
+            if (fileInfo.Length > __MAX_IMAGE_FILE_SIZE_BYTES)
+            {
+                Debug.LogWarning($"Image file '{Path.GetFileName(filePath)}' is too large ({GetFileSizeString(filePath)}). Maximum size is 50MB.");
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Gets a human-readable file size string.
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>Formatted file size string</returns>
+        private static string GetFileSizeString(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                return "Unknown";
+            }
+
+
+            long bytes = new FileInfo(filePath).Length;
+            string[] sizes = { "B", "KB", "MB", "GB" };
+            double len = bytes;
+            int order = 0;
+            while (len >= __BYTES_PER_KILOBYTE && order < sizes.Length - 1)
+            {
+                order++;
+                len /= __BYTES_PER_KILOBYTE;
+            }
+
+            return $"{len:0.##} {sizes[order]}";
         }
     }
 }
