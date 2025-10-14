@@ -185,7 +185,7 @@ namespace ModelLibrary.Editor.Windows
                         {
                             DateTime dateTime = new DateTime(n.createdTimeTicks);
                             EditorGUILayout.LabelField($"{n.author} — {dateTime.ToString(CultureInfo.CurrentCulture)} [{n.tag}]", EditorStyles.miniBoldLabel);
-                            EditorGUILayout.LabelField(n.message, EditorStyles.wordWrappedLabel);
+                            DrawMultilineText(n.message, EditorStyles.wordWrappedLabel);
                             if (!string.IsNullOrEmpty(n.context))
                             {
                                 EditorGUILayout.LabelField("Context:", n.context);
@@ -255,7 +255,7 @@ namespace ModelLibrary.Editor.Windows
                         EditorGUILayout.LabelField(entry.author, EditorStyles.miniLabel);
                     }
                     string summary = string.IsNullOrEmpty(entry.summary) ? "(no summary)" : entry.summary;
-                    EditorGUILayout.LabelField(summary, EditorStyles.wordWrappedMiniLabel);
+                    DrawMultilineText(summary, EditorStyles.wordWrappedMiniLabel);
                 }
             }
         }
@@ -419,6 +419,28 @@ namespace ModelLibrary.Editor.Windows
             {
                 EditorUtility.ClearProgressBar();
                 EditorUtility.DisplayDialog("Import Failed", ex.Message, "OK");
+            }
+        }
+
+        /// <summary>
+        /// Draws multiline text with proper newline handling in Unity Editor GUI.
+        /// Unity's EditorGUILayout.LabelField doesn't handle \n characters properly,
+        /// so this method splits the text and draws each line separately.
+        /// </summary>
+        /// <param name="text">The text to display, may contain newline characters</param>
+        /// <param name="style">The GUIStyle to use for rendering</param>
+        private static void DrawMultilineText(string text, GUIStyle style)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return;
+            }
+
+            // Split text by newlines and draw each line separately
+            string[] lines = text.Split('\n');
+            foreach (string line in lines)
+            {
+                EditorGUILayout.LabelField(line, style);
             }
         }
     }
