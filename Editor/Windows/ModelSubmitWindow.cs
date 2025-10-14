@@ -519,7 +519,12 @@ namespace ModelLibrary.Editor.Windows
             {
                 errors.Add("Version is required");
             }
-            else if (_mode == SubmitMode.New)
+
+            // Validate relative path
+            List<string> pathErrors = PathUtils.ValidateRelativePath(_relativePath);
+            errors.AddRange(pathErrors);
+
+            if (_mode == SubmitMode.New)
             {
                 // Check for duplicate model name
                 if (ModelNameExists(_name))
@@ -631,6 +636,7 @@ namespace ModelLibrary.Editor.Windows
 
             return $"{len:0.##} {sizes[order]}";
         }
+
     }
 }
 
