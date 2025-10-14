@@ -25,7 +25,7 @@ namespace ModelLibrary.Editor.Repository
         // Cache for file existence checks to avoid repeated slow File.Exists() calls
         private readonly ConcurrentDictionary<string, bool> _fileExistsCache = new ConcurrentDictionary<string, bool>();
         private readonly ConcurrentDictionary<string, bool> _directoryExistsCache = new ConcurrentDictionary<string, bool>();
-        
+
         // Cache for directory contents to avoid repeated network calls
         private readonly ConcurrentDictionary<string, HashSet<string>> _directoryContentsCache = new ConcurrentDictionary<string, HashSet<string>>();
         private readonly ConcurrentDictionary<string, DateTime> _directoryCacheTimestamps = new ConcurrentDictionary<string, DateTime>();
@@ -56,24 +56,24 @@ namespace ModelLibrary.Editor.Repository
         /// </summary>
         private bool FileExistsCached(string path)
         {
-            return _fileExistsCache.GetOrAdd(path, p => 
+            return _fileExistsCache.GetOrAdd(path, p =>
             {
                 // For network drives, try to use directory listing cache first
                 if (IsNetworkPath(p))
                 {
                     string directory = Path.GetDirectoryName(p);
                     string fileName = Path.GetFileName(p);
-                    
+
                     if (!string.IsNullOrEmpty(directory) && !string.IsNullOrEmpty(fileName))
                     {
-                        var directoryContents = GetDirectoryContentsCached(directory);
+                        HashSet<string> directoryContents = GetDirectoryContentsCached(directory);
                         if (directoryContents != null && directoryContents.Contains(fileName))
                         {
                             return true;
                         }
                     }
                 }
-                
+
                 // Fallback to direct File.Exists() call
                 return File.Exists(p);
             });
@@ -86,17 +86,17 @@ namespace ModelLibrary.Editor.Repository
         {
             if (string.IsNullOrEmpty(path))
                 return false;
-                
+
             // Check for UNC path (\\server\share)
             if (path.StartsWith(@"\\"))
                 return true;
-                
+
             // Check for mapped network drive (Z: where Z is mapped to network)
             if (path.Length >= 2 && path[1] == ':' && char.IsLetter(path[0]))
             {
                 try
                 {
-                    var drive = new DriveInfo(path.Substring(0, 2));
+                    DriveInfo drive = new DriveInfo(path.Substring(0, 2));
                     return drive.DriveType == DriveType.Network;
                 }
                 catch
@@ -104,7 +104,7 @@ namespace ModelLibrary.Editor.Repository
                     return false;
                 }
             }
-            
+
             return false;
         }
 
@@ -116,8 +116,8 @@ namespace ModelLibrary.Editor.Repository
             if (string.IsNullOrEmpty(directoryPath))
                 return null;
 
-            var now = DateTime.UtcNow;
-            
+            DateTime now = DateTime.UtcNow;
+
             // Check if we have a valid cached result
             if (_directoryContentsCache.TryGetValue(directoryPath, out var cachedContents) &&
                 _directoryCacheTimestamps.TryGetValue(directoryPath, out var cacheTime) &&
@@ -137,9 +137,9 @@ namespace ModelLibrary.Editor.Repository
             try
             {
                 // Get all files in the directory
-                var files = Directory.GetFiles(directoryPath);
-                var fileNames = new HashSet<string>(files.Length);
-                
+                string[] files = Directory.GetFiles(directoryPath);
+                HashSet<string> fileNames = new HashSet<string>(files.Length);
+
                 foreach (string file in files)
                 {
                     fileNames.Add(Path.GetFileName(file));
@@ -148,7 +148,7 @@ namespace ModelLibrary.Editor.Repository
                 // Cache the result
                 _directoryContentsCache[directoryPath] = fileNames;
                 _directoryCacheTimestamps[directoryPath] = now;
-                
+
                 return fileNames;
             }
             catch
@@ -174,7 +174,7 @@ namespace ModelLibrary.Editor.Repository
         private void InvalidateFileCache(string path)
         {
             _fileExistsCache.TryRemove(path, out _);
-            
+
             // Also invalidate directory contents cache for the parent directory
             string directory = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(directory))
@@ -192,7 +192,7 @@ namespace ModelLibrary.Editor.Repository
             _directoryExistsCache.TryRemove(path, out _);
             _directoryContentsCache.TryRemove(path, out _);
             _directoryCacheTimestamps.TryRemove(path, out _);
-            
+
             // Also invalidate parent directory contents cache
             string parentDirectory = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(parentDirectory))
@@ -236,7 +236,7 @@ namespace ModelLibrary.Editor.Repository
 
             // Write the JSON file asynchronously to avoid blocking the UI thread
             await File.WriteAllTextAsync(path, json);
-            
+
             // Invalidate cache since we just created/updated the file
             InvalidateFileCache(path);
         }
@@ -274,7 +274,7 @@ namespace ModelLibrary.Editor.Repository
 
             // Write the JSON file asynchronously
             await File.WriteAllTextAsync(path, json);
-            
+
             // Invalidate cache since we just created/updated the file
             InvalidateFileCache(path);
         }
@@ -293,7 +293,7 @@ namespace ModelLibrary.Editor.Repository
             // Create the directory (and any parent directories) if they don't exist
             string fullPath = Join(Root, relativePath);
             Directory.CreateDirectory(fullPath);
-            
+
             // Invalidate directory cache since we just created it
             InvalidateDirectoryCache(fullPath);
             return Task.CompletedTask;
@@ -335,7 +335,7 @@ namespace ModelLibrary.Editor.Repository
 
             // Copy the file asynchronously, overwriting if it already exists
             await Task.Run(() => File.Copy(localAbsolutePath, dst, overwrite: true));
-            
+
             // Invalidate cache since we just created/updated the file
             InvalidateFileCache(dst);
         }

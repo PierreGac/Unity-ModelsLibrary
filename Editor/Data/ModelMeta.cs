@@ -40,6 +40,13 @@ namespace ModelLibrary.Data
         public const string MODEL_JSON = "model.json";
 
         /// <summary>
+        /// Schema version for this ModelMeta data structure.
+        /// Used for migration when loading older versions of the data.
+        /// Increment this when making breaking changes to the data structure.
+        /// </summary>
+        public int schemaVersion = 1;
+
+        /// <summary>
         /// Basic identity information (ID and name) that identifies this model family.
         /// All versions of the same model share the same identity.
         /// </summary>
@@ -60,24 +67,24 @@ namespace ModelLibrary.Data
         /// Examples: "A medieval longsword with ornate handle and crossguard", "Low-poly tree for forest environments"
         /// </summary>
         public string description;
-        
+
         /// <summary>
         /// Categorization tags to help with searching and filtering models.
         /// See Tags class for more details.
         /// </summary>
         public Tags tags = new Tags();
-        
+
         /// <summary>
         /// Name of the person who created this model version.
         /// Retrieved from the user identity provider when the model is submitted.
         /// </summary>
         public string author;
-        
+
         /// <summary>
         /// DateTime.Ticks of the creation date
         /// </summary>
         public long createdTimeTicks = 0;
-        
+
         /// <summary>
         /// DateTime.Ticks when the last update have been done
         /// </summary>
@@ -164,7 +171,7 @@ namespace ModelLibrary.Data
         /// Allows adding custom metadata without changing the core schema.
         /// Examples: "polyCount": "1500", "textureSize": "1024x1024", "exportSettings": "FBX2018"
         /// </summary>
-        public Dictionary<string,string> extra = new Dictionary<string,string>();
+        public Dictionary<string, string> extra = new Dictionary<string, string>();
 
         /// <summary>
         /// Per-FBX/OBJ importer settings captured at submit time, keyed by payload-relative path (e.g., "payload/model.fbx").
