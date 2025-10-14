@@ -1,9 +1,13 @@
 ﻿
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Utils;
 using UnityEditor;
+using UnityEngine;
 
 namespace ModelLibrary.Editor.Services
 {
@@ -15,22 +19,11 @@ namespace ModelLibrary.Editor.Services
     {
         public static async Task<string> ImportFromCacheAsync(string cacheVersionRoot, ModelMeta meta, bool cleanDestination = true, string overrideInstallPath = null)
         {
-            // Determine destination folder
-            string destRel;
-            if (!string.IsNullOrEmpty(overrideInstallPath))
-            {
-                destRel = overrideInstallPath;
-            }
-            else if (!string.IsNullOrEmpty(meta.relativePath))
-            {
-                destRel = $"Assets/{meta.relativePath}";
-            }
-            else
-            {
-                string safeName = meta.identity.name;
-                destRel = $"Assets/Models/{safeName}";
-            }
+            // Determine destination folder with validation and logging
+            string destRel = ResolveDestinationPath(meta, overrideInstallPath);
             string destAbs = Path.GetFullPath(destRel);
+
+            Debug.Log($"[ModelProjectImporter] Importing model '{meta?.identity?.name}' to path: {destRel}");
 
             if (cleanDestination && Directory.Exists(destAbs))
             {
@@ -77,7 +70,7 @@ namespace ModelLibrary.Editor.Services
                     {
                         continue;
                     }
-                    if(string.Equals(fileName, "auto_preview.png"))
+                    if (string.Equals(fileName, "auto_preview.png"))
                     {
                         continue;
                     }
@@ -114,17 +107,17 @@ namespace ModelLibrary.Editor.Services
                         {
                             try
                             {
-                                if (!string.IsNullOrEmpty(settings.materialImportMode) && System.Enum.TryParse(settings.materialImportMode, out ModelImporterMaterialImportMode mim))
+                                if (!string.IsNullOrEmpty(settings.materialImportMode) && System.Enum.TryParse(settings.materialImportMode, out ModelImporterMaterialImportMode mode))
                                 {
-                                    importer.materialImportMode = mim;
+                                    importer.materialImportMode = mode;
                                 }
-                                if (!string.IsNullOrEmpty(settings.materialSearch) && System.Enum.TryParse(settings.materialSearch, out ModelImporterMaterialSearch ms))
+                                if (!string.IsNullOrEmpty(settings.materialSearch) && System.Enum.TryParse(settings.materialSearch, out ModelImporterMaterialSearch search))
                                 {
-                                    importer.materialSearch = ms;
+                                    importer.materialSearch = search;
                                 }
-                                if (!string.IsNullOrEmpty(settings.materialName) && System.Enum.TryParse(settings.materialName, out ModelImporterMaterialName mn))
+                                if (!string.IsNullOrEmpty(settings.materialName) && System.Enum.TryParse(settings.materialName, out ModelImporterMaterialName name))
                                 {
-                                    importer.materialName = mn;
+                                    importer.materialName = name;
                                 }
                                 AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
                             }
@@ -182,6 +175,62 @@ namespace ModelLibrary.Editor.Services
                 Directory.CreateDirectory(Path.GetDirectoryName(target));
                 File.Copy(file, target, overwrite: true);
             }
+        }
+
+        /// <summary>
+        /// Resolves the destination path for model import with validation and logging.
+        /// </summary>
+        /// <param name="meta">Model metadata containing relative path information</param>
+        /// <param name="overrideInstallPath">Optional override path for installation</param>
+        /// <returns>Resolved destination path relative to project root</returns>
+        private static string ResolveDestinationPath(ModelMeta meta, string overrideInstallPath)
+        {
+            // Priority 1: Override path (highest priority)
+            if (!string.IsNullOrEmpty(overrideInstallPath))
+            {
+                Debug.Log($"[ModelProjectImporter] Using override install path: {overrideInstallPath}");
+                return PathUtils.SanitizePathSeparator(overrideInstallPath);
+            }
+
+            // Priority 2: Meta relative path (with validation)
+            if (!string.IsNullOrEmpty(meta?.relativePath))
+            {
+                // Validate the relative path before using it
+                List<string> pathErrors = PathUtils.ValidateRelativePath(meta.relativePath);
+                if (pathErrors.Count > 0)
+                {
+                    Debug.LogWarning($"[ModelProjectImporter] Invalid relative path '{meta.relativePath}': {string.Join(", ", pathErrors)}. Using fallback path.");
+                }
+                else
+                {
+                    string resolvedPath = $"Assets/{meta.relativePath}";
+                    Debug.Log($"[ModelProjectImporter] Using meta relative path: {resolvedPath}");
+                    return PathUtils.SanitizePathSeparator(resolvedPath);
+                }
+            }
+
+            // Priority 3: Fallback to safe default
+            string safeName = SanitizeFolderName(meta?.identity?.name ?? "UnknownModel");
+            string fallbackPath = $"Assets/Models/{safeName}";
+            Debug.Log($"[ModelProjectImporter] Using fallback path for model '{meta?.identity?.name}': {fallbackPath}");
+            return fallbackPath;
+        }
+
+        /// <summary>
+        /// Sanitizes folder name by removing invalid characters.
+        /// </summary>
+        /// <param name="name">Original folder name</param>
+        /// <returns>Sanitized folder name safe for file system</returns>
+        private static string SanitizeFolderName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return "UnknownModel";
+            }
+
+            char[] invalidChars = Path.GetInvalidFileNameChars();
+            char[] result = name.Trim().Select(c => invalidChars.Contains(c) ? '_' : c).ToArray();
+            return new string(result).Replace(' ', '_');
         }
     }
 }

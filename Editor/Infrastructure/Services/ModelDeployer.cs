@@ -55,8 +55,8 @@ namespace ModelLibrary.Editor.Services
                 }
 
                 string ext = Path.GetExtension(path).ToLowerInvariant();
-                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ || 
-                    ext == FileExtensions.PNG || ext == FileExtensions.TGA || ext == FileExtensions.JPG || ext == FileExtensions.JPEG || ext == FileExtensions.PSD || 
+                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ ||
+                    ext == FileExtensions.PNG || ext == FileExtensions.TGA || ext == FileExtensions.JPG || ext == FileExtensions.JPEG || ext == FileExtensions.PSD ||
                     ext == FileExtensions.MAT)
                 {
                     // In the version folder the payload is placed under payload/<filename>
@@ -327,7 +327,8 @@ namespace ModelLibrary.Editor.Services
                 RenderTexture.active = previous;
                 RenderTexture.ReleaseTemporary(temp);
             }
-        }        private static List<string> NormalizeProjectTags(IEnumerable<string> projectTags)
+        }
+        private static List<string> NormalizeProjectTags(IEnumerable<string> projectTags)
         {
             if (projectTags == null)
             {
@@ -350,24 +351,60 @@ namespace ModelLibrary.Editor.Services
         {
             string sanitizedName = SanitizeFolderName(identityName);
             string defaultPath = $"Assets/Models/{sanitizedName}";
-            string path = string.IsNullOrWhiteSpace(installPath) ? defaultPath : PathUtils.SanitizePathSeparator(installPath);
+
+            string path;
+            if (string.IsNullOrWhiteSpace(installPath))
+            {
+                path = defaultPath;
+                Debug.Log($"[ModelDeployer] Using default install path for model '{identityName}': {path}");
+            }
+            else
+            {
+                path = PathUtils.SanitizePathSeparator(installPath);
+                Debug.Log($"[ModelDeployer] Using provided install path for model '{identityName}': {path}");
+            }
+
             if (!path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
             {
                 path = $"Assets/{path.TrimStart('/')}";
+                Debug.Log($"[ModelDeployer] Added 'Assets/' prefix to install path: {path}");
             }
-            return PathUtils.SanitizePathSeparator(path);
+
+            string finalPath = PathUtils.SanitizePathSeparator(path);
+            Debug.Log($"[ModelDeployer] Final resolved install path for model '{identityName}': {finalPath}");
+            return finalPath;
         }
 
         private static string ResolveRelativePath(string relativePath, string identityName)
         {
             string sanitizedName = SanitizeFolderName(identityName);
             string defaultPath = $"Models/{sanitizedName}";
+
+            // Validate relative path if provided
+            if (!string.IsNullOrWhiteSpace(relativePath))
+            {
+                List<string> pathErrors = PathUtils.ValidateRelativePath(relativePath);
+                if (pathErrors.Count > 0)
+                {
+                    Debug.LogWarning($"[ModelDeployer] Invalid relative path '{relativePath}' for model '{identityName}': {string.Join(", ", pathErrors)}. Using fallback path.");
+                    relativePath = null; // Force fallback to default
+                }
+                else
+                {
+                    Debug.Log($"[ModelDeployer] Using validated relative path '{relativePath}' for model '{identityName}'");
+                }
+            }
+
             string path = string.IsNullOrWhiteSpace(relativePath) ? defaultPath : PathUtils.SanitizePathSeparator(relativePath);
             if (path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
             {
                 path = path[7..]; // Remove "Assets/" prefix
+                Debug.Log($"[ModelDeployer] Removed 'Assets/' prefix from path: {path}");
             }
-            return PathUtils.SanitizePathSeparator(path);
+
+            string finalPath = PathUtils.SanitizePathSeparator(path);
+            Debug.Log($"[ModelDeployer] Final resolved relative path for model '{identityName}': {finalPath}");
+            return finalPath;
         }
 
         private static string SanitizeFolderName(string name)

@@ -11,11 +11,28 @@ namespace ModelLibrary.Editor.Utils
     public static class PathUtils
     {
         /// <summary>
-        /// Sanitizes path separators by converting backslashes to forward slashes.
+        /// Sanitizes path separators by converting backslashes to forward slashes and removing double slashes.
         /// </summary>
         /// <param name="path">The path to sanitize</param>
-        /// <returns>Path with forward slashes as separators</returns>
-        public static string SanitizePathSeparator(string path) => path.Replace('\\', '/');
+        /// <returns>Path with forward slashes as separators and no double slashes</returns>
+        public static string SanitizePathSeparator(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return path;
+            }
+
+            // Replace backslashes with forward slashes
+            string sanitized = path.Replace('\\', '/');
+            
+            // Remove double slashes (but preserve the first slash if path starts with /)
+            while (sanitized.Contains("//"))
+            {
+                sanitized = sanitized.Replace("//", "/");
+            }
+            
+            return sanitized;
+        }
 
         /// <summary>
         /// Validates the relative path for common issues and constraints.
