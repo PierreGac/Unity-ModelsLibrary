@@ -35,6 +35,8 @@ namespace ModelLibrary.Editor.Windows
         private readonly Dictionary<string, int> _tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> _sortedTags = new List<string>();
         private ModelIndex _tagSource;
+        private bool _loadingIndex = false;
+        private ModelIndex _indexCache;
         [MenuItem("Tools/Model Library/Browser")]
         public static void Open()
         {
@@ -49,8 +51,28 @@ namespace ModelLibrary.Editor.Windows
                 ? new Repository.FileSystemRepository(settings.repositoryRoot)
                 : new Repository.HttpRepository(settings.repositoryRoot);
             _service = new ModelLibraryService(repo);
-            _ = _service.RefreshIndexAsync();
+            _ = LoadIndexAsync();
             FirstRunWizard.MaybeShow();
+        }
+
+        private async Task LoadIndexAsync()
+        {
+            if (_loadingIndex) return;
+
+            _loadingIndex = true;
+            try
+            {
+                _indexCache = await _service.GetIndexAsync();
+                Repaint(); // Refresh the UI when index is loaded
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to load index: {ex.Message}");
+            }
+            finally
+            {
+                _loadingIndex = false;
+            }
         }
 
         private void OnGUI()
@@ -68,7 +90,8 @@ namespace ModelLibrary.Editor.Windows
                 }
                 if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(70)))
                 {
-                    _ = _service.RefreshIndexAsync();
+                    _indexCache = null; // Clear cache to force reload
+                    _ = LoadIndexAsync();
                 }
                 if (GUILayout.Button("Submit Model", EditorStyles.toolbarButton, GUILayout.Width(100)))
                 {
@@ -79,15 +102,15 @@ namespace ModelLibrary.Editor.Windows
                     UserSettingsWindow.Open();
                 }
             }
-            Task<ModelIndex> indexTask = _service.GetIndexAsync();
-            ModelIndex index = indexTask.IsCompleted ? indexTask.Result : null;
-
-            DrawTagFilter(index);
-            if (!indexTask.IsCompleted)
+            // Use cached index if available, otherwise show loading
+            if (_indexCache == null)
             {
                 GUILayout.Label("Loading index...");
                 return;
             }
+
+            ModelIndex index = _indexCache;
+            DrawTagFilter(index);
             if (index == null || index.entries == null)
             {
                 GUILayout.Label("No models available.");
