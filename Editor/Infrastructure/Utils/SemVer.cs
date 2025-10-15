@@ -20,17 +20,17 @@ namespace ModelLibrary.Editor.Utils
         /// <summary>
         /// Major version number - incremented for breaking changes.
         /// </summary>
-        public readonly int Major;
+        public readonly int major;
 
         /// <summary>
         /// Minor version number - incremented for new features.
         /// </summary>
-        public readonly int Minor;
+        public readonly int minor;
 
         /// <summary>
         /// Patch version number - incremented for bug fixes.
         /// </summary>
-        public readonly int Patch;
+        public readonly int patch;
 
         /// <summary>
         /// Create a new SemVer with the specified version numbers.
@@ -40,9 +40,9 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="patch">Patch version number</param>
         public SemVer(int major, int minor, int patch)
         {
-            Major = major;
-            Minor = minor;
-            Patch = patch;
+            this.major = major;
+            this.minor = minor;
+            this.patch = patch;
         }
 
         /// <summary>
@@ -64,15 +64,16 @@ namespace ModelLibrary.Editor.Utils
 
             // Split by dots to get the three parts
             string[] parts = s.Split('.');
-            if (parts.Length < 3)
+            if (parts.Length != 3)
             {
-                return false; // Need at least 3 parts
+                return false; // Need exactly 3 parts (MAJOR.MINOR.PATCH)
             }
 
-            // Try to parse each part as an integer
+            // Try to parse each part as an integer and validate they are non-negative
             if (int.TryParse(parts[0], out int major) &&
                 int.TryParse(parts[1], out int minor) &&
-                int.TryParse(parts[2], out int patch))
+                int.TryParse(parts[2], out int patch) &&
+                major >= 0 && minor >= 0 && patch >= 0)
             {
                 v = new SemVer(major, minor, patch);
                 return true;
@@ -84,7 +85,7 @@ namespace ModelLibrary.Editor.Utils
         /// Convert the SemVer back to a string format.
         /// </summary>
         /// <returns>Version string in MAJOR.MINOR.PATCH format</returns>
-        public override string ToString() => $"{Major}.{Minor}.{Patch}";
+        public override string ToString() => $"{major}.{minor}.{patch}";
 
         /// <summary>
         /// Compare this version with another version.
@@ -95,19 +96,19 @@ namespace ModelLibrary.Editor.Utils
         public int CompareTo(SemVer other)
         {
             // Compare major version first
-            if (Major != other.Major)
+            if (major != other.major)
             {
-                return Major.CompareTo(other.Major);
+                return major.CompareTo(other.major);
             }
 
             // If major is equal, compare minor version
-            if (Minor != other.Minor)
+            if (minor != other.minor)
             {
-                return Minor.CompareTo(other.Minor);
+                return minor.CompareTo(other.minor);
             }
 
             // If minor is also equal, compare patch version
-            return Patch.CompareTo(other.Patch);
+            return patch.CompareTo(other.patch);
         }
     }
 }

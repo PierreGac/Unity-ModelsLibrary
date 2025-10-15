@@ -329,7 +329,7 @@ namespace ModelLibrary.Editor.Windows
         {
             if (SemVer.TryParse(current, out SemVer parsed))
             {
-                SemVer next = new SemVer(parsed.Major, parsed.Minor, parsed.Patch + 1);
+                SemVer next = new SemVer(parsed.major, parsed.minor, parsed.patch + 1);
                 return next.ToString();
             }
 

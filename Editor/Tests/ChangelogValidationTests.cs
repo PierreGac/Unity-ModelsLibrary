@@ -356,10 +356,10 @@ namespace ModelLibrary.Editor.Tests
         [Test]
         public void TestBoundaryLengthValidation()
         {
-            // Test changelog at minimum length boundary
-            string minLengthChangelog = "Fixed bug."; // Exactly 10 characters
+            // Test changelog at minimum length boundary with meaningful content (3+ unique words)
+            string minLengthChangelog = "Fixed critical bug."; // 18 characters, 3 unique words
             List<string> errors = ChangelogValidator.ValidateChangelog(minLengthChangelog, false);
-            Assert.IsEmpty(errors, "Changelog at minimum length should be valid");
+            Assert.IsEmpty(errors, "Changelog at minimum length with meaningful content should be valid");
 
             // Test changelog just below minimum length
             string belowMinChangelog = "Fixed bug"; // 9 characters

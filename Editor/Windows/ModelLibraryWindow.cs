@@ -37,6 +37,8 @@ namespace ModelLibrary.Editor.Windows
         private ModelIndex _tagSource;
         private bool _loadingIndex = false;
         private ModelIndex _indexCache;
+        private int _updateCount = 0;
+        private readonly Dictionary<string, bool> _modelUpdateStatus = new Dictionary<string, bool>();
         [MenuItem("Tools/Model Library/Browser")]
         public static void Open()
         {
@@ -104,12 +106,19 @@ namespace ModelLibrary.Editor.Windows
 
         private async Task LoadIndexAsync()
         {
-            if (_loadingIndex) return;
+            if (_loadingIndex)
+            {
+                return;
+            }
 
             _loadingIndex = true;
             try
             {
                 _indexCache = await _service.GetIndexAsync();
+
+                // Check for updates in the background
+                _ = CheckForUpdatesAsync();
+
                 Repaint(); // Refresh the UI when index is loaded
             }
             catch (Exception ex)
@@ -119,6 +128,31 @@ namespace ModelLibrary.Editor.Windows
             finally
             {
                 _loadingIndex = false;
+            }
+        }
+
+        private async Task CheckForUpdatesAsync()
+        {
+            try
+            {
+                _updateCount = await _service.GetUpdateCountAsync();
+
+                // Update individual model status
+                if (_indexCache?.entries != null)
+                {
+                    _modelUpdateStatus.Clear();
+                    foreach (ModelIndex.Entry entry in _indexCache.entries)
+                    {
+                        bool hasUpdate = await _service.HasUpdateAsync(entry.id);
+                        _modelUpdateStatus[entry.id] = hasUpdate;
+                    }
+                }
+
+                Repaint(); // Refresh UI to show update indicators
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to check for updates: {ex.Message}");
             }
         }
 
@@ -153,6 +187,19 @@ namespace ModelLibrary.Editor.Windows
                 {
                     _indexCache = null; // Clear cache to force reload
                     _ = LoadIndexAsync();
+                }
+
+                // Update indicator and refresh button
+                if (_updateCount > 0)
+                {
+                    using (new EditorGUI.DisabledScope(true))
+                    {
+                        GUILayout.Button($"Updates ({_updateCount})", EditorStyles.toolbarButton, GUILayout.Width(100));
+                    }
+                }
+                if (GUILayout.Button("Check Updates", EditorStyles.toolbarButton, GUILayout.Width(100)))
+                {
+                    _ = CheckForUpdatesAsync();
                 }
                 if (GUILayout.Button("Submit Model", EditorStyles.toolbarButton, GUILayout.Width(100)))
                 {
@@ -403,17 +450,32 @@ namespace ModelLibrary.Editor.Windows
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    GUILayout.Label(e.name, EditorStyles.boldLabel);
+                    // Model name with update indicator
+                    string modelName = e.name;
+                    if (_modelUpdateStatus.TryGetValue(e.id, out bool hasUpdate) && hasUpdate)
+                    {
+                        // Add update indicator to model name
+                        modelName = $"🔄 {e.name}";
+                    }
+                    GUILayout.Label(modelName, EditorStyles.boldLabel);
+
                     GUILayout.FlexibleSpace();
                     GUILayout.Label($"v{e.latestVersion}");
                     bool installed = TryGetLocalInstall(e, out ModelMeta localMeta);
                     string localVersion = installed ? localMeta.version : null;
-                    bool needsUpgrade = installed && NeedsUpgrade(localVersion, e.latestVersion);
+
+                    // Only consider the model as properly installed if we have a valid local version
+                    bool properlyInstalled = installed && !string.IsNullOrEmpty(localVersion) && localVersion != "(unknown)";
+                    bool needsUpgrade = properlyInstalled && NeedsUpgrade(localVersion, e.latestVersion);
                     bool isBusy = _importsInProgress.Contains(e.id);
-                    if (installed)
+                    if (properlyInstalled)
                     {
                         string label = needsUpgrade ? $"Local v{localVersion} (update available)" : $"Local v{localVersion}";
                         GUILayout.Label(label, EditorStyles.miniLabel);
+                    }
+                    else if (installed && (string.IsNullOrEmpty(localVersion) || localVersion == "(unknown)"))
+                    {
+                        GUILayout.Label("Local (version unknown)", EditorStyles.miniLabel);
                     }
                     if (GUILayout.Button("Details", GUILayout.Width(70)))
                     {
@@ -427,12 +489,12 @@ namespace ModelLibrary.Editor.Windows
                             _ = Download(e.id, e.latestVersion);
                         }
                     }
-                    using (new EditorGUI.DisabledScope(isBusy || (installed && !needsUpgrade)))
+                    using (new EditorGUI.DisabledScope(isBusy || (properlyInstalled && !needsUpgrade)))
                     {
                         string actionLabel = needsUpgrade ? "Update" : "Import";
                         if (GUILayout.Button(actionLabel, GUILayout.Width(80)))
                         {
-                            string previousVersion = installed ? localVersion : null;
+                            string previousVersion = properlyInstalled ? localVersion : null;
                             _ = Import(e.id, e.latestVersion, needsUpgrade, previousVersion);
                         }
                     }
@@ -562,9 +624,10 @@ namespace ModelLibrary.Editor.Windows
             {
                 return false;
             }
-            if (string.IsNullOrEmpty(localVersion))
+            if (string.IsNullOrEmpty(localVersion) || localVersion == "(unknown)")
             {
-                return true;
+                // Don't show as needing upgrade if we can't determine the local version
+                return false;
             }
             if (SemVer.TryParse(localVersion, out SemVer local) && SemVer.TryParse(remoteVersion, out SemVer remote))
             {
@@ -711,15 +774,10 @@ namespace ModelLibrary.Editor.Windows
                     bool any = latestMeta.assetGuids != null && latestMeta.assetGuids.Any(g => set.Contains(g));
                     if (any)
                     {
-                        // We can't know the exact local version from GUIDs alone; mark as installed with unknown version.
-                        ModelMeta minimal = new ModelMeta
-                        {
-                            identity = new ModelIdentity { id = entry.id, name = entry.name },
-                            version = "(unknown)"
-                        };
-                        _localInstallCache[entry.id] = minimal;
-                        meta = minimal;
-                        return true;
+                        // We can't know the exact local version from GUIDs alone; don't mark as installed
+                        // This prevents false "update available" messages
+                        meta = null;
+                        return false;
                     }
                 }
                 catch { }
@@ -788,7 +846,7 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 EditorUtility.DisplayProgressBar(progressTitle, "Copying into Assets...", 0.6f);
-                await ModelProjectImporter.ImportFromCacheAsync(root, meta, cleanDestination: true, overrideInstallPath: chosenInstallPath);
+                await ModelProjectImporter.ImportFromCacheAsync(root, meta, cleanDestination: true, overrideInstallPath: chosenInstallPath, isUpdate: isUpgrade);
                 InvalidateLocalInstall(id);
                 _localInstallCache[id] = meta;
 
@@ -801,6 +859,7 @@ namespace ModelLibrary.Editor.Windows
             catch (Exception ex)
             {
                 EditorUtility.DisplayDialog(isUpgrade ? "Update Failed" : "Import Failed", ex.Message, "OK");
+                Debug.LogException(ex);
             }
             finally
             {

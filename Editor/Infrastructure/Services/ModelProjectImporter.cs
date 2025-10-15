@@ -17,7 +17,7 @@ namespace ModelLibrary.Editor.Services
     /// </summary>
     public static class ModelProjectImporter
     {
-        public static async Task<string> ImportFromCacheAsync(string cacheVersionRoot, ModelMeta meta, bool cleanDestination = true, string overrideInstallPath = null)
+        public static async Task<string> ImportFromCacheAsync(string cacheVersionRoot, ModelMeta meta, bool cleanDestination = true, string overrideInstallPath = null, bool isUpdate = false)
         {
             // Determine destination folder with validation and logging
             string destRel = ResolveDestinationPath(meta, overrideInstallPath);
@@ -25,11 +25,33 @@ namespace ModelLibrary.Editor.Services
 
             Debug.Log($"[ModelProjectImporter] Importing model '{meta?.identity?.name}' to path: {destRel}");
 
+            // Get existing GUIDs BEFORE import to avoid false positive conflicts
+            HashSet<string> existingGuidsBeforeImport = new HashSet<string>();
+            if (!isUpdate && meta?.assetGuids != null && meta.assetGuids.Count > 0)
+            {
+                string[] allGuids = AssetDatabase.FindAssets(string.Empty);
+                existingGuidsBeforeImport = new HashSet<string>(allGuids);
+                Debug.Log($"[ModelProjectImporter] Found {existingGuidsBeforeImport.Count} existing GUIDs before import");
+            }
+
+            // Ensure destination is a directory, not a file
+            if (File.Exists(destAbs))
+            {
+                Debug.LogWarning($"[ModelProjectImporter] Destination path points to an existing file: {destAbs}. Converting to directory path.");
+                destAbs = Path.Combine(Path.GetDirectoryName(destAbs), Path.GetFileNameWithoutExtension(destAbs));
+                destRel = PathUtils.SanitizePathSeparator(destAbs.Replace(Path.GetFullPath("Assets"), "Assets"));
+            }
+
             if (cleanDestination && Directory.Exists(destAbs))
             {
                 TryCleanDirectory(destAbs);
             }
-            Directory.CreateDirectory(destAbs);
+
+            // Ensure the directory exists
+            if (!Directory.Exists(destAbs))
+            {
+                Directory.CreateDirectory(destAbs);
+            }
 
             // Copy payload files into root of model folder (flatten), and images under images/
             string payloadRoot = Path.Combine(cacheVersionRoot, "payload");
@@ -48,11 +70,26 @@ namespace ModelLibrary.Editor.Services
                     {
                         continue;
                     }
-                    File.Copy(file, target, overwrite: true);
-                    string srcMeta = file + FileExtensions.META;
-                    if (File.Exists(srcMeta))
+                    try
                     {
-                        File.Copy(srcMeta, target + FileExtensions.META, overwrite: true);
+                        // Ensure target directory exists
+                        string targetDir = Path.GetDirectoryName(target);
+                        if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
+                        {
+                            Directory.CreateDirectory(targetDir);
+                        }
+
+                        File.Copy(file, target, overwrite: true);
+                        string srcMeta = file + FileExtensions.META;
+                        if (File.Exists(srcMeta))
+                        {
+                            File.Copy(srcMeta, target + FileExtensions.META, overwrite: true);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[ModelProjectImporter] Failed to copy payload file {file} to {target}: {ex.Message}");
+                        throw;
                     }
                 }
             }
@@ -74,11 +111,26 @@ namespace ModelLibrary.Editor.Services
                     {
                         continue;
                     }
-                    File.Copy(file, target, overwrite: true);
-                    string srcMeta = file + FileExtensions.META;
-                    if (File.Exists(srcMeta))
+                    try
                     {
-                        File.Copy(srcMeta, target + FileExtensions.META, overwrite: true);
+                        // Ensure target directory exists
+                        string targetDir = Path.GetDirectoryName(target);
+                        if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
+                        {
+                            Directory.CreateDirectory(targetDir);
+                        }
+
+                        File.Copy(file, target, overwrite: true);
+                        string srcMeta = file + FileExtensions.META;
+                        if (File.Exists(srcMeta))
+                        {
+                            File.Copy(srcMeta, target + FileExtensions.META, overwrite: true);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[ModelProjectImporter] Failed to copy dependency file {file} to {target}: {ex.Message}");
+                        throw;
                     }
                 }
             }
@@ -90,8 +142,16 @@ namespace ModelLibrary.Editor.Services
             // Refresh to register new files
             AssetDatabase.Refresh();
 
-            // Check for GUID conflicts after import
-            await CheckForGuidConflictsAsync(meta, destAbs);
+            // Check for GUID conflicts after import (only for new imports, not updates)
+            if (!isUpdate)
+            {
+                await CheckForGuidConflictsAsync(meta, destAbs, existingGuidsBeforeImport);
+            }
+            else
+            {
+                // For updates, log that GUID conflicts are expected and normal
+                Debug.Log($"[ModelProjectImporter] Model update completed for '{meta.identity.name}'. GUID conflicts are expected and normal for updates.");
+            }
 
             // Restore per-file model importer settings captured in meta (if present)
             foreach (string file in Directory.GetFiles(destAbs, "*", SearchOption.TopDirectoryOnly))
@@ -137,28 +197,42 @@ namespace ModelLibrary.Editor.Services
         {
             try
             {
-                Directory.Delete(path, true);
+                // Handle both files and directories
+                if (File.Exists(path))
+                {
+                    File.SetAttributes(path, FileAttributes.Normal);
+                    File.Delete(path);
+                }
+                else if (Directory.Exists(path))
+                {
+                    Directory.Delete(path, true);
+                }
             }
             catch
             {
                 try
                 {
-                    foreach (string file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+                    // If it's a directory, try to clean individual files
+                    if (Directory.Exists(path))
                     {
-                        File.SetAttributes(file, FileAttributes.Normal);
-                        File.Delete(file);
-                    }
+                        foreach (string file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+                        {
+                            File.SetAttributes(file, FileAttributes.Normal);
+                            File.Delete(file);
+                        }
 
-                    foreach (string dir in Directory.GetDirectories(path, "*", SearchOption.AllDirectories))
-                    {
-                        Directory.Delete(dir, true);
-                    }
+                        foreach (string dir in Directory.GetDirectories(path, "*", SearchOption.AllDirectories))
+                        {
+                            Directory.Delete(dir, true);
+                        }
 
-                    Directory.Delete(path, true);
+                        Directory.Delete(path, true);
+                    }
                 }
                 catch
                 {
-                    // give up, will overwrite existing files during copy
+                    // Best effort cleanup - will overwrite existing files during copy
+                    Debug.LogWarning($"[ModelProjectImporter] Failed to clean destination: {path}");
                 }
             }
         }
@@ -207,6 +281,14 @@ namespace ModelLibrary.Editor.Services
                 else
                 {
                     string resolvedPath = $"Assets/{meta.relativePath}";
+
+                    // Ensure the path points to a directory, not a file
+                    if (File.Exists(Path.GetFullPath(resolvedPath)))
+                    {
+                        Debug.LogWarning($"[ModelProjectImporter] Relative path points to a file: {meta.relativePath}. Converting to directory path.");
+                        resolvedPath = Path.GetDirectoryName(resolvedPath);
+                    }
+
                     Debug.Log($"[ModelProjectImporter] Using meta relative path: {resolvedPath}");
                     return PathUtils.SanitizePathSeparator(resolvedPath);
                 }
@@ -236,7 +318,7 @@ namespace ModelLibrary.Editor.Services
             return new string(result).Replace(' ', '_');
         }
 
-        private static async Task CheckForGuidConflictsAsync(ModelMeta meta, string destAbs)
+        private static async Task CheckForGuidConflictsAsync(ModelMeta meta, string destAbs, HashSet<string> existingGuidsBeforeImport = null)
         {
             try
             {
@@ -245,23 +327,44 @@ namespace ModelLibrary.Editor.Services
                     return;
                 }
 
-                // Get all GUIDs in the project
-                string[] allGuids = AssetDatabase.FindAssets(string.Empty);
-                HashSet<string> existingGuids = new HashSet<string>(allGuids);
+                // Use pre-import GUIDs if provided, otherwise get current GUIDs (for backward compatibility)
+                HashSet<string> existingGuids;
+                if (existingGuidsBeforeImport != null)
+                {
+                    existingGuids = existingGuidsBeforeImport;
+                    Debug.Log($"[ModelProjectImporter] Using pre-import GUIDs for conflict detection: {existingGuids.Count} GUIDs");
+                }
+                else
+                {
+                    string[] allGuids = AssetDatabase.FindAssets(string.Empty);
+                    existingGuids = new HashSet<string>(allGuids);
+                    Debug.Log($"[ModelProjectImporter] Using current GUIDs for conflict detection: {existingGuids.Count} GUIDs");
+                }
 
                 List<string> conflictingGuids = new List<string>();
+                List<string> sameModelGuids = new List<string>();
+
                 foreach (string guid in meta.assetGuids)
                 {
                     if (existingGuids.Contains(guid))
                     {
                         string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                        if (!string.IsNullOrEmpty(assetPath) && !assetPath.StartsWith(destAbs.Replace('\\', '/')))
+                        if (!string.IsNullOrEmpty(assetPath))
                         {
-                            conflictingGuids.Add(guid);
+                            // Check if the conflicting asset is from the same model (same directory)
+                            if (assetPath.StartsWith(destAbs.Replace('\\', '/')))
+                            {
+                                sameModelGuids.Add(guid);
+                            }
+                            else
+                            {
+                                conflictingGuids.Add(guid);
+                            }
                         }
                     }
                 }
 
+                // Only show conflict dialog for actual conflicts (different models), not same-model GUIDs
                 if (conflictingGuids.Count > 0)
                 {
                     string conflictMessage = $"GUID conflicts detected for model '{meta.identity.name}':\n";
@@ -287,6 +390,11 @@ namespace ModelLibrary.Editor.Services
                         await RegenerateGuidsForImportedModelAsync(destAbs);
                     }
                 }
+                else if (sameModelGuids.Count > 0)
+                {
+                    // Same model GUIDs are expected and normal
+                    Debug.Log($"[ModelProjectImporter] Found {sameModelGuids.Count} GUIDs from the same model - this is expected and normal.");
+                }
             }
             catch (Exception ex)
             {
@@ -307,7 +415,7 @@ namespace ModelLibrary.Editor.Services
                     if (content.Contains("guid:"))
                     {
                         // Generate new GUID
-                        string newGuid = System.Guid.NewGuid().ToString("N");
+                        string newGuid = Guid.NewGuid().ToString("N");
                         content = System.Text.RegularExpressions.Regex.Replace(content, @"guid: [a-f0-9]{32}", $"guid: {newGuid}");
                         await File.WriteAllTextAsync(metaFile, content);
                     }

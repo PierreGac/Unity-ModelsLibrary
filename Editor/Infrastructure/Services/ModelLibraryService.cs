@@ -20,9 +20,14 @@ namespace ModelLibrary.Editor.Services
     {
         private readonly IModelRepository _repo;
         private ModelIndex _indexCache;
+        private ModelUpdateDetector _updateDetector;
         private readonly Dictionary<string, Texture2D> _previewCache = new Dictionary<string, Texture2D>();
 
-        public ModelLibraryService(IModelRepository repo) => _repo = repo;
+        public ModelLibraryService(IModelRepository repo)
+        {
+            _repo = repo;
+            _updateDetector = new ModelUpdateDetector(this);
+        }
 
         /// <summary>
         /// Get the cached index, loading it from repository if needed.
@@ -109,20 +114,14 @@ namespace ModelLibrary.Editor.Services
             {
                 // All models are visible (no project restrictions)
 
-                // Attempt to find the highest local version present by reading meta.json copies under Assets
-                string foundLocalVersion = null;
-                // Heuristic: check for any .modelmeta.json marker files (optional), else detect via known GUIDs
-                // We try GUID scan using the latest meta first
-                try
+                // Try to find the actual local version by looking for modelLibrary.meta.json files
+                string foundLocalVersion = await FindLocalVersionAsync(e.id);
+
+                // If no local version found via manifest files, try GUID-based detection as fallback
+                if (string.IsNullOrEmpty(foundLocalVersion))
                 {
-                    ModelMeta meta = await _repo.LoadMetaAsync(e.id, e.latestVersion);
-                    bool any = meta.assetGuids.Any(g => guidSet.Contains(g));
-                    if (any)
-                    {
-                        foundLocalVersion = e.latestVersion; // At least those GUIDs exist
-                    }
+                    foundLocalVersion = await FindLocalVersionByGuidsAsync(e.id, guidSet);
                 }
-                catch { /* ignore if not accessible */ }
 
                 bool hasUpdate = false;
                 if (!string.IsNullOrEmpty(foundLocalVersion))
@@ -137,6 +136,188 @@ namespace ModelLibrary.Editor.Services
             }
 
             return results;
+        }
+
+        /// <summary>
+        /// Find the local version by looking for modelLibrary.meta.json manifest files.
+        /// </summary>
+        private async Task<string> FindLocalVersionAsync(string modelId)
+        {
+            try
+            {
+                // Look for modelLibrary.meta.json files in the project
+                string[] manifestFiles = UnityEditor.AssetDatabase.FindAssets("modelLibrary.meta");
+
+                foreach (string guid in manifestFiles)
+                {
+                    string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                    if (string.IsNullOrEmpty(path))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        string content = await File.ReadAllTextAsync(path);
+                        if (string.IsNullOrEmpty(content))
+                        {
+                            Debug.LogWarning($"[ModelLibraryService] Manifest file {path} is empty");
+                            continue;
+                        }
+
+                        ModelMeta localMeta = JsonUtil.FromJson<ModelMeta>(content);
+                        if (localMeta == null)
+                        {
+                            Debug.LogWarning($"[ModelLibraryService] Failed to parse manifest file {path} - JSON deserialization returned null");
+                            continue;
+                        }
+
+                        if (localMeta.identity == null)
+                        {
+                            Debug.LogWarning($"[ModelLibraryService] Manifest file {path} has null identity");
+                            continue;
+                        }
+
+                        if (string.IsNullOrEmpty(localMeta.identity.id))
+                        {
+                            Debug.LogWarning($"[ModelLibraryService] Manifest file {path} has empty model ID");
+                            continue;
+                        }
+
+                        if (string.IsNullOrEmpty(localMeta.version))
+                        {
+                            Debug.LogWarning($"[ModelLibraryService] Manifest file {path} has empty version for model {localMeta.identity.id}");
+                            continue;
+                        }
+
+                        // Check if this manifest belongs to the model we're looking for
+                        if (localMeta.identity.id == modelId)
+                        {
+                            Debug.Log($"[ModelLibraryService] Found local version {localMeta.version} for model {modelId} at {path}");
+                            return localMeta.version;
+                        }
+                        else
+                        {
+                            Debug.Log($"[ModelLibraryService] Manifest file {path} belongs to model {localMeta.identity.id}, not {modelId}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[ModelLibraryService] Failed to read manifest file {path}: {ex.Message}\n{ex.StackTrace}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ModelLibraryService] Error scanning for local versions of {modelId}: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Find the local version by checking which version's GUIDs are present in the project.
+        /// </summary>
+        private async Task<string> FindLocalVersionByGuidsAsync(string modelId, HashSet<string> projectGuids)
+        {
+            try
+            {
+                // Get the model index to find available versions
+                ModelIndex index = await GetIndexAsync();
+                ModelIndex.Entry entry = index.Get(modelId);
+                if (entry == null)
+                {
+                    return null;
+                }
+
+                // For now, we'll check the latest version since we don't have a versions list
+                // In a more complete implementation, we'd need to query the repository for all available versions
+                try
+                {
+                    ModelMeta meta = await _repo.LoadMetaAsync(modelId, entry.latestVersion);
+                    if (meta == null)
+                    {
+                        Debug.LogWarning($"[ModelLibraryService] Failed to load metadata for model {modelId} version {entry.latestVersion}");
+                        return null;
+                    }
+
+                    if (meta.assetGuids == null || meta.assetGuids.Count == 0)
+                    {
+                        Debug.LogWarning($"[ModelLibraryService] Model {modelId} version {entry.latestVersion} has no asset GUIDs");
+                        return null;
+                    }
+
+                    // Check if any GUIDs from this version exist in the project
+                    List<string> foundGuids = new List<string>();
+                    foreach (string guid in meta.assetGuids)
+                    {
+                        if (projectGuids.Contains(guid))
+                        {
+                            foundGuids.Add(guid);
+                        }
+                    }
+
+                    if (foundGuids.Count > 0)
+                    {
+                        Debug.Log($"[ModelLibraryService] Found local version {entry.latestVersion} for model {modelId} via GUID detection. Found {foundGuids.Count}/{meta.assetGuids.Count} GUIDs: {string.Join(", ", foundGuids.Take(3))}{(foundGuids.Count > 3 ? "..." : "")}");
+                        return entry.latestVersion;
+                    }
+                    else
+                    {
+                        Debug.Log($"[ModelLibraryService] Model {modelId} version {entry.latestVersion} has {meta.assetGuids.Count} GUIDs but none found in project");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[ModelLibraryService] Error checking GUIDs for model {modelId}: {ex.Message}\n{ex.StackTrace}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ModelLibraryService] Error in GUID-based version detection for {modelId}: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Get all models with available updates.
+        /// </summary>
+        public async Task<List<ModelUpdateDetector.ModelUpdateInfo>> GetAvailableUpdatesAsync()
+        {
+            return await _updateDetector.GetAvailableUpdatesAsync();
+        }
+
+        /// <summary>
+        /// Get update information for a specific model.
+        /// </summary>
+        public async Task<ModelUpdateDetector.ModelUpdateInfo> GetUpdateInfoAsync(string modelId)
+        {
+            return await _updateDetector.GetUpdateInfoAsync(modelId);
+        }
+
+        /// <summary>
+        /// Check if a specific model has updates available.
+        /// </summary>
+        public async Task<bool> HasUpdateAsync(string modelId)
+        {
+            return await _updateDetector.HasUpdateAsync(modelId);
+        }
+
+        /// <summary>
+        /// Get the total number of available updates.
+        /// </summary>
+        public async Task<int> GetUpdateCountAsync()
+        {
+            return await _updateDetector.GetUpdateCountAsync();
+        }
+
+        /// <summary>
+        /// Force a refresh of all update information.
+        /// </summary>
+        public async Task RefreshAllUpdatesAsync()
+        {
+            await _updateDetector.RefreshAllUpdatesAsync();
         }
 
         /// <summary>
@@ -250,7 +431,7 @@ namespace ModelLibrary.Editor.Services
                 throw new InvalidOperationException($"Invalid base version '{sourceVersion}'.");
             }
 
-            SemVer bumped = bumpStrategy != null ? bumpStrategy(parsedSource) : new SemVer(parsedSource.Major, parsedSource.Minor, parsedSource.Patch + 1);
+            SemVer bumped = bumpStrategy != null ? bumpStrategy(parsedSource) : new SemVer(parsedSource.major, parsedSource.minor, parsedSource.patch + 1);
             string newVersion = bumped.ToString();
 
             long nowUtc = DateTime.Now.Ticks;
