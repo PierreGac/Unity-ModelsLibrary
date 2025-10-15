@@ -108,6 +108,9 @@ namespace ModelLibrary.Editor.Services
             meta.payloadRelativePaths = relPayload;
             meta.assetGuids = guids;
 
+            // Log GUID collection for debugging
+            Debug.Log($"[ModelDeployer] Collected {guids.Count} asset GUIDs for model '{meta.identity.name}': {string.Join(", ", guids.Take(5))}{(guids.Count > 5 ? "..." : "")}");
+
             // Dependencies: gather GUIDs referenced by selected assets (materials, textures)
             HashSet<string> dependencyGuids = new HashSet<string>();
             foreach (string guid in guids)

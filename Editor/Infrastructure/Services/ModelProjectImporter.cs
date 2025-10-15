@@ -90,6 +90,9 @@ namespace ModelLibrary.Editor.Services
             // Refresh to register new files
             AssetDatabase.Refresh();
 
+            // Check for GUID conflicts after import
+            await CheckForGuidConflictsAsync(meta, destAbs);
+
             // Restore per-file model importer settings captured in meta (if present)
             foreach (string file in Directory.GetFiles(destAbs, "*", SearchOption.TopDirectoryOnly))
             {
@@ -107,15 +110,15 @@ namespace ModelLibrary.Editor.Services
                         {
                             try
                             {
-                                if (!string.IsNullOrEmpty(settings.materialImportMode) && System.Enum.TryParse(settings.materialImportMode, out ModelImporterMaterialImportMode mode))
+                                if (!string.IsNullOrEmpty(settings.materialImportMode) && Enum.TryParse(settings.materialImportMode, out ModelImporterMaterialImportMode mode))
                                 {
                                     importer.materialImportMode = mode;
                                 }
-                                if (!string.IsNullOrEmpty(settings.materialSearch) && System.Enum.TryParse(settings.materialSearch, out ModelImporterMaterialSearch search))
+                                if (!string.IsNullOrEmpty(settings.materialSearch) && Enum.TryParse(settings.materialSearch, out ModelImporterMaterialSearch search))
                                 {
                                     importer.materialSearch = search;
                                 }
-                                if (!string.IsNullOrEmpty(settings.materialName) && System.Enum.TryParse(settings.materialName, out ModelImporterMaterialName name))
+                                if (!string.IsNullOrEmpty(settings.materialName) && Enum.TryParse(settings.materialName, out ModelImporterMaterialName name))
                                 {
                                     importer.materialName = name;
                                 }
@@ -231,6 +234,93 @@ namespace ModelLibrary.Editor.Services
             char[] invalidChars = Path.GetInvalidFileNameChars();
             char[] result = name.Trim().Select(c => invalidChars.Contains(c) ? '_' : c).ToArray();
             return new string(result).Replace(' ', '_');
+        }
+
+        private static async Task CheckForGuidConflictsAsync(ModelMeta meta, string destAbs)
+        {
+            try
+            {
+                if (meta?.assetGuids == null || meta.assetGuids.Count == 0)
+                {
+                    return;
+                }
+
+                // Get all GUIDs in the project
+                string[] allGuids = AssetDatabase.FindAssets(string.Empty);
+                HashSet<string> existingGuids = new HashSet<string>(allGuids);
+
+                List<string> conflictingGuids = new List<string>();
+                foreach (string guid in meta.assetGuids)
+                {
+                    if (existingGuids.Contains(guid))
+                    {
+                        string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                        if (!string.IsNullOrEmpty(assetPath) && !assetPath.StartsWith(destAbs.Replace('\\', '/')))
+                        {
+                            conflictingGuids.Add(guid);
+                        }
+                    }
+                }
+
+                if (conflictingGuids.Count > 0)
+                {
+                    string conflictMessage = $"GUID conflicts detected for model '{meta.identity.name}':\n";
+                    foreach (string guid in conflictingGuids)
+                    {
+                        string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                        conflictMessage += $"• {guid} -> {assetPath}\n";
+                    }
+                    conflictMessage += "\nThis may cause issues with asset references. Consider regenerating GUIDs for the imported model.";
+
+                    Debug.LogWarning($"[ModelProjectImporter] {conflictMessage}");
+
+                    // Show a dialog to the user
+                    bool regenerateGuids = EditorUtility.DisplayDialog(
+                        "GUID Conflicts Detected",
+                        conflictMessage + "\n\nWould you like to regenerate GUIDs for the imported model?",
+                        "Regenerate GUIDs",
+                        "Ignore"
+                    );
+
+                    if (regenerateGuids)
+                    {
+                        await RegenerateGuidsForImportedModelAsync(destAbs);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ModelProjectImporter] Error checking for GUID conflicts: {ex.Message}");
+            }
+        }
+
+        private static async Task RegenerateGuidsForImportedModelAsync(string destAbs)
+        {
+            try
+            {
+                // Find all .meta files in the destination directory
+                string[] metaFiles = Directory.GetFiles(destAbs, "*.meta", SearchOption.AllDirectories);
+
+                foreach (string metaFile in metaFiles)
+                {
+                    string content = await File.ReadAllTextAsync(metaFile);
+                    if (content.Contains("guid:"))
+                    {
+                        // Generate new GUID
+                        string newGuid = System.Guid.NewGuid().ToString("N");
+                        content = System.Text.RegularExpressions.Regex.Replace(content, @"guid: [a-f0-9]{32}", $"guid: {newGuid}");
+                        await File.WriteAllTextAsync(metaFile, content);
+                    }
+                }
+
+                // Refresh to apply new GUIDs
+                AssetDatabase.Refresh();
+                Debug.Log($"[ModelProjectImporter] Regenerated GUIDs for imported model in {destAbs}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ModelProjectImporter] Error regenerating GUIDs: {ex.Message}");
+            }
         }
     }
 }

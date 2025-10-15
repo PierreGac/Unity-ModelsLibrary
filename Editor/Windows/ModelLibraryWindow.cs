@@ -46,13 +46,60 @@ namespace ModelLibrary.Editor.Windows
 
         private void OnEnable()
         {
+            // Check if configuration is needed before creating services
+            if (!FirstRunWizard.IsConfigured())
+            {
+                FirstRunWizard.MaybeShow();
+                return; // Don't initialize services until configured
+            }
+
+            // Only initialize services if properly configured
+            InitializeServices();
+        }
+
+        private void InitializeServices()
+        {
             ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
             IModelRepository repo = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.FileSystem
                 ? new Repository.FileSystemRepository(settings.repositoryRoot)
                 : new Repository.HttpRepository(settings.repositoryRoot);
             _service = new ModelLibraryService(repo);
             _ = LoadIndexAsync();
-            FirstRunWizard.MaybeShow();
+        }
+
+        public void ReinitializeAfterConfiguration()
+        {
+            // Clear any existing state
+            _indexCache = null;
+            _loadingIndex = false;
+
+            // Reinitialize services with new configuration
+            InitializeServices();
+        }
+
+        private void DrawConfigurationRequired()
+        {
+            EditorGUILayout.HelpBox("Model Library needs to be configured before use.", MessageType.Warning);
+            EditorGUILayout.Space();
+
+            if (GUILayout.Button("Open Configuration Wizard", GUILayout.Height(30)))
+            {
+                FirstRunWizard.MaybeShow();
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.HelpBox("The configuration wizard will help you set up:\n• Your user name\n• Repository location (local folder or server URL)", MessageType.Info);
+        }
+
+        private void DrawServicesNotInitialized()
+        {
+            EditorGUILayout.HelpBox("Services are not initialized. This should not happen.", MessageType.Error);
+            EditorGUILayout.Space();
+
+            if (GUILayout.Button("Retry Initialization", GUILayout.Height(30)))
+            {
+                InitializeServices();
+            }
         }
 
         private async Task LoadIndexAsync()
@@ -77,6 +124,20 @@ namespace ModelLibrary.Editor.Windows
 
         private void OnGUI()
         {
+            // Check if we need to show configuration first
+            if (!FirstRunWizard.IsConfigured())
+            {
+                DrawConfigurationRequired();
+                return;
+            }
+
+            // Check if services are initialized
+            if (_service == null)
+            {
+                DrawServicesNotInitialized();
+                return;
+            }
+
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
                 _search = GUILayout.TextField(_search, EditorStyles.toolbarSearchField);
