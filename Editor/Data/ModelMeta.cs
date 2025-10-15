@@ -131,11 +131,6 @@ namespace ModelLibrary.Data
         /// </summary>
         public long uploadTimeTicks = 0;
 
-        /// <summary>
-        /// Optional project scopes that restrict visibility to specific Unity projects.
-        /// Match values against Application.productName.
-        /// </summary>
-        public List<string> projectTags = new List<string>();
 
         /// <summary>
         /// Preferred install path inside the Unity project (e.g., "Assets/Models/Spaceship").

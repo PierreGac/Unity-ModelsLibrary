@@ -21,7 +21,7 @@ namespace ModelLibrary.Editor.Services
         /// <summary>
         /// Build the ModelMeta from the current selection, including payload file list, GUIDs and dependency GUIDs.
         /// </summary>
-        public static async Task<ModelMeta> BuildMetaFromSelectionAsync(string identityName, string identityId, string version, string description, IEnumerable<string> imagePaths, IEnumerable<string> tags, IEnumerable<string> projectTags, string installPath, string relativePath, IUserIdentityProvider idProvider)
+        public static async Task<ModelMeta> BuildMetaFromSelectionAsync(string identityName, string identityId, string version, string description, IEnumerable<string> imagePaths, IEnumerable<string> tags, string installPath, string relativePath, IUserIdentityProvider idProvider)
         {
             string resolvedId = string.IsNullOrWhiteSpace(identityId) ? Guid.NewGuid().ToString("N") : identityId;
             ModelMeta meta = new ModelMeta
@@ -33,7 +33,6 @@ namespace ModelLibrary.Editor.Services
                 createdTimeTicks = DateTime.Now.Ticks,
                 updatedTimeTicks = DateTime.Now.Ticks,
                 uploadTimeTicks = DateTime.Now.Ticks,
-                projectTags = NormalizeProjectTags(projectTags),
                 installPath = ResolveInstallPath(installPath, identityName),
                 relativePath = ResolveRelativePath(relativePath, identityName)
             };
@@ -327,24 +326,6 @@ namespace ModelLibrary.Editor.Services
                 RenderTexture.active = previous;
                 RenderTexture.ReleaseTemporary(temp);
             }
-        }
-        private static List<string> NormalizeProjectTags(IEnumerable<string> projectTags)
-        {
-            if (projectTags == null)
-            {
-                return new List<string>();
-            }
-
-            HashSet<string> unique = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string tag in projectTags)
-            {
-                if (string.IsNullOrWhiteSpace(tag))
-                {
-                    continue;
-                }
-                unique.Add(tag.Trim());
-            }
-            return new List<string>(unique);
         }
 
         private static string ResolveInstallPath(string installPath, string identityName)

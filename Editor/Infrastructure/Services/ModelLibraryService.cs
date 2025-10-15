@@ -107,15 +107,7 @@ namespace ModelLibrary.Editor.Services
 
             foreach (ModelIndex.Entry e in index.entries)
             {
-                if (e.projectScopes != null && e.projectScopes.Count > 0)
-                {
-                    string projectName = Application.productName;
-                    bool matches = e.projectScopes.Any(scope => string.Equals(scope, projectName, StringComparison.OrdinalIgnoreCase));
-                    if (!matches)
-                    {
-                        continue;
-                    }
-                }
+                // All models are visible (no project restrictions)
 
                 // Attempt to find the highest local version present by reading meta.json copies under Assets
                 string foundLocalVersion = null;
@@ -348,7 +340,6 @@ namespace ModelLibrary.Editor.Services
             long timestamp = meta.updatedTimeTicks <= 0 ? DateTime.Now.Ticks : meta.updatedTimeTicks;
             long releaseTimestamp = meta.uploadTimeTicks <= 0 ? timestamp : meta.uploadTimeTicks;
             List<string> tags = meta.tags?.values != null ? new List<string>(meta.tags.values) : new List<string>();
-            List<string> projectScopes = meta.projectTags != null ? new List<string>(meta.projectTags) : new List<string>();
 
             if (entry == null)
             {
@@ -361,7 +352,6 @@ namespace ModelLibrary.Editor.Services
                     updatedTimeTicks = timestamp,
                     releaseTimeTicks = releaseTimestamp,
                     tags = tags,
-                    projectScopes = projectScopes
                 };
                 index.entries.Add(entry);
             }
@@ -382,7 +372,6 @@ namespace ModelLibrary.Editor.Services
                 entry.description = meta.description;
                 entry.updatedTimeTicks = timestamp;
                 entry.tags = tags;
-                entry.projectScopes = projectScopes;
             }
 
             await _repo.SaveIndexAsync(index);

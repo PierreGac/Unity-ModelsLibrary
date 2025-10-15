@@ -25,25 +25,25 @@ namespace ModelLibrary.Data
             /// This is the primary key used to identify models.
             /// </summary>
             public string id;
-            
+
             /// <summary>
             /// Human-readable name of the model (same as ModelIdentity.Name).
             /// Used for display in the browser and search functionality.
             /// </summary>
             public string name;
-            
+
             /// <summary>
             /// The latest version number available for this model.
             /// Format: Semantic Versioning (e.g., "1.2.3")
             /// </summary>
             public string latestVersion;
-            
+
             /// <summary>
             /// Short description/summary for quick browsing.
             /// Usually the first line or a condensed version of the full description.
             /// </summary>
             public string description;
-            
+
             /// <summary>
             /// Tags associated with this model for categorization and filtering.
             /// Copied from the latest version's metadata.
@@ -60,10 +60,6 @@ namespace ModelLibrary.Data
             /// </summary>
             public long releaseTimeTicks = 0;
 
-            /// <summary>
-            /// Optional list of project names that can see this model. Empty list means visible to all projects.
-            /// </summary>
-            public List<string> projectScopes = new List<string>();
         }
 
         /// <summary>

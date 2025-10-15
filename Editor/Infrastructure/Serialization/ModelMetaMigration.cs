@@ -107,8 +107,6 @@ namespace ModelLibrary.Editor.Serialization
                 if (modelMeta.imageRelativePaths == null)
                     modelMeta.imageRelativePaths = new List<string>();
 
-                if (modelMeta.projectTags == null)
-                    modelMeta.projectTags = new List<string>();
 
                 if (modelMeta.notes == null)
                     modelMeta.notes = new List<Data.ModelNote>();
@@ -144,5 +142,6 @@ namespace ModelLibrary.Editor.Serialization
                 return false;
             }
         }
+
     }
 }

@@ -49,9 +49,7 @@ namespace ModelLibrary.Editor.Windows
         private string _relativePath;
         private List<string> _imageAbsPaths = new();
         private List<string> _tags = new();
-        private List<string> _projectTags = new();
         private string _newTag = string.Empty;
-        private string _newProjectTag = string.Empty;
         private readonly IUserIdentityProvider _idProvider = new SimpleUserIdentityProvider();
 
         [MenuItem("Tools/Model Library/Submit Model")]
@@ -71,7 +69,6 @@ namespace ModelLibrary.Editor.Windows
             _service = new ModelLibraryService(repo);
             _installPath = DefaultInstallPath();
             _relativePath = GetDefaultRelativePath();
-            _projectTags.Clear();
             _ = LoadIndexAsync();
         }
 
@@ -143,27 +140,6 @@ namespace ModelLibrary.Editor.Windows
                 // Relative Path with validation feedback
                 DrawRelativePathField();
 
-                EditorGUILayout.LabelField("Project Visibility", EditorStyles.boldLabel);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    _newProjectTag = EditorGUILayout.TextField("Add Project", _newProjectTag);
-                    if (GUILayout.Button("Add", GUILayout.Width(__BUTTON_WIDTH_MEDIUM)) && !string.IsNullOrWhiteSpace(_newProjectTag))
-                    {
-                        AddProjectTag(_newProjectTag);
-                        _newProjectTag = string.Empty;
-                    }
-                }
-                for (int i = _projectTags.Count - 1; i >= 0; i--)
-                {
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        EditorGUILayout.LabelField("- " + _projectTags[i]);
-                        if (GUILayout.Button("x", GUILayout.Width(__BUTTON_WIDTH_SMALL)))
-                        {
-                            _projectTags.RemoveAt(i);
-                        }
-                    }
-                }
 
                 if (GUILayout.Button("Add Images..."))
                 {
@@ -237,7 +213,6 @@ namespace ModelLibrary.Editor.Windows
                 {
                     _changeSummary = "Initial submission";
                 }
-                _projectTags.Clear();
                 _installPath = DefaultInstallPath();
                 _relativePath = GetDefaultRelativePath();
             }
@@ -335,7 +310,6 @@ namespace ModelLibrary.Editor.Windows
                 _name = entry.name;
                 _description = _latestSelectedMeta?.description ?? string.Empty;
                 _tags = new List<string>(_latestSelectedMeta?.tags?.values ?? new List<string>());
-                _projectTags = new List<string>(_latestSelectedMeta?.projectTags ?? new List<string>());
                 _installPath = _latestSelectedMeta?.installPath ?? DefaultInstallPath();
                 _relativePath = _latestSelectedMeta?.relativePath ?? GetDefaultRelativePath();
                 _version = SuggestNextVersion(entry.latestVersion);
@@ -407,7 +381,7 @@ namespace ModelLibrary.Editor.Windows
             try
             {
                 EditorUtility.DisplayProgressBar(progressTitle, "Preparing metadata...", 0.2f);
-                ModelMeta meta = await ModelDeployer.BuildMetaFromSelectionAsync(identityName, identityId, _version, _description, _imageAbsPaths, _tags, _projectTags, _installPath, _relativePath, _idProvider);
+                ModelMeta meta = await ModelDeployer.BuildMetaFromSelectionAsync(identityName, identityId, _version, _description, _imageAbsPaths, _tags, _installPath, _relativePath, _idProvider);
 
                 temp = Path.Combine(Path.GetTempPath(), "ModelSubmit_" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(temp);
@@ -573,19 +547,6 @@ namespace ModelLibrary.Editor.Windows
             return errors;
         }
 
-        private void AddProjectTag(string projectTag)
-        {
-            if (string.IsNullOrWhiteSpace(projectTag))
-            {
-                return;
-            }
-
-            string trimmed = projectTag.Trim();
-            if (!_projectTags.Contains(trimmed))
-            {
-                _projectTags.Add(trimmed);
-            }
-        }
 
         /// <summary>
         /// Validates if the selected file is a valid image file.

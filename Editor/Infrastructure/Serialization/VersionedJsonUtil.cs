@@ -157,7 +157,6 @@ namespace ModelLibrary.Editor.Serialization
                 modelMeta.textures = new List<Data.AssetRef>();
                 modelMeta.assetGuids = new List<string>();
                 modelMeta.imageRelativePaths = new List<string>();
-                modelMeta.projectTags = new List<string>();
                 modelMeta.notes = new List<Data.ModelNote>();
                 modelMeta.dependencies = new List<string>();
                 modelMeta.dependenciesDetailed = new List<Data.DependencyRef>();

@@ -29,7 +29,6 @@ namespace ModelLibrary.Editor.Windows
         private readonly HashSet<string> _importsInProgress = new();
         private readonly Dictionary<string, Texture2D> _thumbnailCache = new();
         private readonly HashSet<string> _loadingThumbnails = new();
-        private string _projectName;
         private bool _showTagFilter;
         private readonly HashSet<string> _selectedTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private Vector2 _tagScroll;
@@ -40,7 +39,6 @@ namespace ModelLibrary.Editor.Windows
         public static void Open()
         {
             ModelLibraryWindow win = GetWindow<ModelLibraryWindow>("Model Library");
-            win._projectName = Application.productName;
             win.Show();
         }
 
@@ -103,7 +101,7 @@ namespace ModelLibrary.Editor.Windows
                 query = query.Where(e => EntryMatchesSearch(e, trimmedSearch));
             }
 
-            query = query.Where(IsVisibleForCurrentProject);
+            // All models are visible (no project restrictions)
 
             if (_selectedTags.Count > 0)
             {
@@ -283,7 +281,7 @@ namespace ModelLibrary.Editor.Windows
 
             foreach (ModelIndex.Entry entry in index.entries)
             {
-                if (!IsVisibleForCurrentProject(entry) || entry?.tags == null)
+                if (entry?.tags == null)
                 {
                     continue;
                 }
@@ -313,27 +311,9 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        private bool IsVisibleForCurrentProject(ModelIndex.Entry entry)
-        {
-            if (entry == null)
-            {
-                return false;
-            }
-
-            if (entry.projectScopes == null || entry.projectScopes.Count == 0)
-            {
-                return true;
-            }
-
-            return entry.projectScopes.Any(scope => string.Equals(scope, _projectName, StringComparison.OrdinalIgnoreCase));
-        }
 
         private void DrawEntry(ModelIndex.Entry e)
         {
-            if (!IsVisibleForCurrentProject(e))
-            {
-                return;
-            }
 
             using (new EditorGUILayout.VerticalScope("box"))
             {
@@ -513,7 +493,7 @@ namespace ModelLibrary.Editor.Windows
         {
             string modelName = meta?.identity?.name ?? "Model";
             string candidate;
-            
+
             // First try the relative path from meta
             if (!string.IsNullOrWhiteSpace(meta?.relativePath))
             {
@@ -529,7 +509,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 candidate = BuildInstallPath(modelName);
             }
-            
+
             return NormalizeInstallPath(candidate) ?? BuildInstallPath(modelName);
         }
 
@@ -591,7 +571,7 @@ namespace ModelLibrary.Editor.Windows
             string normalized = PathUtils.SanitizePathSeparator(path.Trim());
             if (!normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
             {
-                normalized = $"Assets/{normalized.TrimStart('/') }";
+                normalized = $"Assets/{normalized.TrimStart('/')}";
             }
             return normalized;
         }
