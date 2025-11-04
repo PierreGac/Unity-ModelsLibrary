@@ -17,10 +17,7 @@ namespace ModelLibrary.Editor.Services
         /// Initializes a new instance of the ModelDownloader with the specified service.
         /// </summary>
         /// <param name="service">The model library service to use for downloading.</param>
-        public ModelDownloader(ModelLibraryService service)
-        {
-            _service = service;
-        }
+        public ModelDownloader(ModelLibraryService service) => _service = service;
 
         /// <summary>
         /// Downloads a model version from the repository to the local cache.

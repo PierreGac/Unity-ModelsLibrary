@@ -38,13 +38,10 @@ namespace ModelLibrary.Editor.Repository
 
         /// <summary>
         /// Initialize the repository with a root directory path.
+        /// Normalizes path separators to match the current operating system.
         /// </summary>
         /// <param name="root">The root directory path (local or UNC)</param>
-        public FileSystemRepository(string root)
-        {
-            // Normalize path separators to match the current operating system
-            Root = root.Replace('/', Path.DirectorySeparatorChar);
-        }
+        public FileSystemRepository(string root) => Root = root.Replace('/', Path.DirectorySeparatorChar);
 
         /// <summary>
         /// Helper method to safely join path segments and normalize separators.
@@ -134,8 +131,8 @@ namespace ModelLibrary.Editor.Repository
             DateTime now = DateTime.UtcNow;
 
             // Check if we have a valid cached result
-            if (_directoryContentsCache.TryGetValue(directoryPath, out var cachedContents) &&
-                _directoryCacheTimestamps.TryGetValue(directoryPath, out var cacheTime) &&
+            if (_directoryContentsCache.TryGetValue(directoryPath, out HashSet<string> cachedContents) &&
+                _directoryCacheTimestamps.TryGetValue(directoryPath, out DateTime cacheTime) &&
                 now - cacheTime < DirectoryCacheExpiry)
             {
                 return cachedContents;

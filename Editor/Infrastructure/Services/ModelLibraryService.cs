@@ -293,41 +293,31 @@ namespace ModelLibrary.Editor.Services
         /// Get all models with available updates.
         /// </summary>
         public async Task<List<ModelUpdateDetector.ModelUpdateInfo>> GetAvailableUpdatesAsync()
-        {
-            return await _updateDetector.GetAvailableUpdatesAsync();
-        }
+            => await _updateDetector.GetAvailableUpdatesAsync();
 
         /// <summary>
         /// Get update information for a specific model.
         /// </summary>
         public async Task<ModelUpdateDetector.ModelUpdateInfo> GetUpdateInfoAsync(string modelId)
-        {
-            return await _updateDetector.GetUpdateInfoAsync(modelId);
-        }
+            => await _updateDetector.GetUpdateInfoAsync(modelId);
 
         /// <summary>
         /// Check if a specific model has updates available.
         /// </summary>
         public async Task<bool> HasUpdateAsync(string modelId)
-        {
-            return await _updateDetector.HasUpdateAsync(modelId);
-        }
+            => await _updateDetector.HasUpdateAsync(modelId);
 
         /// <summary>
         /// Get the total number of available updates.
         /// </summary>
         public async Task<int> GetUpdateCountAsync()
-        {
-            return await _updateDetector.GetUpdateCountAsync();
-        }
+            => await _updateDetector.GetUpdateCountAsync();
 
         /// <summary>
         /// Force a refresh of all update information.
         /// </summary>
         public async Task RefreshAllUpdatesAsync()
-        {
-            await _updateDetector.RefreshAllUpdatesAsync();
-        }
+            => await _updateDetector.RefreshAllUpdatesAsync();
 
         /// <summary>
         /// Delete a specific model version from the repository.
