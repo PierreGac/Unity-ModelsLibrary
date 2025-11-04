@@ -71,5 +71,13 @@ namespace ModelLibrary.Editor.Repository
         public Task UploadFileAsync(string relativePath, string localAbsolutePath) => Task.CompletedTask;
 
         public Task DownloadFileAsync(string relativePath, string localAbsolutePath) => Task.CompletedTask;
+
+        public Task<bool> DeleteVersionAsync(string modelId, string version)
+        {
+            // HTTP repository deletion would require a DELETE endpoint on the server
+            // This is a stub implementation - actual HTTP repos should implement DELETE /models/{modelId}/{version}
+            UnityEngine.Debug.LogWarning("[HttpRepository] DeleteVersionAsync is not implemented for HTTP repositories. Requires server-side DELETE endpoint.");
+            return Task.FromResult(false);
+        }
     }
 }

@@ -27,16 +27,24 @@ namespace ModelLibrary.Editor.Services
         }
 
         /// <summary>
-        /// Information about a model update.
+        /// Information about a model update status.
+        /// Contains both local and remote version information, update availability, and descriptive text.
         /// </summary>
         public class ModelUpdateInfo
         {
+            /// <summary>The unique identifier of the model.</summary>
             public string modelId { get; set; }
+            /// <summary>The display name of the model.</summary>
             public string modelName { get; set; }
+            /// <summary>The version currently installed locally.</summary>
             public string localVersion { get; set; }
+            /// <summary>The latest version available in the repository.</summary>
             public string remoteVersion { get; set; }
+            /// <summary>Whether an update is available (remote version is newer than local).</summary>
             public bool hasUpdate { get; set; }
+            /// <summary>Timestamp when this update information was last checked.</summary>
             public DateTime lastChecked { get; set; }
+            /// <summary>Human-readable description of the update (from changelog or version comparison).</summary>
             public string updateDescription { get; set; }
         }
 
@@ -106,6 +114,11 @@ namespace ModelLibrary.Editor.Services
             _lastUpdateCheck = DateTime.MinValue;
         }
 
+        /// <summary>
+        /// Refreshes update information for all models in the index.
+        /// Uses caching to avoid excessive checks - only refreshes if cache is expired or empty.
+        /// Skips update checks for models that are not installed locally.
+        /// </summary>
         private async Task RefreshUpdateInfoAsync()
         {
             // Check if we need to refresh based on time interval
@@ -172,6 +185,15 @@ namespace ModelLibrary.Editor.Services
             }
         }
 
+        /// <summary>
+        /// Gets a human-readable description of an available update.
+        /// Attempts to extract the changelog summary from the latest version metadata.
+        /// Falls back to a version comparison description if changelog is not available.
+        /// </summary>
+        /// <param name="modelId">The unique identifier of the model.</param>
+        /// <param name="localVersion">The currently installed local version.</param>
+        /// <param name="remoteVersion">The latest available remote version.</param>
+        /// <returns>A descriptive string about the update, or a generic version comparison message.</returns>
         private async Task<string> GetUpdateDescriptionAsync(string modelId, string localVersion, string remoteVersion)
         {
             try

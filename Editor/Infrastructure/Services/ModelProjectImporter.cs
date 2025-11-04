@@ -193,6 +193,12 @@ namespace ModelLibrary.Editor.Services
             return await Task.FromResult(destRel);
         }
 
+        /// <summary>
+        /// Attempts to clean (delete) a directory or file at the specified path.
+        /// Handles both file and directory deletion, with robust error handling.
+        /// If initial deletion fails, attempts to clean individual files and subdirectories.
+        /// </summary>
+        /// <param name="path">Path to the file or directory to clean.</param>
         private static void TryCleanDirectory(string path)
         {
             try
@@ -237,6 +243,12 @@ namespace ModelLibrary.Editor.Services
             }
         }
 
+        /// <summary>
+        /// Recursively copies a directory and all its contents to a destination directory.
+        /// Preserves directory structure and overwrites existing files.
+        /// </summary>
+        /// <param name="srcDir">Source directory to copy from.</param>
+        /// <param name="dstDir">Destination directory to copy to.</param>
         private static void CopyDir(string srcDir, string dstDir)
         {
             if (!Directory.Exists(srcDir))
@@ -255,11 +267,13 @@ namespace ModelLibrary.Editor.Services
         }
 
         /// <summary>
-        /// Resolves the destination path for model import with validation and logging.
+        /// Resolves the destination path for model import with comprehensive validation and logging.
+        /// Priority order: 1) Override path (if provided), 2) Meta relative path (if valid), 3) Fallback default path.
+        /// Validates paths and handles file-to-directory conversion if needed.
         /// </summary>
-        /// <param name="meta">Model metadata containing relative path information</param>
-        /// <param name="overrideInstallPath">Optional override path for installation</param>
-        /// <returns>Resolved destination path relative to project root</returns>
+        /// <param name="meta">Model metadata containing relative path information.</param>
+        /// <param name="overrideInstallPath">Optional override path for installation (user-selected).</param>
+        /// <returns>Resolved destination path relative to project root (e.g., "Assets/Models/ModelName").</returns>
         private static string ResolveDestinationPath(ModelMeta meta, string overrideInstallPath)
         {
             // Priority 1: Override path (highest priority)
@@ -318,6 +332,15 @@ namespace ModelLibrary.Editor.Services
             return new string(result).Replace(' ', '_');
         }
 
+        /// <summary>
+        /// Checks for GUID conflicts between imported model assets and existing project assets.
+        /// Uses pre-import GUID snapshot to avoid false positives from the import itself.
+        /// Differentiates between same-model GUIDs (expected) and actual conflicts with other models.
+        /// Shows a dialog to the user if conflicts are detected, offering to regenerate GUIDs.
+        /// </summary>
+        /// <param name="meta">Model metadata containing asset GUIDs to check.</param>
+        /// <param name="destAbs">Absolute path to the destination directory where the model was imported.</param>
+        /// <param name="existingGuidsBeforeImport">Set of GUIDs that existed before import (for accurate conflict detection).</param>
         private static async Task CheckForGuidConflictsAsync(ModelMeta meta, string destAbs, HashSet<string> existingGuidsBeforeImport = null)
         {
             try
@@ -402,6 +425,12 @@ namespace ModelLibrary.Editor.Services
             }
         }
 
+        /// <summary>
+        /// Regenerates GUIDs for all .meta files in the imported model directory.
+        /// This resolves GUID conflicts by assigning new unique identifiers to imported assets.
+        /// Uses regex to replace GUID values in .meta files, then refreshes the AssetDatabase.
+        /// </summary>
+        /// <param name="destAbs">Absolute path to the directory containing the imported model.</param>
         private static async Task RegenerateGuidsForImportedModelAsync(string destAbs)
         {
             try

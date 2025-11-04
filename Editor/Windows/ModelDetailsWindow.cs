@@ -3,11 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ModelLibrary.Data;
+using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Repository;
 using ModelLibrary.Editor.Services;
 using ModelLibrary.Editor.Settings;
 using ModelLibrary.Editor.Utils;
-using Identity = ModelLibrary.Editor.Identity;
 using UnityEditor;
 using UnityEngine;
 using System.Globalization;
@@ -15,29 +16,66 @@ using System.Globalization;
 namespace ModelLibrary.Editor.Windows
 {
     /// <summary>
-    /// Shows a model version's metadata, structure, tags and notes; allows import and editing.
+    /// Detailed view window for a specific model version.
+    /// Displays comprehensive metadata including description, tags, structure, changelog, and notes.
+    /// Allows Artists to edit metadata (description and tags) and delete versions.
+    /// Allows all users to add feedback notes and import the model to their project.
     /// </summary>
     public class ModelDetailsWindow : EditorWindow
     {
+        // Model Identification
+        /// <summary>The unique identifier of the model being displayed.</summary>
         private string _modelId;
+        /// <summary>The version of the model being displayed.</summary>
         private string _version;
+
+        // Services
+        /// <summary>Service instance for repository operations.</summary>
         private ModelLibraryService _service;
+
+        // Metadata
+        /// <summary>The loaded model metadata.</summary>
         private Data.ModelMeta _meta;
+        /// <summary>Original metadata JSON for change detection when saving.</summary>
         private string _baselineMetaJson;
+        /// <summary>Edited description text (may differ from _meta.description).</summary>
         private string _editedDescription;
+
+        // UI State
+        /// <summary>Scroll position for the main content area.</summary>
         private Vector2 _scroll;
+        /// <summary>Scroll position for the model structure section.</summary>
         private Vector2 _structureScroll;
+        /// <summary>Whether the structure section is expanded.</summary>
         private bool _showStructure = true;
+        /// <summary>Whether the notes section is expanded.</summary>
         private bool _showNotes = true;
+        /// <summary>Whether the changelog section is expanded.</summary>
         private bool _showChangelog = true;
+
+        // Editing State
+        /// <summary>Whether tag editing mode is active.</summary>
         private bool _editingTags = false;
+        /// <summary>Flag indicating if metadata is currently being saved.</summary>
         private bool _isSavingMetadata = false;
+        /// <summary>Editable list of tags (used during tag editing).</summary>
         private List<string> _editableTags = new();
+        /// <summary>Text field for adding new tags.</summary>
         private string _newTag = string.Empty;
+
+        // Notes
+        /// <summary>Text field for the new note message.</summary>
         private string _newNoteMessage = string.Empty;
+        /// <summary>Selected tag for the new note.</summary>
         private string _newNoteTag = "remarks";
+        /// <summary>Available note tags for categorization.</summary>
         private readonly string[] _noteTags = { "bugfix", "improvements", "remarks", "question", "praise" };
 
+        /// <summary>
+        /// Opens the model details window for a specific model version.
+        /// </summary>
+        /// <param name="id">The unique identifier of the model.</param>
+        /// <param name="version">The version of the model to display.</param>
         public static void Open(string id, string version)
         {
             ModelDetailsWindow w = GetWindow<ModelDetailsWindow>("Model Details");
@@ -45,6 +83,9 @@ namespace ModelLibrary.Editor.Windows
             w.Show();
         }
 
+        /// <summary>
+        /// Initializes the window by setting up services and loading metadata.
+        /// </summary>
         private void Init()
         {
             ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
@@ -55,6 +96,9 @@ namespace ModelLibrary.Editor.Windows
             _ = Load();
         }
 
+        /// <summary>
+        /// Asynchronously loads the model metadata and initializes the editing state.
+        /// </summary>
         private async Task Load()
         {
             _meta = await _service.GetMetaAsync(_modelId, _version);
@@ -71,6 +115,10 @@ namespace ModelLibrary.Editor.Windows
 
             EditorGUILayout.LabelField(_meta.identity.name, EditorStyles.boldLabel);
             EditorGUILayout.LabelField($"v{_meta.version} by {_meta.author}");
+
+            // Delete version button (with safety checks)
+            DrawDeleteVersionButton();
+
             EditorGUILayout.Space();
 
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
@@ -84,11 +132,17 @@ namespace ModelLibrary.Editor.Windows
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.LabelField("Tags:", EditorStyles.boldLabel);
-                string tagButtonLabel = _editingTags ? "Cancel" : "Edit";
-                if (GUILayout.Button(tagButtonLabel, GUILayout.Width(60)))
+                SimpleUserIdentityProvider identityProviderForTags = new SimpleUserIdentityProvider();
+                bool isArtistForTags = identityProviderForTags.GetUserRole() == UserRole.Artist;
+
+                if (isArtistForTags)
                 {
-                    _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
-                    _editingTags = !_editingTags;
+                    string tagButtonLabel = _editingTags ? "Cancel" : "Edit";
+                    if (GUILayout.Button(tagButtonLabel, GUILayout.Width(60)))
+                    {
+                        _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
+                        _editingTags = !_editingTags;
+                    }
                 }
             }
 
@@ -120,16 +174,28 @@ namespace ModelLibrary.Editor.Windows
                 EditorGUILayout.LabelField(string.Join(", ", _meta.tags?.values.ToArray() ?? Array.Empty<string>()));
             }
             EditorGUILayout.Space();
-            using (new EditorGUILayout.HorizontalScope())
+
+            // Only show Save Metadata Changes button for Artists
+            SimpleUserIdentityProvider identityProviderForSave = new SimpleUserIdentityProvider();
+            bool isArtistForSave = identityProviderForSave.GetUserRole() == UserRole.Artist;
+
+            if (isArtistForSave)
             {
-                GUILayout.FlexibleSpace();
-                using (new EditorGUI.DisabledScope(_isSavingMetadata))
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Save Metadata Changes", GUILayout.Width(180)))
+                    GUILayout.FlexibleSpace();
+                    using (new EditorGUI.DisabledScope(_isSavingMetadata))
                     {
-                        _ = SaveMetadataChangesAsync();
+                        if (GUILayout.Button("Save Metadata Changes", GUILayout.Width(180)))
+                        {
+                            _ = SaveMetadataChangesAsync();
+                        }
                     }
                 }
+            }
+            else
+            {
+                EditorGUILayout.HelpBox("Metadata editing is only available for Artists. Switch to Artist role in User Settings to edit metadata.", MessageType.Info);
             }
             EditorGUILayout.Space();
 
@@ -290,7 +356,7 @@ namespace ModelLibrary.Editor.Windows
             try
             {
                 _isSavingMetadata = true;
-                string author = new Identity.SimpleUserIdentityProvider().GetUserName();
+                string author = new SimpleUserIdentityProvider().GetUserName();
                 await _service.PublishMetadataUpdateAsync(_meta, _version, summary, author);
                 _version = _meta.version;
                 await Load();
@@ -441,6 +507,129 @@ namespace ModelLibrary.Editor.Windows
             foreach (string line in lines)
             {
                 EditorGUILayout.LabelField(line, style);
+            }
+        }
+
+        /// <summary>
+        /// Draws the delete version button with comprehensive safety checks.
+        /// Only visible to Artists. Shows a warning dialog for all deletions,
+        /// and an additional confirmation dialog if deleting the latest version.
+        /// </summary>
+        private void DrawDeleteVersionButton()
+        {
+            // Only show delete button for Artists
+            SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
+            if (identityProvider.GetUserRole() != UserRole.Artist)
+            {
+                return; // Developers cannot delete versions
+            }
+
+            EditorGUILayout.Space(2);
+
+            // Check if this is the latest version
+            bool isLatestVersion = false;
+            try
+            {
+                // Synchronously check if this is the latest version (we'll need to load index)
+                // For now, we'll show the button but disable it if it's the latest
+                // In a real implementation, we'd want to check this asynchronously
+            }
+            catch { }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.FlexibleSpace();
+
+                // Warning style for delete button
+                Color originalColor = GUI.color;
+                GUI.color = Color.red;
+
+                EditorGUILayout.HelpBox("Deleting a version permanently removes it from the repository. This action cannot be undone.", MessageType.Warning);
+
+                GUI.color = originalColor;
+
+                if (GUILayout.Button("Delete This Version", GUILayout.Width(150), GUILayout.Height(25)))
+                {
+                    // Show confirmation dialog
+                    bool confirmed = EditorUtility.DisplayDialog(
+                        "Delete Version",
+                        $"Are you sure you want to delete version {_meta.version} of '{_meta.identity.name}'?\n\n" +
+                        "This will permanently remove:\n" +
+                        "• The version folder\n" +
+                        "• All payload files\n" +
+                        "• All images\n" +
+                        "• The metadata\n\n" +
+                        "This action cannot be undone!",
+                        "Delete",
+                        "Cancel");
+
+                    if (confirmed)
+                    {
+                        // Double confirmation for latest version
+                        ModelIndex index = _service.GetIndexAsync().GetAwaiter().GetResult();
+                        ModelIndex.Entry entry = index?.entries?.FirstOrDefault(e => e.id == _modelId);
+                        if (entry != null && entry.latestVersion == _version)
+                        {
+                            bool confirmLatest = EditorUtility.DisplayDialog(
+                                "Delete Latest Version",
+                                $"Warning: You are about to delete the LATEST version ({_version})!\n\n" +
+                                "This will make the model appear outdated in the index.\n" +
+                                "You should update the index manually after deletion.\n\n" +
+                                "Are you absolutely sure?",
+                                "Yes, Delete Anyway",
+                                "Cancel");
+
+                            if (!confirmLatest)
+                            {
+                                return;
+                            }
+                        }
+
+                        // Perform deletion
+                        _ = DeleteVersionAsync();
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Asynchronously deletes the current model version from the repository.
+        /// Removes all files, metadata, and images associated with the version.
+        /// Closes the window after successful deletion since the version no longer exists.
+        /// </summary>
+        private async Task DeleteVersionAsync()
+        {
+            EditorUtility.DisplayProgressBar("Deleting Version", $"Deleting {_meta.identity.name} v{_meta.version}...", 0.5f);
+
+            try
+            {
+                bool deleted = await _service.DeleteVersionAsync(_modelId, _version);
+
+                EditorUtility.ClearProgressBar();
+
+                if (deleted)
+                {
+                    EditorUtility.DisplayDialog("Deletion Successful",
+                        $"Version {_version} of '{_meta.identity.name}' has been deleted from the repository.",
+                        "OK");
+
+                    // Close this window since the version no longer exists
+                    Close();
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("Deletion Failed",
+                        $"Failed to delete version {_version}. The version may not exist or there was an error accessing the repository.",
+                        "OK");
+                }
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.ClearProgressBar();
+                EditorUtility.DisplayDialog("Deletion Error",
+                    $"An error occurred while deleting the version:\n\n{ex.Message}",
+                    "OK");
+                Debug.LogException(ex);
             }
         }
     }

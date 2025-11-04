@@ -22,14 +22,19 @@ namespace ModelLibrary.Editor.Repository
         /// </summary>
         public string Root { get; }
 
-        // Cache for file existence checks to avoid repeated slow File.Exists() calls
+        // Performance Optimization: Caching
+        /// <summary>Cache for file existence checks to avoid repeated slow File.Exists() calls, especially on network drives.</summary>
         private readonly ConcurrentDictionary<string, bool> _fileExistsCache = new ConcurrentDictionary<string, bool>();
+        /// <summary>Cache for directory existence checks to avoid repeated slow Directory.Exists() calls.</summary>
         private readonly ConcurrentDictionary<string, bool> _directoryExistsCache = new ConcurrentDictionary<string, bool>();
 
-        // Cache for directory contents to avoid repeated network calls
+        // Network Optimization: Directory Listing Cache
+        /// <summary>Cache for directory contents to minimize network calls for UNC paths.</summary>
         private readonly ConcurrentDictionary<string, HashSet<string>> _directoryContentsCache = new ConcurrentDictionary<string, HashSet<string>>();
+        /// <summary>Timestamps for directory cache entries to implement expiration.</summary>
         private readonly ConcurrentDictionary<string, DateTime> _directoryCacheTimestamps = new ConcurrentDictionary<string, DateTime>();
-        private static readonly TimeSpan DirectoryCacheExpiry = TimeSpan.FromMinutes(5); // Cache directory contents for 5 minutes
+        /// <summary>Time span before directory cache entries expire (5 minutes).</summary>
+        private static readonly TimeSpan DirectoryCacheExpiry = TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// Initialize the repository with a root directory path.
@@ -52,8 +57,11 @@ namespace ModelLibrary.Editor.Repository
 
         /// <summary>
         /// Cached file existence check to avoid repeated slow File.Exists() calls.
-        /// For network drives, uses directory listing cache to minimize network calls.
+        /// For network drives (UNC paths), uses directory listing cache to minimize network calls.
+        /// Falls back to direct File.Exists() for local drives or when cache lookup fails.
         /// </summary>
+        /// <param name="path">Absolute path to the file to check.</param>
+        /// <returns>True if the file exists, false otherwise.</returns>
         private bool FileExistsCached(string path)
         {
             return _fileExistsCache.GetOrAdd(path, p =>
@@ -80,8 +88,11 @@ namespace ModelLibrary.Editor.Repository
         }
 
         /// <summary>
-        /// Check if a path is on a network drive (UNC path or mapped network drive).
+        /// Checks if a path is on a network drive (UNC path or mapped network drive).
+        /// Detects both UNC paths (\\server\share) and mapped network drives (Z: where Z is mapped).
         /// </summary>
+        /// <param name="path">The path to check.</param>
+        /// <returns>True if the path is on a network drive, false otherwise.</returns>
         private static bool IsNetworkPath(string path)
         {
             if (string.IsNullOrEmpty(path))
@@ -109,8 +120,12 @@ namespace ModelLibrary.Editor.Repository
         }
 
         /// <summary>
-        /// Get directory contents with caching to minimize network calls.
+        /// Gets directory contents with caching to minimize network calls for UNC paths.
+        /// Cache entries expire after DirectoryCacheExpiry (5 minutes) to ensure data freshness.
+        /// Returns null if the directory doesn't exist or cannot be read.
         /// </summary>
+        /// <param name="directoryPath">Absolute path to the directory to list.</param>
+        /// <returns>Set of file names in the directory, or null if directory doesn't exist or cannot be read.</returns>
         private HashSet<string> GetDirectoryContentsCached(string directoryPath)
         {
             if (string.IsNullOrEmpty(directoryPath))
@@ -162,15 +177,21 @@ namespace ModelLibrary.Editor.Repository
 
         /// <summary>
         /// Cached directory existence check to avoid repeated slow Directory.Exists() calls.
+        /// Uses a thread-safe concurrent dictionary for caching results.
         /// </summary>
+        /// <param name="path">Absolute path to the directory to check.</param>
+        /// <returns>True if the directory exists, false otherwise.</returns>
         private bool DirectoryExistsCached(string path)
         {
             return _directoryExistsCache.GetOrAdd(path, p => Directory.Exists(p));
         }
 
         /// <summary>
-        /// Invalidate file existence cache for a specific path (call after file operations).
+        /// Invalidates file existence cache for a specific path.
+        /// Also invalidates the parent directory's contents cache since the file list has changed.
+        /// Should be called after file creation, deletion, or modification operations.
         /// </summary>
+        /// <param name="path">Absolute path to the file whose cache should be invalidated.</param>
         private void InvalidateFileCache(string path)
         {
             _fileExistsCache.TryRemove(path, out _);
@@ -185,8 +206,11 @@ namespace ModelLibrary.Editor.Repository
         }
 
         /// <summary>
-        /// Invalidate directory existence cache for a specific path (call after directory operations).
+        /// Invalidates directory existence and contents cache for a specific path.
+        /// Also invalidates the parent directory's contents cache.
+        /// Should be called after directory creation, deletion, or modification operations.
         /// </summary>
+        /// <param name="path">Absolute path to the directory whose cache should be invalidated.</param>
         private void InvalidateDirectoryCache(string path)
         {
             _directoryExistsCache.TryRemove(path, out _);
@@ -202,7 +226,12 @@ namespace ModelLibrary.Editor.Repository
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Loads the global models index from the repository.
+        /// The index file is stored at the repository root as "models_index.json".
+        /// Returns an empty index if the file doesn't exist (new repository).
+        /// </summary>
+        /// <returns>The model index, or an empty index if the file doesn't exist.</returns>
         public async Task<ModelIndex> LoadIndexAsync()
         {
             // Build the full path to the models index file
@@ -222,7 +251,12 @@ namespace ModelLibrary.Editor.Repository
             return JsonUtil.FromJson<ModelIndex>(json) ?? new ModelIndex();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Saves the global models index to the repository.
+        /// Creates the root directory if it doesn't exist.
+        /// Invalidates the file cache after writing to ensure subsequent reads get fresh data.
+        /// </summary>
+        /// <param name="index">The model index to save.</param>
         public async Task SaveIndexAsync(ModelIndex index)
         {
             // Build the full path to the models index file
@@ -241,7 +275,14 @@ namespace ModelLibrary.Editor.Repository
             InvalidateFileCache(path);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Loads a specific model version's metadata from the repository.
+        /// The metadata file is stored at: &lt;root&gt;/&lt;modelId&gt;/&lt;version&gt;/model.json
+        /// </summary>
+        /// <param name="modelId">The unique identifier of the model.</param>
+        /// <param name="version">The version string (e.g., "1.0.0").</param>
+        /// <returns>The model metadata object.</returns>
+        /// <exception cref="FileNotFoundException">Thrown if the metadata file doesn't exist.</exception>
         public async Task<ModelMeta> LoadMetaAsync(string modelId, string version)
         {
             // Build the path to the model.json file: <root>/<modelId>/<version>/model.json
@@ -260,7 +301,14 @@ namespace ModelLibrary.Editor.Repository
             return JsonUtil.FromJson<ModelMeta>(json);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Saves a specific model version's metadata to the repository.
+        /// Creates the version directory structure if it doesn't exist.
+        /// The metadata file is stored at: &lt;root&gt;/&lt;modelId&gt;/&lt;version&gt;/model.json
+        /// </summary>
+        /// <param name="modelId">The unique identifier of the model.</param>
+        /// <param name="version">The version string (e.g., "1.0.0").</param>
+        /// <param name="meta">The model metadata to save.</param>
         public async Task SaveMetaAsync(string modelId, string version, ModelMeta meta)
         {
             // Build the path to the model.json file: <root>/<modelId>/<version>/model.json
@@ -279,7 +327,12 @@ namespace ModelLibrary.Editor.Repository
             InvalidateFileCache(path);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Checks whether a directory exists at a repository-relative path.
+        /// Uses cached directory existence checks for performance.
+        /// </summary>
+        /// <param name="relativePath">Repository-relative path to check.</param>
+        /// <returns>True if the directory exists, false otherwise.</returns>
         public Task<bool> DirectoryExistsAsync(string relativePath)
         {
             // Check if the directory exists at the repository-relative path
@@ -287,7 +340,12 @@ namespace ModelLibrary.Editor.Repository
             return Task.FromResult(DirectoryExistsCached(fullPath));
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Ensures a directory exists at a repository-relative path.
+        /// Creates the directory and all parent directories if they don't exist.
+        /// Invalidates the directory cache after creation.
+        /// </summary>
+        /// <param name="relativePath">Repository-relative path where the directory should exist.</param>
         public Task EnsureDirectoryAsync(string relativePath)
         {
             // Create the directory (and any parent directories) if they don't exist
@@ -299,7 +357,13 @@ namespace ModelLibrary.Editor.Repository
             return Task.CompletedTask;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Lists all files recursively under the given repository-relative directory.
+        /// Returns paths relative to the repository root, using forward slashes as separators.
+        /// Returns an empty list if the directory doesn't exist.
+        /// </summary>
+        /// <param name="relativeDir">Repository-relative path to the directory to list.</param>
+        /// <returns>List of file paths relative to the repository root.</returns>
         public Task<List<string>> ListFilesAsync(string relativeDir)
         {
             // Build the absolute path to the directory
@@ -357,6 +421,47 @@ namespace ModelLibrary.Editor.Repository
 
             // Copy the file asynchronously, overwriting if it already exists
             await Task.Run(() => File.Copy(src, localAbsolutePath, overwrite: true));
+        }
+
+        /// <summary>
+        /// Deletes a specific model version from the repository.
+        /// Recursively removes the entire version directory including all payload files, images, and metadata.
+        /// Invalidates all relevant caches after deletion.
+        /// </summary>
+        /// <param name="modelId">The unique identifier of the model.</param>
+        /// <param name="version">The version string to delete (e.g., "1.0.0").</param>
+        /// <returns>True if the version was successfully deleted; false if it didn't exist or deletion failed.</returns>
+        public async Task<bool> DeleteVersionAsync(string modelId, string version)
+        {
+            string versionDir = Path.Combine(Root, modelId, version);
+            string normalizedVersionDir = PathUtils.NormalizePath(versionDir);
+
+            // Check if the version directory exists
+            if (!Directory.Exists(normalizedVersionDir))
+            {
+                return false; // Version doesn't exist
+            }
+
+            try
+            {
+                // Delete the entire version directory asynchronously to avoid blocking the UI thread
+                await Task.Run(() =>
+                {
+                    Directory.Delete(normalizedVersionDir, recursive: true);
+                });
+
+                // Invalidate caches for this path to ensure fresh data on subsequent operations
+                _directoryExistsCache.TryRemove(normalizedVersionDir, out _);
+                _directoryContentsCache.TryRemove(normalizedVersionDir, out _);
+                _directoryCacheTimestamps.TryRemove(normalizedVersionDir, out _);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError($"[FileSystemRepository] Failed to delete version {modelId}/{version}: {ex.Message}");
+                return false;
+            }
         }
     }
 }

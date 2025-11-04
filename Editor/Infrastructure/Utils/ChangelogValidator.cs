@@ -132,24 +132,10 @@ namespace ModelLibrary.Editor.Utils
         {
             List<string> errors = new List<string>();
 
-            // Check for proper sentence structure
-            if (!changelog.EndsWith(".", StringComparison.Ordinal) &&
-                !changelog.EndsWith("!", StringComparison.Ordinal) &&
-                !changelog.EndsWith("?", StringComparison.Ordinal))
-            {
-                errors.Add("Changelog should end with proper punctuation (. ! ?)");
-            }
-
             // Check for excessive whitespace
             if (changelog.Contains("  ") || changelog.Contains("\t\t"))
             {
                 errors.Add("Changelog contains excessive whitespace");
-            }
-
-            // Check for proper capitalization
-            if (changelog.Length > 0 && char.IsLower(changelog[0]))
-            {
-                errors.Add("Changelog should start with a capital letter");
             }
 
             // Check for repeated words
@@ -290,9 +276,11 @@ namespace ModelLibrary.Editor.Utils
 
         /// <summary>
         /// Gets validation suggestions for improving a changelog entry.
+        /// Analyzes the changelog content and provides actionable suggestions based on validation rules.
+        /// Suggestions help users understand what needs to be improved to pass validation.
         /// </summary>
-        /// <param name="changelog">The changelog text to analyze</param>
-        /// <returns>List of improvement suggestions</returns>
+        /// <param name="changelog">The changelog text to analyze.</param>
+        /// <returns>List of improvement suggestions (bullet-point format).</returns>
         public static List<string> GetValidationSuggestions(string changelog)
         {
             List<string> suggestions = new List<string>();
@@ -319,19 +307,6 @@ namespace ModelLibrary.Editor.Utils
                 suggestions.Add("• Focus on the most important changes");
             }
 
-            // Formatting suggestions
-            if (!trimmedChangelog.EndsWith(".", StringComparison.Ordinal) &&
-                !trimmedChangelog.EndsWith("!", StringComparison.Ordinal) &&
-                !trimmedChangelog.EndsWith("?", StringComparison.Ordinal))
-            {
-                suggestions.Add("• End the description with proper punctuation");
-            }
-
-            if (trimmedChangelog.Length > 0 && char.IsLower(trimmedChangelog[0]))
-            {
-                suggestions.Add("• Start the description with a capital letter");
-            }
-
             // Content suggestions
             if (IsMeaninglessContent(trimmedChangelog))
             {
@@ -345,9 +320,11 @@ namespace ModelLibrary.Editor.Utils
 
         /// <summary>
         /// Sanitizes a changelog entry by removing invalid characters and normalizing formatting.
+        /// Removes control characters (except newlines, carriage returns, and tabs), normalizes whitespace,
+        /// and trims the result. This ensures the changelog is safe to store and display.
         /// </summary>
-        /// <param name="changelog">The changelog text to sanitize</param>
-        /// <returns>Sanitized changelog text</returns>
+        /// <param name="changelog">The changelog text to sanitize.</param>
+        /// <returns>Sanitized changelog text with normalized formatting.</returns>
         public static string SanitizeChangelog(string changelog)
         {
             if (string.IsNullOrEmpty(changelog))
@@ -384,13 +361,8 @@ namespace ModelLibrary.Editor.Utils
             sanitized = Regex.Replace(sanitized, @"\n[ \t]+", "\n"); // Remove leading spaces/tabs after newlines
             sanitized = Regex.Replace(sanitized, @"\n{2,}", "\n"); // Collapse multiple newlines into single newline
 
-            // Trim and ensure proper ending
+            // Trim
             sanitized = sanitized.Trim();
-            if (!string.IsNullOrEmpty(sanitized) && !sanitized.EndsWith(".", StringComparison.Ordinal) &&
-                !sanitized.EndsWith("!", StringComparison.Ordinal) && !sanitized.EndsWith("?", StringComparison.Ordinal))
-            {
-                sanitized += ".";
-            }
 
             return sanitized;
         }

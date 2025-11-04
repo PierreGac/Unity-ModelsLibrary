@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
+using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Repository;
 using ModelLibrary.Editor.Services;
 using ModelLibrary.Editor.Settings;
@@ -14,31 +15,80 @@ using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
 {
+    /// <summary>
+    /// Main browser window for the Model Library system.
+    /// Provides a unified interface to browse, search, filter, and manage 3D models from the repository.
+    /// Supports both list and grid view modes with thumbnail previews, update detection, and role-based access control.
+    /// </summary>
     public class ModelLibraryWindow : EditorWindow
     {
         /// <summary>
-        /// Main browser window to list models from the repository and perform actions.
+        /// Display mode for the model browser.
         /// </summary>
+        private enum ViewMode
+        {
+            /// <summary>Traditional list view with detailed information for each model.</summary>
+            List,
+            /// <summary>Grid view with thumbnail previews and compact information.</summary>
+            Grid
+        }
+
+        // Core Services
+        /// <summary>Service instance for interacting with the model repository.</summary>
         private ModelLibraryService _service;
+
+        // UI State
+        /// <summary>Current search query text entered by the user.</summary>
         private string _search = string.Empty;
+        /// <summary>Scroll position for the main model list/grid view.</summary>
         private Vector2 _scroll;
+        /// <summary>Dictionary tracking which model entries are expanded in list view.</summary>
         private Dictionary<string, bool> _expanded = new();
-        private readonly Dictionary<string, ModelMeta> _metaCache = new();
-        private readonly HashSet<string> _loadingMeta = new();
-        private readonly Dictionary<string, ModelMeta> _localInstallCache = new();
-        private readonly HashSet<string> _importsInProgress = new();
-        private readonly Dictionary<string, Texture2D> _thumbnailCache = new();
-        private readonly HashSet<string> _loadingThumbnails = new();
+        /// <summary>Whether the tag filter panel is currently expanded.</summary>
         private bool _showTagFilter;
-        private readonly HashSet<string> _selectedTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Scroll position for the tag filter panel.</summary>
         private Vector2 _tagScroll;
-        private readonly Dictionary<string, int> _tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        private readonly List<string> _sortedTags = new List<string>();
-        private ModelIndex _tagSource;
-        private bool _loadingIndex = false;
+        /// <summary>Current view mode (List or Grid). Defaults to Grid.</summary>
+        private ViewMode _viewMode = ViewMode.Grid;
+
+        // Caching and Loading State
+        /// <summary>Cache of loaded model metadata, keyed by "modelId@version".</summary>
+        private readonly Dictionary<string, ModelMeta> _metaCache = new();
+        /// <summary>Set of metadata keys currently being loaded to prevent duplicate requests.</summary>
+        private readonly HashSet<string> _loadingMeta = new();
+        /// <summary>Cache of locally installed model metadata, keyed by model ID.</summary>
+        private readonly Dictionary<string, ModelMeta> _localInstallCache = new();
+        /// <summary>Cache of loaded thumbnail textures for grid view, keyed by "modelId@version#thumb".</summary>
+        private readonly Dictionary<string, Texture2D> _thumbnailCache = new();
+        /// <summary>Set of thumbnail keys currently being loaded to prevent duplicate requests.</summary>
+        private readonly HashSet<string> _loadingThumbnails = new();
+        /// <summary>Cached model index to avoid repeated loading.</summary>
         private ModelIndex _indexCache;
+        /// <summary>Flag indicating if the index is currently being loaded.</summary>
+        private bool _loadingIndex = false;
+        /// <summary>Reference to the index used for tag cache generation (for change detection).</summary>
+        private ModelIndex _tagSource;
+
+        // Import/Download State
+        /// <summary>Set of model IDs currently being imported to prevent duplicate imports.</summary>
+        private readonly HashSet<string> _importsInProgress = new();
+
+        // Tag Filtering
+        /// <summary>Set of currently selected tags for filtering models (case-insensitive comparison).</summary>
+        private readonly HashSet<string> _selectedTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Dictionary counting how many models use each tag (case-insensitive keys).</summary>
+        private readonly Dictionary<string, int> _tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Sorted list of all available tags for display in the filter UI.</summary>
+        private readonly List<string> _sortedTags = new List<string>();
+
+        // Update Detection
+        /// <summary>Total count of models with available updates.</summary>
         private int _updateCount = 0;
+        /// <summary>Dictionary tracking which models have updates available, keyed by model ID.</summary>
         private readonly Dictionary<string, bool> _modelUpdateStatus = new Dictionary<string, bool>();
+        /// <summary>
+        /// Menu item to open the Model Library browser window.
+        /// </summary>
         [MenuItem("Tools/Model Library/Browser")]
         public static void Open()
         {
@@ -46,6 +96,10 @@ namespace ModelLibrary.Editor.Windows
             win.Show();
         }
 
+        /// <summary>
+        /// Unity lifecycle method called when the window is enabled.
+        /// Checks if configuration is needed and initializes services if ready.
+        /// </summary>
         private void OnEnable()
         {
             // Check if configuration is needed before creating services
@@ -59,6 +113,10 @@ namespace ModelLibrary.Editor.Windows
             InitializeServices();
         }
 
+        /// <summary>
+        /// Initializes the model library service based on current settings.
+        /// Creates the appropriate repository (FileSystem or HTTP) and begins loading the index.
+        /// </summary>
         private void InitializeServices()
         {
             ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
@@ -69,6 +127,11 @@ namespace ModelLibrary.Editor.Windows
             _ = LoadIndexAsync();
         }
 
+        /// <summary>
+        /// Reinitializes the window after configuration changes.
+        /// Called by FirstRunWizard when settings are saved.
+        /// Clears cached state and reloads services with new configuration.
+        /// </summary>
         public void ReinitializeAfterConfiguration()
         {
             // Clear any existing state
@@ -104,11 +167,16 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
+        /// <summary>
+        /// Asynchronously loads the model index from the repository.
+        /// Caches the result and triggers background update checking.
+        /// Prevents duplicate concurrent loads using the _loadingIndex flag.
+        /// </summary>
         private async Task LoadIndexAsync()
         {
             if (_loadingIndex)
             {
-                return;
+                return; // Already loading, skip duplicate request
             }
 
             _loadingIndex = true;
@@ -116,7 +184,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 _indexCache = await _service.GetIndexAsync();
 
-                // Check for updates in the background
+                // Check for updates in the background after index loads
                 _ = CheckForUpdatesAsync();
 
                 Repaint(); // Refresh the UI when index is loaded
@@ -131,13 +199,19 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
+        /// <summary>
+        /// Asynchronously checks for available model updates.
+        /// Updates both the global update count and per-model update status.
+        /// This runs in the background after the index loads to avoid blocking the UI.
+        /// </summary>
         private async Task CheckForUpdatesAsync()
         {
             try
             {
+                // Get total count of models with updates
                 _updateCount = await _service.GetUpdateCountAsync();
 
-                // Update individual model status
+                // Update individual model status for badge display
                 if (_indexCache?.entries != null)
                 {
                     _modelUpdateStatus.Clear();
@@ -201,13 +275,29 @@ namespace ModelLibrary.Editor.Windows
                 {
                     _ = CheckForUpdatesAsync();
                 }
-                if (GUILayout.Button("Submit Model", EditorStyles.toolbarButton, GUILayout.Width(100)))
+                // Only show Submit Model button for Artists
+                SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
+                if (identityProvider.GetUserRole() == UserRole.Artist)
                 {
-                    ModelSubmitWindow.Open();
+                    if (GUILayout.Button("Submit Model", EditorStyles.toolbarButton, GUILayout.Width(100)))
+                    {
+                        ModelSubmitWindow.Open();
+                    }
                 }
                 if (GUILayout.Button("User", EditorStyles.toolbarButton, GUILayout.Width(60)))
                 {
                     UserSettingsWindow.Open();
+                }
+
+                GUILayout.FlexibleSpace();
+
+                // View mode toggle
+                string[] viewModeLabels = { "List", "Grid" };
+                int newViewMode = GUILayout.Toolbar((int)_viewMode, viewModeLabels, EditorStyles.toolbarButton, GUILayout.Width(100));
+                if (newViewMode != (int)_viewMode)
+                {
+                    _viewMode = (ViewMode)newViewMode;
+                    Repaint();
                 }
             }
             // Use cached index if available, otherwise show loading
@@ -247,10 +337,18 @@ namespace ModelLibrary.Editor.Windows
                 EditorGUILayout.HelpBox("No models match the current filters.", MessageType.Info);
                 return;
             }
+
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
-            foreach (ModelIndex.Entry e in q)
+            if (_viewMode == ViewMode.Grid)
             {
-                DrawEntry(e);
+                DrawGridView(q);
+            }
+            else
+            {
+                foreach (ModelIndex.Entry e in q)
+                {
+                    DrawEntry(e);
+                }
             }
             EditorGUILayout.EndScrollView();
         }
@@ -443,6 +541,106 @@ namespace ModelLibrary.Editor.Windows
         }
 
 
+        /// <summary>
+        /// Draws notification badges for notes and updates in list view.
+        /// Displays an info icon if the model has feedback notes, and a refresh icon if updates are available.
+        /// Uses Unity's built-in icons with fallback to emoji if icons are not available.
+        /// </summary>
+        /// <param name="e">The model index entry to check for notifications.</param>
+        private void DrawNotificationBadges(ModelIndex.Entry e)
+        {
+            // Check if model has notes (from cached metadata)
+            bool hasNotes = HasNotes(e.id, e.latestVersion);
+
+            // Check if model has updates available (check both update status cache and local upgrade status)
+            bool hasUpdateFromCache = _modelUpdateStatus.TryGetValue(e.id, out bool updateStatus) && updateStatus;
+
+            // Also check local upgrade status for more accurate detection
+            bool hasUpdateLocally = false;
+            bool installed = TryGetLocalInstall(e, out ModelMeta localMeta);
+            if (installed && localMeta != null && !string.IsNullOrEmpty(localMeta.version) && localMeta.version != "(unknown)")
+            {
+                hasUpdateLocally = NeedsUpgrade(localMeta.version, e.latestVersion);
+            }
+
+            bool hasUpdate = hasUpdateFromCache || hasUpdateLocally;
+
+            // Draw notes badge if model has notes
+            if (hasNotes)
+            {
+                // Try multiple icon names for better compatibility
+                GUIContent notesIcon = EditorGUIUtility.IconContent("console.infoicon");
+                if (notesIcon == null || notesIcon.image == null)
+                {
+                    notesIcon = EditorGUIUtility.IconContent("d_console.infoicon");
+                }
+                if (notesIcon == null || notesIcon.image == null)
+                {
+                    notesIcon = EditorGUIUtility.IconContent("_Help");
+                }
+
+                if (notesIcon != null && notesIcon.image != null)
+                {
+                    notesIcon.tooltip = "This model has feedback notes";
+                    GUILayout.Label(notesIcon, GUILayout.Width(16), GUILayout.Height(16));
+                }
+                else
+                {
+                    // Fallback to emoji if icon not available
+                    GUILayout.Label("📝", GUILayout.Width(16), GUILayout.Height(16));
+                }
+            }
+
+            // Draw update badge if model has updates available
+            if (hasUpdate)
+            {
+                // Try multiple icon names for better compatibility
+                GUIContent updateIcon = EditorGUIUtility.IconContent("d_Refresh");
+                if (updateIcon == null || updateIcon.image == null)
+                {
+                    updateIcon = EditorGUIUtility.IconContent("Refresh");
+                }
+                if (updateIcon == null || updateIcon.image == null)
+                {
+                    updateIcon = EditorGUIUtility.IconContent("TreeEditor.Refresh");
+                }
+
+                if (updateIcon != null && updateIcon.image != null)
+                {
+                    updateIcon.tooltip = "Update available";
+                    GUILayout.Label(updateIcon, GUILayout.Width(16), GUILayout.Height(16));
+                }
+                else
+                {
+                    // Fallback to emoji if icon not available
+                    GUILayout.Label("🔄", GUILayout.Width(16), GUILayout.Height(16));
+                }
+            }
+
+            // Add spacing if any badges were shown
+            if (hasNotes || hasUpdate)
+            {
+                GUILayout.Space(4);
+            }
+        }
+
+        /// <summary>
+        /// Checks if a model has feedback notes in its metadata.
+        /// Uses the metadata cache to avoid loading metadata multiple times.
+        /// </summary>
+        /// <param name="modelId">The unique identifier of the model.</param>
+        /// <param name="version">The version of the model to check.</param>
+        /// <returns>True if the model has one or more notes, false otherwise.</returns>
+        private bool HasNotes(string modelId, string version)
+        {
+            string key = modelId + "@" + version;
+            if (_metaCache.TryGetValue(key, out ModelMeta meta) && meta != null)
+            {
+                return meta.notes != null && meta.notes.Count > 0;
+            }
+            return false;
+        }
+
         private void DrawEntry(ModelIndex.Entry e)
         {
 
@@ -450,14 +648,11 @@ namespace ModelLibrary.Editor.Windows
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    // Model name with update indicator
-                    string modelName = e.name;
-                    if (_modelUpdateStatus.TryGetValue(e.id, out bool hasUpdate) && hasUpdate)
-                    {
-                        // Add update indicator to model name
-                        modelName = $"🔄 {e.name}";
-                    }
-                    GUILayout.Label(modelName, EditorStyles.boldLabel);
+                    // Notification badges (notes and updates)
+                    DrawNotificationBadges(e);
+
+                    // Model name
+                    GUILayout.Label(e.name, EditorStyles.boldLabel);
 
                     GUILayout.FlexibleSpace();
                     GUILayout.Label($"v{e.latestVersion}");
@@ -544,6 +739,159 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
+        /// <summary>
+        /// Draws models in a responsive grid view with thumbnail previews.
+        /// Calculates the number of columns based on available window width.
+        /// Each model is displayed as a card with a clickable thumbnail, name, version, and status.
+        /// </summary>
+        /// <param name="entries">List of model entries to display in the grid.</param>
+        private void DrawGridView(List<ModelIndex.Entry> entries)
+        {
+            const float thumbnailSize = 128f;
+            const float spacing = 8f;
+            const float cardPadding = 4f;
+            const float minCardWidth = thumbnailSize + (cardPadding * 2);
+
+            // Calculate number of columns based on window width
+            float availableWidth = EditorGUIUtility.currentViewWidth - 20f; // Account for scrollbar
+            int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / (minCardWidth + spacing)));
+
+            int row = 0;
+            int col = 0;
+
+            foreach (ModelIndex.Entry entry in entries)
+            {
+                if (col == 0)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                }
+
+                // Draw grid card
+                DrawGridCard(entry, thumbnailSize, cardPadding);
+
+                col++;
+                if (col >= columns)
+                {
+                    EditorGUILayout.EndHorizontal();
+                    col = 0;
+                    row++;
+                }
+            }
+
+            // Close any remaining horizontal scope
+            if (col > 0)
+            {
+                EditorGUILayout.EndHorizontal();
+            }
+        }
+
+        /// <summary>
+        /// Draws a single model card in the grid view.
+        /// Displays a thumbnail (or placeholder), model name, version, and installation status.
+        /// The thumbnail is clickable and opens the model details window.
+        /// </summary>
+        /// <param name="entry">The model index entry to display.</param>
+        /// <param name="thumbnailSize">The size (width and height) of the thumbnail in pixels.</param>
+        /// <param name="padding">The padding around the card content.</param>
+        private void DrawGridCard(ModelIndex.Entry entry, float thumbnailSize, float padding)
+        {
+            using (new EditorGUILayout.VerticalScope("box", GUILayout.Width(thumbnailSize + (padding * 2)), GUILayout.Height(thumbnailSize + 60)))
+            {
+                // Load metadata and thumbnail if needed
+                string key = entry.id + "@" + entry.latestVersion;
+                if (!_metaCache.ContainsKey(key) && !_loadingMeta.Contains(key))
+                {
+                    _ = LoadMetaAsync(entry.id, entry.latestVersion);
+                }
+
+                // Get thumbnail
+                string thumbKey = key + "#thumb";
+                _thumbnailCache.TryGetValue(thumbKey, out Texture2D thumbnail);
+
+                // Thumbnail area (clickable)
+                Rect thumbRect = GUILayoutUtility.GetRect(thumbnailSize, thumbnailSize, GUILayout.Width(thumbnailSize), GUILayout.Height(thumbnailSize));
+
+                // Draw thumbnail or placeholder
+                if (thumbnail != null)
+                {
+                    // Draw thumbnail as button
+                    if (GUI.Button(thumbRect, new GUIContent(thumbnail), GUIStyle.none))
+                    {
+                        ModelDetailsWindow.Open(entry.id, entry.latestVersion);
+                    }
+                }
+                else
+                {
+                    // Draw placeholder background
+                    EditorGUI.DrawRect(thumbRect, new Color(0.2f, 0.2f, 0.2f, 1f));
+                    // Draw placeholder text
+                    GUI.Label(thumbRect, "No Preview", EditorStyles.centeredGreyMiniLabel);
+                    // Make placeholder clickable
+                    if (GUI.Button(thumbRect, GUIContent.none, GUIStyle.none))
+                    {
+                        ModelDetailsWindow.Open(entry.id, entry.latestVersion);
+                    }
+                }
+
+                GUILayout.Space(2);
+
+                // Model name with badges
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    // Notification badges (compact version)
+                    DrawCompactNotificationBadges(entry);
+
+                    // Truncate name if too long
+                    string displayName = entry.name;
+                    if (displayName.Length > 15)
+                    {
+                        displayName = $"{displayName[..12]}...";
+                    }
+                    GUILayout.Label(displayName, EditorStyles.miniLabel, GUILayout.ExpandWidth(true));
+                }
+
+                // Version info
+                GUILayout.Label($"v{entry.latestVersion}", EditorStyles.centeredGreyMiniLabel);
+
+                // Install status
+                bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
+                string localVersion = installed ? localMeta.version : null;
+                bool properlyInstalled = installed && !string.IsNullOrEmpty(localVersion) && localVersion != "(unknown)";
+                bool hasUpdate = _modelUpdateStatus.TryGetValue(entry.id, out bool updateStatus) && updateStatus;
+
+                if (properlyInstalled)
+                {
+                    string statusText = hasUpdate ? "Update" : "Installed";
+                    GUILayout.Label(statusText, EditorStyles.centeredGreyMiniLabel);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws compact notification badges for grid view.
+        /// </summary>
+        private void DrawCompactNotificationBadges(ModelIndex.Entry e)
+        {
+            bool hasNotes = HasNotes(e.id, e.latestVersion);
+            bool hasUpdate = _modelUpdateStatus.TryGetValue(e.id, out bool updateStatus) && updateStatus;
+
+            // Also check local upgrade status
+            bool installed = TryGetLocalInstall(e, out ModelMeta localMeta);
+            if (installed && localMeta != null && !string.IsNullOrEmpty(localMeta.version) && localMeta.version != "(unknown)")
+            {
+                hasUpdate = hasUpdate || NeedsUpgrade(localMeta.version, e.latestVersion);
+            }
+
+            if (hasNotes)
+            {
+                GUILayout.Label("📝", GUILayout.Width(12), GUILayout.Height(12));
+            }
+            if (hasUpdate)
+            {
+                GUILayout.Label("🔄", GUILayout.Width(12), GUILayout.Height(12));
+            }
+        }
+
         private void OnDisable()
         {
             _thumbnailCache.Clear();
@@ -618,6 +966,14 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
+        /// <summary>
+        /// Determines if a local model version needs to be upgraded to the remote version.
+        /// Uses semantic versioning comparison when possible, falls back to string comparison.
+        /// Returns false for unknown local versions to prevent false "update available" messages.
+        /// </summary>
+        /// <param name="localVersion">The version currently installed locally.</param>
+        /// <param name="remoteVersion">The latest version available in the repository.</param>
+        /// <returns>True if the remote version is newer than the local version, false otherwise.</returns>
         private static bool NeedsUpgrade(string localVersion, string remoteVersion)
         {
             if (string.IsNullOrEmpty(remoteVersion))
@@ -735,6 +1091,16 @@ namespace ModelLibrary.Editor.Windows
             return new string(result);
         }
 
+        /// <summary>
+        /// Attempts to find a locally installed version of the specified model.
+        /// Uses a two-step approach:
+        /// 1. Searches for manifest files (modelLibrary.meta.json) in the Assets folder.
+        /// 2. Falls back to GUID-based detection if no manifest is found.
+        /// Results are cached to improve performance.
+        /// </summary>
+        /// <param name="entry">The model index entry to check for local installation.</param>
+        /// <param name="meta">Output parameter containing the local model metadata if found.</param>
+        /// <returns>True if the model is installed locally, false otherwise.</returns>
         private bool TryGetLocalInstall(ModelIndex.Entry entry, out ModelMeta meta)
         {
             if (_localInstallCache.TryGetValue(entry.id, out meta) && meta != null)
@@ -804,6 +1170,15 @@ namespace ModelLibrary.Editor.Windows
             EditorUtility.DisplayDialog("Downloaded", $"Cached at: {root}", "OK");
         }
 
+        /// <summary>
+        /// Imports a model version into the Unity project.
+        /// Downloads the model if not cached, then copies files into the Assets folder.
+        /// Supports both new imports and updates to existing models.
+        /// </summary>
+        /// <param name="id">The unique identifier of the model to import.</param>
+        /// <param name="version">The version of the model to import.</param>
+        /// <param name="isUpgrade">True if this is an update to an existing installation, false for new imports.</param>
+        /// <param name="previousVersion">The version being upgraded from (used for display messages).</param>
         private async Task Import(string id, string version, bool isUpgrade = false, string previousVersion = null)
         {
             if (_importsInProgress.Contains(id))

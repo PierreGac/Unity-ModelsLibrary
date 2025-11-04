@@ -16,47 +16,112 @@ using UnityEngine;
 namespace ModelLibrary.Editor.Windows
 {
     /// <summary>
-    /// Wizard to submit a new model version based on current Project selection.
+    /// Wizard window for submitting new models or updating existing models to the repository.
+    /// Provides a comprehensive form for entering model metadata, selecting assets, and managing versions.
+    /// Includes real-time validation for changelogs, paths, and version numbers.
+    /// Only accessible to users with the Artist role.
     /// </summary>
     public class ModelSubmitWindow : EditorWindow
     {
-        private enum SubmitMode { New, Update }
+        /// <summary>
+        /// Submission mode indicating whether this is a new model or an update to an existing one.
+        /// </summary>
+        private enum SubmitMode 
+        { 
+            /// <summary>Creating a new model entry in the repository.</summary>
+            New, 
+            /// <summary>Submitting a new version of an existing model.</summary>
+            Update 
+        }
 
         // UI Constants
+        /// <summary>Width for small buttons (e.g., remove buttons).</summary>
         private const int __BUTTON_WIDTH_SMALL = 24;
+        /// <summary>Width for medium-sized buttons.</summary>
         private const int __BUTTON_WIDTH_MEDIUM = 50;
+        /// <summary>Minimum height for the description text area.</summary>
         private const int __TEXT_AREA_HEIGHT_DESCRIPTION = 60;
+        /// <summary>Minimum height for the changelog text area.</summary>
         private const int __TEXT_AREA_HEIGHT_CHANGELOG = 40;
 
         // File Size Constants
-        private const long __MAX_IMAGE_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+        /// <summary>Maximum allowed image file size (50MB).</summary>
+        private const long __MAX_IMAGE_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+        /// <summary>Number of bytes per kilobyte for file size calculations.</summary>
         private const long __BYTES_PER_KILOBYTE = 1024;
 
+        // Submission State
+        /// <summary>Current submission mode (New or Update).</summary>
         private SubmitMode _mode = SubmitMode.New;
+        /// <summary>Service instance for repository operations.</summary>
         private ModelLibraryService _service;
+        /// <summary>List of existing models loaded from the index (for update mode).</summary>
         private readonly List<ModelIndex.Entry> _existingModels = new();
+        /// <summary>Index of the selected model in update mode.</summary>
         private int _selectedModelIndex;
+        /// <summary>Flag indicating if the index is currently being loaded.</summary>
         private bool _isLoadingIndex;
+        /// <summary>Flag indicating if base metadata is being loaded for the selected model.</summary>
         private bool _loadingBaseMeta;
+        /// <summary>Flag indicating if a submission is currently in progress.</summary>
         private bool _isSubmitting;
+        /// <summary>Changelog summary for the submission (required for updates).</summary>
         private string _changeSummary = "Initial submission";
+        /// <summary>Cached metadata of the latest version of the selected model (update mode).</summary>
         private ModelMeta _latestSelectedMeta;
 
+        // Form Fields
+        /// <summary>Model name (required).</summary>
         private string _name = "New Model";
+        /// <summary>Model version in SemVer format (required).</summary>
         private string _version = "1.0.0";
+        /// <summary>Model description (optional).</summary>
         private string _description = string.Empty;
+        /// <summary>Absolute install path in the Unity project (e.g., "Assets/Models/ModelName").</summary>
         private string _installPath;
+        /// <summary>Relative path from Assets folder (e.g., "Models/ModelName").</summary>
         private string _relativePath;
+        /// <summary>List of absolute paths to preview images.</summary>
         private List<string> _imageAbsPaths = new();
+        /// <summary>List of tags for categorizing the model.</summary>
         private List<string> _tags = new();
+        /// <summary>Text field for adding new tags.</summary>
         private string _newTag = string.Empty;
+        /// <summary>User identity provider for getting author information.</summary>
         private readonly IUserIdentityProvider _idProvider = new SimpleUserIdentityProvider();
 
+        /// <summary>
+        /// Menu item to open the submit model window.
+        /// Checks user role and only allows Artists to access the submission interface.
+        /// </summary>
         [MenuItem("Tools/Model Library/Submit Model")]
         public static void Open()
         {
+            // Only allow Artists to submit models
+            SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
+            if (identityProvider.GetUserRole() != UserRole.Artist)
+            {
+                EditorUtility.DisplayDialog("Access Denied", 
+                    "Model submission is only available for Artists. Please switch to Artist role in User Settings.", 
+                    "OK");
+                return;
+            }
+
             ModelSubmitWindow w = GetWindow<ModelSubmitWindow>("Submit Model");
             w.Show();
+        }
+
+        /// <summary>
+        /// Validation method for the submit model menu item.
+        /// Only enables the menu item for users with the Artist role.
+        /// </summary>
+        /// <returns>True if the user is an Artist, false otherwise.</returns>
+        [MenuItem("Tools/Model Library/Submit Model", true)]
+        public static bool ValidateSubmitModel()
+        {
+            // Only show menu item for Artists
+            SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
+            return identityProvider.GetUserRole() == UserRole.Artist;
         }
 
         private void OnEnable()
@@ -336,11 +401,16 @@ namespace ModelLibrary.Editor.Windows
             return current;
         }
 
+        /// <summary>
+        /// Submits the model to the repository.
+        /// Builds metadata from the form data, materializes files into a temporary folder,
+        /// and uploads to the repository. Handles both new submissions and updates.
+        /// </summary>
         private async Task Submit()
         {
             if (_isSubmitting)
             {
-                return;
+                return; // Prevent duplicate submissions
             }
 
             // Final validation check (should not happen due to UI validation, but safety net)
@@ -481,8 +551,10 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Get validation errors for the current form state.
+        /// Validates the current form state and returns a list of validation errors.
+        /// Checks model name, version, path validity, changelog requirements, and duplicate detection.
         /// </summary>
+        /// <returns>List of validation error messages. Empty list indicates valid form state.</returns>
         private List<string> GetValidationErrors()
         {
             List<string> errors = new List<string>();
@@ -809,8 +881,6 @@ namespace ModelLibrary.Editor.Windows
         private const string __ERROR_TYPE_CHARACTERS = "characters";
         private const string __ERROR_TYPE_AT_LEAST = "at least";
         private const string __ERROR_TYPE_EXCEED = "exceed";
-        private const string __ERROR_TYPE_PUNCTUATION = "punctuation";
-        private const string __ERROR_TYPE_CAPITAL = "capital";
         private const string __ERROR_TYPE_MEANINGFUL = "meaningful";
 
         private const string __SUGGESTION_BULLET = "• ";
@@ -847,16 +917,6 @@ namespace ModelLibrary.Editor.Windows
                         suggestions.Add(__SUGGESTION_BULLET + "Consider shortening the description");
                         suggestions.Add(__SUGGESTION_BULLET + "Focus on the most important changes");
                     }
-                    showSuggestions = true;
-                }
-                else if (error.Contains(__ERROR_TYPE_PUNCTUATION))
-                {
-                    suggestions.Add(__SUGGESTION_BULLET + "End the description with proper punctuation (. ! ?)");
-                    showSuggestions = true;
-                }
-                else if (error.Contains(__ERROR_TYPE_CAPITAL))
-                {
-                    suggestions.Add(__SUGGESTION_BULLET + "Start the description with a capital letter");
                     showSuggestions = true;
                 }
                 else if (error.Contains(__ERROR_TYPE_MEANINGFUL))

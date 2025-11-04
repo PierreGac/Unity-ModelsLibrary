@@ -151,5 +151,79 @@ namespace ModelLibrary.Editor.Utils
             return normalizedPath.EndsWith("/Materials", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(normalizedPath, "Materials", StringComparison.OrdinalIgnoreCase);
         }
+
+        /// <summary>
+        /// Normalizes a path by converting to absolute path, resolving relative components, and normalizing separators.
+        /// This ensures consistent path handling across different operating systems and handles edge cases.
+        /// </summary>
+        /// <param name="path">The path to normalize</param>
+        /// <returns>Normalized absolute path</returns>
+        public static string NormalizePath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return path;
+            }
+
+            try
+            {
+                // Get the full absolute path (resolves relative paths, .., etc.)
+                string fullPath = Path.GetFullPath(path);
+
+                // Normalize path separators to match the current OS
+                fullPath = fullPath.Replace('/', Path.DirectorySeparatorChar);
+                fullPath = fullPath.Replace('\\', Path.DirectorySeparatorChar);
+
+                // Remove trailing separators (except for root paths like C:\)
+                if (fullPath.Length > 1 && fullPath.EndsWith(Path.DirectorySeparatorChar.ToString()))
+                {
+                    // Don't remove trailing separator for root paths (C:\, \\server\share)
+                    if (!IsRootPath(fullPath))
+                    {
+                        fullPath = fullPath.TrimEnd(Path.DirectorySeparatorChar);
+                    }
+                }
+
+                return fullPath;
+            }
+            catch
+            {
+                // If path normalization fails (e.g., invalid characters), return the original path
+                // This prevents exceptions from breaking the calling code
+                return path;
+            }
+        }
+
+        /// <summary>
+        /// Checks if a path is a root path (e.g., C:\ or \\server\share).
+        /// </summary>
+        /// <param name="path">The path to check</param>
+        /// <returns>True if the path is a root path</returns>
+        private static bool IsRootPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return false;
+            }
+
+            // Check for Windows drive root (C:\, D:\, etc.)
+            if (path.Length == 3 && char.IsLetter(path[0]) && path[1] == ':' && path[2] == Path.DirectorySeparatorChar)
+            {
+                return true;
+            }
+
+            // Check for UNC root (\\server\share)
+            if (path.StartsWith(@"\\") && path.IndexOf(Path.DirectorySeparatorChar, 2) > 0)
+            {
+                int secondSlash = path.IndexOf(Path.DirectorySeparatorChar, 2);
+                // If there's no third slash, it's a root UNC path
+                if (secondSlash == path.Length - 1 || path.IndexOf(Path.DirectorySeparatorChar, secondSlash + 1) < 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }
 }

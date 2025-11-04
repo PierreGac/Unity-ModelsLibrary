@@ -139,8 +139,12 @@ namespace ModelLibrary.Editor.Services
         }
 
         /// <summary>
-        /// Find the local version by looking for modelLibrary.meta.json manifest files.
+        /// Finds the local version of a model by scanning for manifest files (modelLibrary.meta.json).
+        /// This is the primary method for local version detection, providing accurate version information.
+        /// Searches the entire Assets folder for manifest files and matches them by model ID.
         /// </summary>
+        /// <param name="modelId">The unique identifier of the model to find.</param>
+        /// <returns>The local version string if found, null otherwise.</returns>
         private async Task<string> FindLocalVersionAsync(string modelId)
         {
             try
@@ -216,8 +220,13 @@ namespace ModelLibrary.Editor.Services
         }
 
         /// <summary>
-        /// Find the local version by checking which version's GUIDs are present in the project.
+        /// Finds the local version of a model by matching asset GUIDs from metadata against project GUIDs.
+        /// This is a fallback method when manifest files are not available.
+        /// Note: This method can only detect the latest version, not intermediate versions.
         /// </summary>
+        /// <param name="modelId">The unique identifier of the model to find.</param>
+        /// <param name="projectGuids">Set of all asset GUIDs currently in the Unity project.</param>
+        /// <returns>The detected local version (typically the latest version), or null if not found.</returns>
         private async Task<string> FindLocalVersionByGuidsAsync(string modelId, HashSet<string> projectGuids)
         {
             try
@@ -321,9 +330,47 @@ namespace ModelLibrary.Editor.Services
         }
 
         /// <summary>
-        /// Download a specific model version into the local editor cache.
-        /// Returns the absolute cache folder and loaded meta.
+        /// Delete a specific model version from the repository.
+        /// Note: Deletion of the latest version is not recommended as it requires updating the index.
         /// </summary>
+        /// <param name="modelId">The model ID (GUID).</param>
+        /// <param name="version">The version string to delete (e.g., "1.0.0").</param>
+        /// <returns>True if deletion was successful; false otherwise.</returns>
+        public async Task<bool> DeleteVersionAsync(string modelId, string version)
+        {
+            try
+            {
+                // Check if this is the latest version (warning only - UI handles confirmation)
+                ModelIndex index = await GetIndexAsync();
+                ModelIndex.Entry entry = index?.entries?.FirstOrDefault(e => e.id == modelId);
+                if (entry != null && entry.latestVersion == version)
+                {
+                    Debug.LogWarning($"[ModelLibraryService] Deleting latest version {version} of model {modelId}. The index will still reference this version until manually updated.");
+                }
+
+                // Delete the version from repository
+                bool deleted = await _repo.DeleteVersionAsync(modelId, version);
+                if (deleted)
+                {
+                    Debug.Log($"[ModelLibraryService] Successfully deleted version {version} of model {modelId}");
+                }
+                return deleted;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ModelLibraryService] Error deleting version {version} of model {modelId}: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Downloads a specific model version from the repository into the local editor cache.
+        /// Downloads all payload files, dependencies, images, and metadata to a local cache directory.
+        /// Creates the cache directory structure and saves metadata for quick access.
+        /// </summary>
+        /// <param name="id">The unique identifier of the model to download.</param>
+        /// <param name="version">The version string to download (e.g., "1.0.0").</param>
+        /// <returns>A tuple containing the absolute cache root path and the loaded model metadata.</returns>
         public async Task<(string versionRoot, ModelMeta meta)> DownloadModelVersionAsync(string id, string version)
         {
             // Download all payload & images to local cache folder
@@ -359,9 +406,14 @@ namespace ModelLibrary.Editor.Services
         }
 
         /// <summary>
-        /// Submit a prepared model version folder (with payload/images) to the repository and update the index.
-        /// Returns the repository-relative path of the version root.
+        /// Submits a prepared model version folder to the repository and updates the index.
+        /// Uploads all files from the local version folder (payload, dependencies, images) to the repository.
+        /// Generates a model ID if not provided, creates changelog entries, and updates the global index.
         /// </summary>
+        /// <param name="meta">Complete model metadata ready for submission.</param>
+        /// <param name="localVersionRoot">Absolute path to the local version folder containing all files.</param>
+        /// <param name="changeSummary">Optional changelog summary for this version (defaults to "Initial submission").</param>
+        /// <returns>The repository-relative path of the uploaded version root (e.g., "modelId/version").</returns>
         public async Task<string> SubmitNewVersionAsync(ModelMeta meta, string localVersionRoot, string changeSummary = null)
         {
             if (meta == null)
@@ -408,6 +460,17 @@ namespace ModelLibrary.Editor.Services
             return versionRootRel;
         }
 
+        /// <summary>
+        /// Publishes a metadata-only update by creating a new version with updated metadata.
+        /// Clones all files from the base version, creates a new version with bumped version number,
+        /// saves the updated metadata, and updates the index. This is used for metadata edits without file changes.
+        /// </summary>
+        /// <param name="updatedMeta">Updated model metadata with modified fields (description, tags, etc.).</param>
+        /// <param name="baseVersion">The version to clone files from (typically the current latest version).</param>
+        /// <param name="changeSummary">Changelog summary describing what metadata was changed.</param>
+        /// <param name="author">Author name for the metadata update.</param>
+        /// <param name="bumpStrategy">Optional function to customize version bumping (defaults to patch increment).</param>
+        /// <returns>The updated ModelMeta with the new version number.</returns>
         public async Task<ModelMeta> PublishMetadataUpdateAsync(ModelMeta updatedMeta, string baseVersion, string changeSummary, string author, Func<SemVer, SemVer> bumpStrategy = null)
         {
             if (updatedMeta == null)
@@ -456,6 +519,14 @@ namespace ModelLibrary.Editor.Services
             return updatedMeta;
         }
 
+        /// <summary>
+        /// Clones all files from a source version to a target version in the repository.
+        /// Used when creating metadata-only updates - copies all payload and image files to the new version.
+        /// Downloads files to a temporary location, then uploads them to the new version path.
+        /// </summary>
+        /// <param name="modelId">The unique identifier of the model.</param>
+        /// <param name="sourceVersion">The version to clone files from.</param>
+        /// <param name="targetVersion">The new version to clone files to.</param>
         private async Task CloneVersionFilesAsync(string modelId, string sourceVersion, string targetVersion)
         {
             if (string.Equals(sourceVersion, targetVersion, StringComparison.OrdinalIgnoreCase))
@@ -514,6 +585,13 @@ namespace ModelLibrary.Editor.Services
             }
         }
 
+        /// <summary>
+        /// Updates the global model index with the latest metadata from a model version.
+        /// Creates a new index entry if the model doesn't exist, or updates the existing entry.
+        /// Only updates the latest version if the new version is greater than or equal to the existing latest version.
+        /// Updates the cached index to reflect changes immediately.
+        /// </summary>
+        /// <param name="meta">Model metadata containing the latest version information.</param>
         private async Task UpdateIndexWithLatestMetaAsync(ModelMeta meta)
         {
             ModelIndex index = await GetIndexAsync();
@@ -524,6 +602,7 @@ namespace ModelLibrary.Editor.Services
 
             if (entry == null)
             {
+                // Create a new index entry for this model
                 entry = new ModelIndex.Entry
                 {
                     id = meta.identity.id,
@@ -538,6 +617,7 @@ namespace ModelLibrary.Editor.Services
             }
             else
             {
+                // Update existing entry - only update latest version if new version is >= current
                 bool shouldUpdateVersion = true;
                 if (!string.IsNullOrEmpty(entry.latestVersion) && SemVer.TryParse(entry.latestVersion, out SemVer existing) && SemVer.TryParse(meta.version, out SemVer incoming))
                 {
@@ -549,6 +629,7 @@ namespace ModelLibrary.Editor.Services
                     entry.latestVersion = meta.version;
                     entry.releaseTimeTicks = releaseTimestamp;
                 }
+                // Always update other fields (name, description, tags, timestamps)
                 entry.name = meta.identity.name;
                 entry.description = meta.description;
                 entry.updatedTimeTicks = timestamp;
@@ -556,9 +637,19 @@ namespace ModelLibrary.Editor.Services
             }
 
             await _repo.SaveIndexAsync(index);
-            _indexCache = index;
+            _indexCache = index; // Update cache to reflect changes
         }
 
+        /// <summary>
+        /// Ensures a changelog entry exists for the specified version in the model metadata.
+        /// Creates a new entry if one doesn't exist, or updates the existing entry if it does.
+        /// Sanitizes the summary and author fields before adding.
+        /// </summary>
+        /// <param name="meta">Model metadata to add the changelog entry to.</param>
+        /// <param name="summary">Changelog summary text.</param>
+        /// <param name="author">Author name for the changelog entry.</param>
+        /// <param name="version">Version string for the changelog entry.</param>
+        /// <param name="timestamp">Timestamp for the changelog entry (in ticks).</param>
         private static void EnsureChangelogEntry(ModelMeta meta, string summary, string author, string version, long timestamp)
         {
             meta.changelog ??= new List<ModelChangelogEntry>();

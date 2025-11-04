@@ -19,8 +19,20 @@ namespace ModelLibrary.Editor.Services
     public static class ModelDeployer
     {
         /// <summary>
-        /// Build the ModelMeta from the current selection, including payload file list, GUIDs and dependency GUIDs.
+        /// Builds ModelMeta from the currently selected assets in the Unity Project window.
+        /// Collects all selected assets (FBX, OBJ, textures, materials), extracts their GUIDs,
+        /// resolves dependencies, calculates mesh statistics, and prepares metadata for submission.
         /// </summary>
+        /// <param name="identityName">Display name of the model.</param>
+        /// <param name="identityId">Unique identifier (GUID) for the model. If null or empty, generates a new GUID.</param>
+        /// <param name="version">Version string in SemVer format (e.g., "1.0.0").</param>
+        /// <param name="description">Model description text.</param>
+        /// <param name="imagePaths">List of absolute paths to preview images.</param>
+        /// <param name="tags">List of tags for categorizing the model.</param>
+        /// <param name="installPath">Absolute install path in the Unity project (e.g., "Assets/Models/ModelName").</param>
+        /// <param name="relativePath">Relative path from Assets folder (e.g., "Models/ModelName").</param>
+        /// <param name="idProvider">User identity provider for getting author information.</param>
+        /// <returns>Complete ModelMeta object ready for submission.</returns>
         public static async Task<ModelMeta> BuildMetaFromSelectionAsync(string identityName, string identityId, string version, string description, IEnumerable<string> imagePaths, IEnumerable<string> tags, string installPath, string relativePath, IUserIdentityProvider idProvider)
         {
             string resolvedId = string.IsNullOrWhiteSpace(identityId) ? Guid.NewGuid().ToString("N") : identityId;
@@ -191,6 +203,13 @@ namespace ModelLibrary.Editor.Services
             return await Task.FromResult(meta);
         }
 
+        /// <summary>
+        /// Generates automatic preview images for model assets.
+        /// Attempts to create a preview image from the primary model asset (FBX/OBJ/Prefab).
+        /// The preview is saved as "auto_preview.png" in the images folder.
+        /// </summary>
+        /// <param name="meta">Model metadata containing asset GUIDs.</param>
+        /// <param name="versionRoot">Root directory of the version folder where images should be saved.</param>
         private static void GenerateAssetPreviews(ModelMeta meta, string versionRoot)
         {
             try
@@ -240,6 +259,12 @@ namespace ModelLibrary.Editor.Services
             }
         }
 
+        /// <summary>
+        /// Selects the primary asset GUID for preview generation.
+        /// Prefers FBX/OBJ files or Prefabs, falling back to the first available asset GUID.
+        /// </summary>
+        /// <param name="meta">Model metadata containing asset GUIDs.</param>
+        /// <returns>The GUID of the primary asset, or null if no suitable asset is found.</returns>
         private static string SelectPrimaryAssetGuid(ModelMeta meta)
         {
             if (meta?.assetGuids == null)
@@ -265,6 +290,14 @@ namespace ModelLibrary.Editor.Services
             return meta.assetGuids.FirstOrDefault();
         }
 
+        /// <summary>
+        /// Fetches a preview texture for an asset using Unity's AssetPreview API.
+        /// Waits for the preview to load if it's still being generated.
+        /// Falls back to mini thumbnail if high-resolution preview is not available.
+        /// </summary>
+        /// <param name="asset">The Unity asset to generate a preview for.</param>
+        /// <param name="highResolution">Whether to request a high-resolution preview.</param>
+        /// <returns>The preview texture, or null if preview generation fails.</returns>
         private static Texture FetchAssetPreview(UnityEngine.Object asset, bool highResolution)
         {
             if (asset == null)
@@ -289,6 +322,13 @@ namespace ModelLibrary.Editor.Services
             return tex;
         }
 
+        /// <summary>
+        /// Saves a Unity texture to a PNG file on disk.
+        /// Creates a readable copy of the texture, renders it to a RenderTexture, then encodes to PNG.
+        /// </summary>
+        /// <param name="texture">The texture to save.</param>
+        /// <param name="absolutePath">Absolute file path where the PNG should be saved.</param>
+        /// <returns>True if the texture was successfully saved, false otherwise.</returns>
         private static bool SaveTextureToPng(Texture texture, string absolutePath)
         {
             if (texture == null)
@@ -331,6 +371,14 @@ namespace ModelLibrary.Editor.Services
             }
         }
 
+        /// <summary>
+        /// Resolves and validates the install path for a model.
+        /// Ensures the path starts with "Assets/" and uses forward slashes.
+        /// Falls back to a default path if the provided path is invalid.
+        /// </summary>
+        /// <param name="installPath">The install path provided by the user (may be null or invalid).</param>
+        /// <param name="identityName">Model name used for generating default paths.</param>
+        /// <returns>Resolved and sanitized install path.</returns>
         private static string ResolveInstallPath(string installPath, string identityName)
         {
             string sanitizedName = SanitizeFolderName(identityName);
@@ -359,6 +407,14 @@ namespace ModelLibrary.Editor.Services
             return finalPath;
         }
 
+        /// <summary>
+        /// Resolves and validates the relative path for a model.
+        /// Validates the path using PathUtils, removes "Assets/" prefix if present, and ensures proper formatting.
+        /// Falls back to a default path if validation fails.
+        /// </summary>
+        /// <param name="relativePath">The relative path provided by the user (may be null or invalid).</param>
+        /// <param name="identityName">Model name used for generating default paths.</param>
+        /// <returns>Resolved and validated relative path (without "Assets/" prefix).</returns>
         private static string ResolveRelativePath(string relativePath, string identityName)
         {
             string sanitizedName = SanitizeFolderName(identityName);
@@ -391,6 +447,12 @@ namespace ModelLibrary.Editor.Services
             return finalPath;
         }
 
+        /// <summary>
+        /// Sanitizes a folder name by removing invalid file system characters.
+        /// Replaces invalid characters with underscores and spaces with underscores.
+        /// </summary>
+        /// <param name="name">Original folder name.</param>
+        /// <returns>Sanitized folder name safe for use in file system paths.</returns>
         private static string SanitizeFolderName(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -403,6 +465,11 @@ namespace ModelLibrary.Editor.Services
             return new string(result).Replace(' ', '_');
         }
 
+        /// <summary>
+        /// Adds an image reference to the model metadata if it doesn't already exist.
+        /// </summary>
+        /// <param name="meta">Model metadata to update.</param>
+        /// <param name="relativePath">Relative path to the image file.</param>
         private static void AddImageReference(ModelMeta meta, string relativePath)
         {
             if (meta == null || string.IsNullOrEmpty(relativePath))
@@ -417,6 +484,15 @@ namespace ModelLibrary.Editor.Services
             }
         }
 
+        /// <summary>
+        /// Accumulates mesh statistics (vertex and triangle counts) from a model asset.
+        /// Processes both MeshFilter and SkinnedMeshRenderer components.
+        /// Uses a set of processed mesh instance IDs to avoid counting the same mesh multiple times.
+        /// </summary>
+        /// <param name="assetPath">Path to the model asset (FBX/OBJ/Prefab).</param>
+        /// <param name="processedMeshIds">Set of already processed mesh instance IDs to avoid duplicates.</param>
+        /// <param name="vertexCount">Running total of vertices (incremented by this method).</param>
+        /// <param name="triangleCount">Running total of triangles (incremented by this method).</param>
         private static void AccumulateMeshStats(string assetPath, HashSet<int> processedMeshIds, ref int vertexCount, ref int triangleCount)
         {
             if (string.IsNullOrEmpty(assetPath))
@@ -441,6 +517,15 @@ namespace ModelLibrary.Editor.Services
             }
         }
 
+        /// <summary>
+        /// Adds a single mesh's statistics to the running totals.
+        /// Handles both single submesh and multi-submesh meshes.
+        /// Skips meshes that have already been processed (by instance ID).
+        /// </summary>
+        /// <param name="mesh">The mesh to process.</param>
+        /// <param name="processedMeshIds">Set of processed mesh instance IDs.</param>
+        /// <param name="vertexCount">Running total of vertices (incremented by this method).</param>
+        /// <param name="triangleCount">Running total of triangles (incremented by this method).</param>
         private static void AddMesh(Mesh mesh, HashSet<int> processedMeshIds, ref int vertexCount, ref int triangleCount)
         {
             if (mesh == null)
@@ -471,9 +556,14 @@ namespace ModelLibrary.Editor.Services
         }
 
         /// <summary>
-        /// Create a local version folder structure (payload/images) and copy selected assets there.
-        /// Returns the destination path.
+        /// Creates a local version folder structure and copies all model assets into it.
+        /// Creates the folder structure: payload/ (for main assets), payload/deps/ (for dependencies), and images/.
+        /// Copies selected assets, their .meta files, dependencies, and generates automatic previews.
+        /// Writes the model metadata JSON file to the folder for debugging.
         /// </summary>
+        /// <param name="meta">Model metadata containing asset paths and GUIDs.</param>
+        /// <param name="destinationAbsoluteFolder">Absolute path to the destination folder where the version structure should be created.</param>
+        /// <returns>The destination folder path (same as input parameter).</returns>
         public static async Task<string> MaterializeLocalVersionFolderAsync(ModelMeta meta, string destinationAbsoluteFolder)
         {
             Directory.CreateDirectory(destinationAbsoluteFolder);

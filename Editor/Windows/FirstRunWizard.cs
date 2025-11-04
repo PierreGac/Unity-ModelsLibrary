@@ -6,15 +6,25 @@ using UnityEngine;
 namespace ModelLibrary.Editor.Windows
 {
     /// <summary>
-    /// Simple first-run wizard to collect user name and repository root.
-    /// Shown automatically if either is missing when the browser opens.
+    /// First-run configuration wizard for the Model Library system.
+    /// Automatically displayed when the Model Library is not yet configured.
+    /// Collects essential setup information: user name and repository location.
+    /// The wizard is modal and blocks other operations until configuration is complete.
     /// </summary>
     public class FirstRunWizard : EditorWindow
     {
+        /// <summary>User name entered in the form.</summary>
         private string _userName;
+        /// <summary>Repository root path or URL entered in the form.</summary>
         private string _repoRoot;
+        /// <summary>Selected repository type (FileSystem or HTTP).</summary>
         private ModelLibrarySettings.RepositoryKind _kind;
 
+        /// <summary>
+        /// Checks if the Model Library has been properly configured.
+        /// Verifies that both user name and repository root are set and not default values.
+        /// </summary>
+        /// <returns>True if configuration is complete, false if the wizard should be shown.</returns>
         public static bool IsConfigured()
         {
             try
@@ -54,6 +64,10 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
+        /// <summary>
+        /// Shows the first-run wizard if configuration is not complete.
+        /// Called automatically when the Model Library browser opens and configuration is missing.
+        /// </summary>
         public static void MaybeShow()
         {
             if (!IsConfigured())
@@ -61,7 +75,7 @@ namespace ModelLibrary.Editor.Windows
                 FirstRunWizard w = GetWindow<FirstRunWizard>(true, "Model Library Setup", true);
                 w.minSize = new Vector2(420, 180);
                 w.Init();
-                w.ShowUtility();
+                w.ShowUtility(); // Show as modal utility window
             }
         }
 
