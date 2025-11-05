@@ -332,7 +332,7 @@ namespace ModelLibrary.Editor.Services
             {
                 // Check if this is the latest version (warning only - UI handles confirmation)
                 ModelIndex index = await GetIndexAsync();
-                ModelIndex.Entry entry = index?.entries?.FirstOrDefault(e => e.id == modelId);
+                ModelIndex.Entry entry = index != null && index.entries != null ? index.entries.FirstOrDefault(e => e.id == modelId) : null;
                 if (entry != null && entry.latestVersion == version)
                 {
                     Debug.LogWarning($"[ModelLibraryService] Deleting latest version {version} of model {modelId}. The index will still reference this version until manually updated.");
@@ -588,7 +588,7 @@ namespace ModelLibrary.Editor.Services
             ModelIndex.Entry entry = index.Get(meta.identity.id);
             long timestamp = meta.updatedTimeTicks <= 0 ? DateTime.Now.Ticks : meta.updatedTimeTicks;
             long releaseTimestamp = meta.uploadTimeTicks <= 0 ? timestamp : meta.uploadTimeTicks;
-            List<string> tags = meta.tags?.values != null ? new List<string>(meta.tags.values) : new List<string>();
+            List<string> tags = meta.tags != null && meta.tags.values != null ? new List<string>(meta.tags.values) : new List<string>();
 
             if (entry == null)
             {

@@ -51,11 +51,13 @@ namespace ModelLibrary.Editor.Windows
             }
             
             EditorGUILayout.Space();
-            EditorGUILayout.HelpBox(
-                _role == UserRole.Artist 
-                    ? "Artist role: Can submit models, manage versions, and browse the library." 
-                    : "Developer role: Can browse, import models, and leave feedback notes.",
-                MessageType.Info);
+            string roleDescription = _role switch
+            {
+                UserRole.Artist => "Artist role: Can submit models, manage versions, and browse the library.",
+                UserRole.Admin => "Admin role: Full access including analytics, version deletion, and system management.",
+                _ => "Developer role: Can browse, import models, and leave feedback notes."
+            };
+            EditorGUILayout.HelpBox(roleDescription, MessageType.Info);
             
             EditorGUILayout.Space();
             

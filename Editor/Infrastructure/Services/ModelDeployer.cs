@@ -78,7 +78,7 @@ namespace ModelLibrary.Editor.Services
 
                     // Collect details for materials and textures
                     Type t = AssetDatabase.GetMainAssetTypeAtPath(path);
-                    string typeName = t?.Name;
+                    string typeName = t != null ? t.Name : null;
                     if (typeName == nameof(Material))
                     {
                         meta.materials.Add(new AssetRef
@@ -167,7 +167,7 @@ namespace ModelLibrary.Editor.Services
                             AccumulateMeshStats(depPath, processedMeshIds, ref totalVertices, ref totalTriangles);
                         }
 
-                        string typeName = depType?.Name;
+                        string typeName = depType != null ? depType.Name : null;
                         if (typeName == nameof(Material))
                         {
                             meta.materials.Add(new AssetRef
@@ -193,10 +193,10 @@ namespace ModelLibrary.Editor.Services
             }
 
             // Add images (expected to be absolute paths or project relative under Assets)
-            meta.imageRelativePaths = imagePaths?.Select(p => $"images/{Path.GetFileName(p)}").ToList() ?? new List<string>();
+            meta.imageRelativePaths = imagePaths != null ? imagePaths.Select(p => $"images/{Path.GetFileName(p)}").ToList() : new List<string>();
 
             // Add tags
-            meta.tags.values = tags?.ToList() ?? new List<string>();
+            meta.tags.values = tags != null ? tags.ToList() : new List<string>();
             meta.vertexCount = totalVertices;
             meta.triangleCount = totalTriangles;
 
@@ -267,7 +267,7 @@ namespace ModelLibrary.Editor.Services
         /// <returns>The GUID of the primary asset, or null if no suitable asset is found.</returns>
         private static string SelectPrimaryAssetGuid(ModelMeta meta)
         {
-            if (meta?.assetGuids == null)
+            if (meta == null || meta.assetGuids == null)
             {
                 return null;
             }

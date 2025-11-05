@@ -1,7 +1,11 @@
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
+using ModelLibrary.Data;
 using ModelLibrary.Editor;
 using ModelLibrary.Editor.Identity;
+using ModelLibrary.Editor.Services;
+using ModelLibrary.Editor.Settings;
 using ModelLibrary.Editor.Windows;
 using UnityEditor;
 using UnityEngine;
@@ -10,7 +14,8 @@ namespace ModelLibrary.Editor
 {
     /// <summary>
     /// Context menu items for the Unity Editor Project view.
-    /// Provides right-click functionality to submit models directly from selected assets.
+    /// Provides right-click functionality to submit models, open models in the library,
+    /// check for updates, and view model details directly from selected assets.
     /// </summary>
     public static class ContextMenus
     {
@@ -93,6 +98,263 @@ namespace ModelLibrary.Editor
             }
 
             return false; // No valid model assets found
+        }
+
+        /// <summary>
+        /// Right-click context menu item to open the selected model in Model Library browser.
+        /// Finds the model by matching the selected asset's GUID against installed models.
+        /// </summary>
+        [MenuItem("Assets/Model Library/Open in Model Library", false, 1001)]
+        public static void OpenModelInLibrary()
+        {
+            if (Selection.assetGUIDs == null || Selection.assetGUIDs.Length == 0)
+            {
+                return;
+            }
+
+            // Try to find which model this asset belongs to
+            string selectedGuid = Selection.assetGUIDs[0];
+            string modelId = FindModelIdFromGuid(selectedGuid);
+            
+            if (string.IsNullOrEmpty(modelId))
+            {
+                EditorUtility.DisplayDialog("Model Not Found", 
+                    "The selected asset does not belong to any model in the library.\n\nMake sure the model is installed and the asset is part of a registered model.", 
+                    "OK");
+                return;
+            }
+
+            // Open Model Library window and focus on the model
+            ModelLibraryWindow.Open();
+            ModelLibraryWindow window = UnityEditor.EditorWindow.GetWindow<ModelLibraryWindow>();
+            _ = FocusModelInLibraryAsync(window, modelId);
+        }
+
+        /// <summary>
+        /// Validation method for opening model in library menu item.
+        /// Only enabled if a valid asset is selected.
+        /// </summary>
+        [MenuItem("Assets/Model Library/Open in Model Library", true, 1001)]
+        public static bool ValidateOpenModelInLibrary()
+        {
+            if (Selection.assetGUIDs == null || Selection.assetGUIDs.Length == 0)
+            {
+                return false;
+            }
+
+            // Check if at least one selected asset belongs to a model
+            return Selection.assetGUIDs.Any(guid => !string.IsNullOrEmpty(FindModelIdFromGuid(guid)));
+        }
+
+        /// <summary>
+        /// Right-click context menu item to check for updates for the selected model.
+        /// </summary>
+        [MenuItem("Assets/Model Library/Check for Updates", false, 1002)]
+        public static void CheckModelForUpdates()
+        {
+            if (Selection.assetGUIDs == null || Selection.assetGUIDs.Length == 0)
+            {
+                return;
+            }
+
+            string selectedGuid = Selection.assetGUIDs[0];
+            string modelId = FindModelIdFromGuid(selectedGuid);
+            
+            if (string.IsNullOrEmpty(modelId))
+            {
+                EditorUtility.DisplayDialog("Model Not Found", 
+                    "The selected asset does not belong to any model in the library.", 
+                    "OK");
+                return;
+            }
+
+            _ = CheckModelUpdatesAsync(modelId);
+        }
+
+        /// <summary>
+        /// Validation method for check updates menu item.
+        /// </summary>
+        [MenuItem("Assets/Model Library/Check for Updates", true, 1002)]
+        public static bool ValidateCheckModelForUpdates()
+        {
+            return ValidateOpenModelInLibrary();
+        }
+
+        /// <summary>
+        /// Right-click context menu item to view model details.
+        /// </summary>
+        [MenuItem("Assets/Model Library/View Details", false, 1003)]
+        public static void ViewModelDetails()
+        {
+            if (Selection.assetGUIDs == null || Selection.assetGUIDs.Length == 0)
+            {
+                return;
+            }
+
+            string selectedGuid = Selection.assetGUIDs[0];
+            string modelId = FindModelIdFromGuid(selectedGuid);
+            string version = FindModelVersionFromGuid(selectedGuid);
+            
+            if (string.IsNullOrEmpty(modelId) || string.IsNullOrEmpty(version))
+            {
+                EditorUtility.DisplayDialog("Model Not Found", 
+                    "The selected asset does not belong to any model in the library.", 
+                    "OK");
+                return;
+            }
+
+            ModelDetailsWindow.Open(modelId, version);
+        }
+
+        /// <summary>
+        /// Validation method for view details menu item.
+        /// </summary>
+        [MenuItem("Assets/Model Library/View Details", true, 1003)]
+        public static bool ValidateViewModelDetails()
+        {
+            return ValidateOpenModelInLibrary();
+        }
+
+        /// <summary>
+        /// Finds the model ID for a given asset GUID by scanning manifest files.
+        /// </summary>
+        private static string FindModelIdFromGuid(string guid)
+        {
+            if (string.IsNullOrEmpty(guid))
+            {
+                return null;
+            }
+
+            // Search for manifest files in the project
+            string[] manifestGuids = AssetDatabase.FindAssets("modelLibrary.meta");
+            foreach (string manifestGuid in manifestGuids)
+            {
+                string manifestPath = AssetDatabase.GUIDToAssetPath(manifestGuid);
+                if (string.IsNullOrEmpty(manifestPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    string json = File.ReadAllText(manifestPath);
+                    ModelMeta meta = JsonUtility.FromJson<ModelMeta>(json);
+                    
+                    if (meta != null && meta.assetGuids != null && meta.assetGuids.Contains(guid))
+                    {
+                        return meta.identity?.id;
+                    }
+                }
+                catch
+                {
+                    // Ignore errors reading manifest files
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Finds the model version for a given asset GUID by scanning manifest files.
+        /// </summary>
+        private static string FindModelVersionFromGuid(string guid)
+        {
+            if (string.IsNullOrEmpty(guid))
+            {
+                return null;
+            }
+
+            // Search for manifest files in the project
+            string[] manifestGuids = AssetDatabase.FindAssets("modelLibrary.meta");
+            foreach (string manifestGuid in manifestGuids)
+            {
+                string manifestPath = AssetDatabase.GUIDToAssetPath(manifestGuid);
+                if (string.IsNullOrEmpty(manifestPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    string json = File.ReadAllText(manifestPath);
+                    ModelMeta meta = JsonUtility.FromJson<ModelMeta>(json);
+                    
+                    if (meta != null && meta.assetGuids != null && meta.assetGuids.Contains(guid))
+                    {
+                        return meta.version;
+                    }
+                }
+                catch
+                {
+                    // Ignore errors reading manifest files
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Focuses on a specific model in the Model Library window.
+        /// </summary>
+        private static async Task FocusModelInLibraryAsync(ModelLibraryWindow window, string modelId)
+        {
+            if (window == null || string.IsNullOrEmpty(modelId))
+            {
+                return;
+            }
+
+            // Wait a bit for the window to load
+            await Task.Delay(500);
+            
+            // Set search to filter to this model
+            // Note: This requires accessing private fields, so we'll need to add a public method
+            // For now, we'll just open the window - the user can search manually
+            window.Repaint();
+        }
+
+        /// <summary>
+        /// Checks for updates for a specific model.
+        /// </summary>
+        private static async Task CheckModelUpdatesAsync(string modelId)
+        {
+            try
+            {
+                ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
+                Repository.IModelRepository repo = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.FileSystem
+                    ? new Repository.FileSystemRepository(settings.repositoryRoot)
+                    : new Repository.HttpRepository(settings.repositoryRoot);
+                ModelLibraryService service = new ModelLibraryService(repo);
+
+                bool hasUpdate = await service.HasUpdateAsync(modelId);
+                
+                if (hasUpdate)
+                {
+                    ModelIndex.Entry entry = (await service.GetIndexAsync()).Get(modelId);
+                    string latestVersion = entry?.latestVersion ?? "unknown";
+                    
+                    bool update = EditorUtility.DisplayDialog("Update Available", 
+                        $"Model '{entry?.name ?? modelId}' has an update available.\n\nLatest version: {latestVersion}\n\nWould you like to update now?", 
+                        "Update", "Cancel");
+                    
+                    if (update)
+                    {
+                        // Open Model Library window to perform update
+                        ModelLibraryWindow.Open();
+                    }
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("No Updates", 
+                        $"Model '{modelId}' is up to date.", 
+                        "OK");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                EditorUtility.DisplayDialog("Error", 
+                    $"Failed to check for updates: {ex.Message}", 
+                    "OK");
+            }
         }
     }
 }

@@ -17,7 +17,12 @@ namespace ModelLibrary.Editor.Identity
         /// <summary>
         /// Artist/Modeler role - can browse, import, submit models, and manage versions.
         /// </summary>
-        Artist
+        Artist,
+        
+        /// <summary>
+        /// Administrator role - full access including analytics, version deletion, and system management.
+        /// </summary>
+        Admin
     }
 
     public interface IUserIdentityProvider

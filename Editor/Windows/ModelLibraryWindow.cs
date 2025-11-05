@@ -40,6 +40,12 @@ namespace ModelLibrary.Editor.Windows
         // UI State
         /// <summary>Current search query text entered by the user.</summary>
         private string _search = string.Empty;
+        /// <summary>Search history (last 10 searches).</summary>
+        private readonly List<string> _searchHistory = new List<string>();
+        /// <summary>EditorPrefs key for search history.</summary>
+        private const string __SearchHistoryPrefKey = "ModelLibrary.SearchHistory";
+        /// <summary>Maximum number of search history entries to keep.</summary>
+        private const int __MaxSearchHistory = 10;
         /// <summary>Scroll position for the main model list/grid view.</summary>
         private Vector2 _scroll;
         /// <summary>Dictionary tracking which model entries are expanded in list view.</summary>
@@ -50,6 +56,22 @@ namespace ModelLibrary.Editor.Windows
         private Vector2 _tagScroll;
         /// <summary>Current view mode (List or Grid). Defaults to Grid.</summary>
         private ViewMode _viewMode = ViewMode.Grid;
+
+        // Sorting
+        /// <summary>Sort mode for model entries.</summary>
+        private enum SortMode
+        {
+            /// <summary>Sort by model name (alphabetical).</summary>
+            Name,
+            /// <summary>Sort by update date (newest first).</summary>
+            Date,
+            /// <summary>Sort by version number (latest first).</summary>
+            Version
+        }
+        /// <summary>Current sort mode.</summary>
+        private SortMode _sortMode = SortMode.Name;
+        /// <summary>EditorPrefs key for storing sort preference.</summary>
+        private const string __SortModePrefKey = "ModelLibrary.SortMode";
 
         // Caching and Loading State
         /// <summary>Cache of loaded model metadata, keyed by "modelId@version".</summary>
@@ -76,6 +98,26 @@ namespace ModelLibrary.Editor.Windows
         // Tag Filtering
         /// <summary>Set of currently selected tags for filtering models (case-insensitive comparison).</summary>
         private readonly HashSet<string> _selectedTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
+        // Bulk Operations
+        /// <summary>Set of model IDs selected for bulk operations.</summary>
+        private readonly HashSet<string> _selectedModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Flag indicating if bulk selection mode is active.</summary>
+        private bool _bulkSelectionMode = false;
+
+        // Filter Presets
+        /// <summary>Data class for filter presets (search query + selected tags).</summary>
+        [System.Serializable]
+        private class FilterPreset
+        {
+            public string name;
+            public string searchQuery;
+            public List<string> selectedTags;
+        }
+        /// <summary>List of saved filter presets.</summary>
+        private readonly List<FilterPreset> _filterPresets = new List<FilterPreset>();
+        /// <summary>EditorPrefs key for filter presets.</summary>
+        private const string __FilterPresetsPrefKey = "ModelLibrary.FilterPresets";
         /// <summary>Dictionary counting how many models use each tag (case-insensitive keys).</summary>
         private readonly Dictionary<string, int> _tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         /// <summary>Sorted list of all available tags for display in the filter UI.</summary>
@@ -86,6 +128,30 @@ namespace ModelLibrary.Editor.Windows
         private int _updateCount = 0;
         /// <summary>Dictionary tracking which models have updates available, keyed by model ID.</summary>
         private readonly Dictionary<string, bool> _modelUpdateStatus = new Dictionary<string, bool>();
+
+        // Favorites & Recently Used
+        /// <summary>Set of favorite model IDs.</summary>
+        private readonly HashSet<string> _favorites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>List of recently imported model IDs (most recent first).</summary>
+        private readonly List<string> _recentlyUsed = new List<string>();
+        /// <summary>EditorPrefs key for favorites.</summary>
+        private const string __FavoritesPrefKey = "ModelLibrary.Favorites";
+        /// <summary>EditorPrefs key for recently used models.</summary>
+        private const string __RecentlyUsedPrefKey = "ModelLibrary.RecentlyUsed";
+        /// <summary>Maximum number of recently used models to track.</summary>
+        private const int __MaxRecentlyUsed = 20;
+        /// <summary>Filter mode for displaying models.</summary>
+        private enum FilterMode
+        {
+            /// <summary>Show all models.</summary>
+            All,
+            /// <summary>Show only favorite models.</summary>
+            Favorites,
+            /// <summary>Show only recently used models.</summary>
+            Recent
+        }
+        /// <summary>Current filter mode.</summary>
+        private FilterMode _filterMode = FilterMode.All;
         /// <summary>
         /// Menu item to open the Model Library browser window.
         /// </summary>
@@ -102,6 +168,19 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void OnEnable()
         {
+            // Load sort preference from EditorPrefs
+            _sortMode = (SortMode)EditorPrefs.GetInt(__SortModePrefKey, (int)SortMode.Name);
+
+            // Load search history from EditorPrefs
+            LoadSearchHistory();
+
+            // Load filter presets from EditorPrefs
+            LoadFilterPresets();
+            
+            // Load favorites and recently used from EditorPrefs
+            LoadFavorites();
+            LoadRecentlyUsed();
+
             // Check if configuration is needed before creating services
             if (!FirstRunWizard.IsConfigured())
             {
@@ -182,19 +261,27 @@ namespace ModelLibrary.Editor.Windows
             _loadingIndex = true;
             try
             {
+                titleContent.text = "Model Library - Loading...";
+                EditorUtility.DisplayProgressBar("Loading Model Library", "Loading index from repository...", 0.1f);
+
                 _indexCache = await _service.GetIndexAsync();
+
+                EditorUtility.DisplayProgressBar("Loading Model Library", "Processing models...", 0.5f);
 
                 // Check for updates in the background after index loads
                 _ = CheckForUpdatesAsync();
 
                 Repaint(); // Refresh the UI when index is loaded
+                titleContent.text = "Model Library";
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Failed to load index: {ex.Message}");
+                ErrorHandler.ShowError("Load Failed", "Failed to load model index from repository", ex);
+                titleContent.text = "Model Library - Error";
             }
             finally
             {
+                EditorUtility.ClearProgressBar();
                 _loadingIndex = false;
             }
         }
@@ -232,6 +319,9 @@ namespace ModelLibrary.Editor.Windows
 
         private void OnGUI()
         {
+            // Handle keyboard shortcuts
+            HandleKeyboardShortcuts();
+
             // Check if we need to show configuration first
             if (!FirstRunWizard.IsConfigured())
             {
@@ -248,7 +338,22 @@ namespace ModelLibrary.Editor.Windows
 
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
-                _search = GUILayout.TextField(_search, EditorStyles.toolbarSearchField);
+                GUI.SetNextControlName("SearchField");
+                string newSearch = GUILayout.TextField(_search, EditorStyles.toolbarSearchField);
+
+                // Check if search changed and add to history if not empty
+                if (newSearch != _search && !string.IsNullOrWhiteSpace(newSearch))
+                {
+                    AddToSearchHistory(newSearch);
+                }
+                _search = newSearch;
+
+                // Search history dropdown button
+                if (GUILayout.Button("▼", EditorStyles.toolbarButton, GUILayout.Width(20)))
+                {
+                    ShowSearchHistoryMenu();
+                }
+
                 using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(_search)))
                 {
                     if (GUILayout.Button("Clear", EditorStyles.toolbarButton, GUILayout.Width(60)))
@@ -275,6 +380,32 @@ namespace ModelLibrary.Editor.Windows
                 {
                     _ = CheckForUpdatesAsync();
                 }
+                
+                // Bulk operations toggle
+                bool newBulkMode = GUILayout.Toggle(_bulkSelectionMode, "Select", EditorStyles.toolbarButton, GUILayout.Width(70));
+                if (newBulkMode != _bulkSelectionMode)
+                {
+                    _bulkSelectionMode = newBulkMode;
+                    if (!_bulkSelectionMode)
+                    {
+                        _selectedModels.Clear();
+                    }
+                    Repaint();
+                }
+                
+                // Bulk operations buttons
+                using (new EditorGUI.DisabledScope(_selectedModels.Count == 0))
+                {
+                    if (GUILayout.Button($"Import ({_selectedModels.Count})", EditorStyles.toolbarButton, GUILayout.Width(100)))
+                    {
+                        _ = BulkImportAsync();
+                    }
+                    if (GUILayout.Button($"Update ({_selectedModels.Count})", EditorStyles.toolbarButton, GUILayout.Width(100)))
+                    {
+                        _ = BulkUpdateAsync();
+                    }
+                }
+                
                 // Only show Submit Model button for Artists
                 SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
                 if (identityProvider.GetUserRole() == UserRole.Artist)
@@ -291,6 +422,16 @@ namespace ModelLibrary.Editor.Windows
 
                 GUILayout.FlexibleSpace();
 
+                // Sort dropdown
+                GUILayout.Label("Sort:", EditorStyles.miniLabel, GUILayout.Width(35));
+                SortMode newSortMode = (SortMode)EditorGUILayout.EnumPopup(_sortMode, EditorStyles.toolbarPopup, GUILayout.Width(80));
+                if (newSortMode != _sortMode)
+                {
+                    _sortMode = newSortMode;
+                    EditorPrefs.SetInt(__SortModePrefKey, (int)_sortMode);
+                    Repaint();
+                }
+
                 // View mode toggle
                 string[] viewModeLabels = { "List", "Grid" };
                 int newViewMode = GUILayout.Toolbar((int)_viewMode, viewModeLabels, EditorStyles.toolbarButton, GUILayout.Width(100));
@@ -303,7 +444,7 @@ namespace ModelLibrary.Editor.Windows
             // Use cached index if available, otherwise show loading
             if (_indexCache == null)
             {
-                GUILayout.Label("Loading index...");
+                DrawEmptyState("Loading model index...", "Please wait while we fetch the latest models from the repository.");
                 return;
             }
 
@@ -311,15 +452,27 @@ namespace ModelLibrary.Editor.Windows
             DrawTagFilter(index);
             if (index == null || index.entries == null)
             {
-                GUILayout.Label("No models available.");
+                DrawEmptyState("No models available",
+                    "The repository appears to be empty.\n\nTo get started:\n• Submit your first model using 'Submit Model'\n• Check your repository configuration");
                 return;
             }
 
             IEnumerable<ModelIndex.Entry> query = index.entries;
+            
+            // Apply filter mode (All/Favorites/Recent)
+            if (_filterMode == FilterMode.Favorites)
+            {
+                query = query.Where(e => _favorites.Contains(e.id));
+            }
+            else if (_filterMode == FilterMode.Recent)
+            {
+                query = query.Where(e => _recentlyUsed.Contains(e.id));
+            }
+            
             string trimmedSearch = string.IsNullOrWhiteSpace(_search) ? null : _search.Trim();
             if (!string.IsNullOrEmpty(trimmedSearch))
             {
-                query = query.Where(e => EntryMatchesSearch(e, trimmedSearch));
+                query = query.Where(e => EntryMatchesAdvancedSearch(e, trimmedSearch));
             }
 
             // All models are visible (no project restrictions)
@@ -330,11 +483,18 @@ namespace ModelLibrary.Editor.Windows
             }
 
             List<ModelIndex.Entry> q = query.ToList();
+            
+            // Sort the results
+            q = SortEntries(q, _sortMode);
 
+            // Filter mode tabs (All/Favorites/Recent)
+            DrawFilterModeTabs();
+            
             DrawFilterSummary(index.entries.Count, q.Count);
             if (q.Count == 0)
             {
-                EditorGUILayout.HelpBox("No models match the current filters.", MessageType.Info);
+                DrawEmptyState("No models match your filters",
+                    $"Found {index.entries.Count} model(s) in repository, but none match your current search and filters.\n\nTry:\n• Clearing your search query\n• Removing some tag filters\n• Using different search terms");
                 return;
             }
 
@@ -355,18 +515,77 @@ namespace ModelLibrary.Editor.Windows
 
         private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_search) || _selectedTags.Count > 0;
 
-        private static bool EntryMatchesSearch(ModelIndex.Entry entry, string term)
+        /// <summary>
+        /// Checks if an entry matches the advanced search query.
+        /// Supports AND/OR operators for tags: "tag1 AND tag2", "tag1 OR tag2"
+        /// Also matches against model name and description.
+        /// </summary>
+        private static bool EntryMatchesAdvancedSearch(ModelIndex.Entry entry, string query)
         {
-            if (entry == null || string.IsNullOrEmpty(term))
+            if (entry == null || string.IsNullOrEmpty(query))
             {
                 return false;
             }
 
+            string trimmedQuery = query.Trim();
+
+            // Check for AND/OR operators (case-insensitive)
+            if (trimmedQuery.IndexOf(" AND ", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // AND operator: all terms must match
+                string[] terms = trimmedQuery.Split(new[] { " AND " }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string term in terms)
+                {
+                    if (!EntryMatchesTerm(entry, term.Trim()))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            else if (trimmedQuery.IndexOf(" OR ", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // OR operator: at least one term must match
+                string[] terms = trimmedQuery.Split(new[] { " OR " }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string term in terms)
+                {
+                    if (EntryMatchesTerm(entry, term.Trim()))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            else
+            {
+                // Simple search: match the whole query
+                return EntryMatchesTerm(entry, trimmedQuery);
+            }
+        }
+
+        /// <summary>
+        /// Checks if an entry matches a single search term (name, description, or tags).
+        /// </summary>
+        private static bool EntryMatchesTerm(ModelIndex.Entry entry, string term)
+        {
+            if (string.IsNullOrEmpty(term))
+            {
+                return false;
+            }
+
+            // Match against name
             if (!string.IsNullOrEmpty(entry.name) && entry.name.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 return true;
             }
 
+            // Match against description
+            if (!string.IsNullOrEmpty(entry.description) && entry.description.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            // Match against tags
             if (entry.tags != null)
             {
                 foreach (string tag in entry.tags)
@@ -398,6 +617,73 @@ namespace ModelLibrary.Editor.Windows
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Draws an empty state message with helpful guidance.
+        /// Used when there are no models to display or when loading.
+        /// </summary>
+        /// <param name="title">Title of the empty state.</param>
+        /// <param name="message">Helpful message explaining the situation and what to do.</param>
+        private void DrawEmptyState(string title, string message)
+        {
+            EditorGUILayout.Space(20);
+
+            using (new EditorGUILayout.VerticalScope())
+            {
+                GUILayout.FlexibleSpace();
+
+                // Title
+                EditorGUILayout.LabelField(title, EditorStyles.boldLabel, GUILayout.Height(24));
+                EditorGUILayout.Space(10);
+
+                // Message
+                EditorGUILayout.HelpBox(message, MessageType.Info);
+                EditorGUILayout.Space(10);
+
+                // Quick action buttons
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.FlexibleSpace();
+
+                    if (GUILayout.Button("Refresh", GUILayout.Width(100), GUILayout.Height(30)))
+                    {
+                        _indexCache = null;
+                        _ = LoadIndexAsync();
+                    }
+
+                    SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
+                    if (identityProvider.GetUserRole() == UserRole.Artist)
+                    {
+                        if (GUILayout.Button("Submit Model", GUILayout.Width(120), GUILayout.Height(30)))
+                        {
+                            ModelSubmitWindow.Open();
+                        }
+                    }
+
+                    GUILayout.FlexibleSpace();
+                }
+
+                GUILayout.FlexibleSpace();
+            }
+        }
+
+        /// <summary>
+        /// Draws filter mode tabs (All/Favorites/Recent).
+        /// </summary>
+        private void DrawFilterModeTabs()
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                string[] modeLabels = { "All", $"Favorites ({_favorites.Count})", $"Recent ({_recentlyUsed.Count})" };
+                int newMode = GUILayout.Toolbar((int)_filterMode, modeLabels, EditorStyles.toolbarButton);
+                if (newMode != (int)_filterMode)
+                {
+                    _filterMode = (FilterMode)newMode;
+                    Repaint();
+                }
+            }
+            EditorGUILayout.Space(5);
         }
 
         private void DrawFilterSummary(int totalCount, int filteredCount)
@@ -459,6 +745,20 @@ namespace ModelLibrary.Editor.Windows
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
+                    // Filter presets dropdown
+                    if (GUILayout.Button("Presets ▼", EditorStyles.toolbarButton, GUILayout.Width(80)))
+                    {
+                        ShowFilterPresetsMenu();
+                    }
+
+                    using (new EditorGUI.DisabledScope(!HasActiveFilters))
+                    {
+                        if (GUILayout.Button("Save Preset", EditorStyles.toolbarButton, GUILayout.Width(90)))
+                        {
+                            ShowSavePresetDialog();
+                        }
+                    }
+
                     using (new EditorGUI.DisabledScope(_selectedTags.Count == 0))
                     {
                         if (GUILayout.Button("Clear Tags", GUILayout.Width(90)))
@@ -648,6 +948,20 @@ namespace ModelLibrary.Editor.Windows
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
+                    // Favorite star button
+                    bool isFavorite = _favorites.Contains(e.id);
+                    string starText = isFavorite ? "★" : "☆";
+                    Color originalColor = GUI.color;
+                    if (isFavorite)
+                    {
+                        GUI.color = Color.yellow;
+                    }
+                    if (GUILayout.Button(starText, EditorStyles.label, GUILayout.Width(20)))
+                    {
+                        ToggleFavorite(e.id);
+                    }
+                    GUI.color = originalColor;
+                    
                     // Notification badges (notes and updates)
                     DrawNotificationBadges(e);
 
@@ -701,7 +1015,8 @@ namespace ModelLibrary.Editor.Windows
             EditorGUILayout.LabelField("Release:", e.releaseTimeTicks <= 0 ? "�" : new DateTime(e.releaseTimeTicks).ToString(CultureInfo.CurrentCulture));
             // Auto-load meta for details display
             string key = e.id + "@" + e.latestVersion;
-            if (!_metaCache.ContainsKey(key) && !_loadingMeta.Contains(key))
+            bool isLoadingMeta = _loadingMeta.Contains(key);
+            if (!_metaCache.ContainsKey(key) && !isLoadingMeta)
             {
                 _ = LoadMetaAsync(e.id, e.latestVersion);
             }
@@ -709,12 +1024,20 @@ namespace ModelLibrary.Editor.Windows
             {
                 string thumbKey = key + "#thumb";
                 _thumbnailCache.TryGetValue(thumbKey, out Texture2D thumbnail);
+                bool isLoadingThumbnail = _loadingThumbnails.Contains(thumbKey);
                 using (new EditorGUILayout.HorizontalScope())
                 {
+                    Rect thumbRect = GUILayoutUtility.GetRect(64f, 64f, GUILayout.Width(64), GUILayout.Height(64));
                     if (thumbnail != null)
                     {
-                        Rect thumbRect = GUILayoutUtility.GetRect(64f, 64f, GUILayout.Width(64), GUILayout.Height(64));
                         EditorGUI.DrawPreviewTexture(thumbRect, thumbnail, null, ScaleMode.ScaleToFit);
+                        GUILayout.Space(6);
+                    }
+                    else if (isLoadingThumbnail || isLoadingMeta)
+                    {
+                        // Draw loading placeholder
+                        EditorGUI.DrawRect(thumbRect, new Color(0.2f, 0.2f, 0.2f, 1f));
+                        GUI.Label(thumbRect, "Loading...", EditorStyles.centeredGreyMiniLabel);
                         GUILayout.Space(6);
                     }
                     using (new EditorGUILayout.VerticalScope())
@@ -797,6 +1120,28 @@ namespace ModelLibrary.Editor.Windows
         {
             using (new EditorGUILayout.VerticalScope("box", GUILayout.Width(thumbnailSize + (padding * 2)), GUILayout.Height(thumbnailSize + 60)))
             {
+                // Selection checkbox for bulk operations
+                if (_bulkSelectionMode)
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        bool isSelected = _selectedModels.Contains(entry.id);
+                        bool newSelected = EditorGUILayout.Toggle(isSelected, GUILayout.Width(20));
+                        if (newSelected != isSelected)
+                        {
+                            if (newSelected)
+                            {
+                                _selectedModels.Add(entry.id);
+                            }
+                            else
+                            {
+                                _selectedModels.Remove(entry.id);
+                            }
+                        }
+                        GUILayout.FlexibleSpace();
+                    }
+                }
+                
                 // Load metadata and thumbnail if needed
                 string key = entry.id + "@" + entry.latestVersion;
                 if (!_metaCache.ContainsKey(key) && !_loadingMeta.Contains(key))
@@ -807,6 +1152,8 @@ namespace ModelLibrary.Editor.Windows
                 // Get thumbnail
                 string thumbKey = key + "#thumb";
                 _thumbnailCache.TryGetValue(thumbKey, out Texture2D thumbnail);
+                bool isLoadingThumbnail = _loadingThumbnails.Contains(thumbKey);
+                bool isLoadingMeta = _loadingMeta.Contains(key);
 
                 // Thumbnail area (clickable)
                 Rect thumbRect = GUILayoutUtility.GetRect(thumbnailSize, thumbnailSize, GUILayout.Width(thumbnailSize), GUILayout.Height(thumbnailSize));
@@ -824,8 +1171,20 @@ namespace ModelLibrary.Editor.Windows
                 {
                     // Draw placeholder background
                     EditorGUI.DrawRect(thumbRect, new Color(0.2f, 0.2f, 0.2f, 1f));
-                    // Draw placeholder text
-                    GUI.Label(thumbRect, "No Preview", EditorStyles.centeredGreyMiniLabel);
+
+                    // Show loading indicator if loading
+                    if (isLoadingThumbnail || isLoadingMeta)
+                    {
+                        // Draw loading spinner text
+                        string loadingText = "Loading...";
+                        GUI.Label(thumbRect, loadingText, EditorStyles.centeredGreyMiniLabel);
+                    }
+                    else
+                    {
+                        // Draw placeholder text
+                        GUI.Label(thumbRect, "No Preview", EditorStyles.centeredGreyMiniLabel);
+                    }
+
                     // Make placeholder clickable
                     if (GUI.Button(thumbRect, GUIContent.none, GUIStyle.none))
                     {
@@ -838,6 +1197,20 @@ namespace ModelLibrary.Editor.Windows
                 // Model name with badges
                 using (new EditorGUILayout.HorizontalScope())
                 {
+                    // Favorite star button (compact)
+                    bool isFavorite = _favorites.Contains(entry.id);
+                    string starText = isFavorite ? "★" : "☆";
+                    Color originalColor = GUI.color;
+                    if (isFavorite)
+                    {
+                        GUI.color = Color.yellow;
+                    }
+                    if (GUILayout.Button(starText, EditorStyles.miniLabel, GUILayout.Width(16)))
+                    {
+                        ToggleFavorite(entry.id);
+                    }
+                    GUI.color = originalColor;
+
                     // Notification badges (compact version)
                     DrawCompactNotificationBadges(entry);
 
@@ -1079,6 +1452,131 @@ namespace ModelLibrary.Editor.Windows
             return normalized;
         }
 
+        /// <summary>
+        /// Loads favorites from EditorPrefs.
+        /// </summary>
+        private void LoadFavorites()
+        {
+            _favorites.Clear();
+            string favoritesJson = EditorPrefs.GetString(__FavoritesPrefKey, "[]");
+            try
+            {
+                string[] favorites = JsonUtility.FromJson<string[]>(favoritesJson);
+                if (favorites != null)
+                {
+                    foreach (string id in favorites)
+                    {
+                        _favorites.Add(id);
+                    }
+                }
+            }
+            catch
+            {
+                // If parsing fails, start with empty favorites
+            }
+        }
+
+        /// <summary>
+        /// Saves favorites to EditorPrefs.
+        /// </summary>
+        private void SaveFavorites()
+        {
+            try
+            {
+                string favoritesJson = JsonUtility.ToJson(_favorites.ToArray());
+                EditorPrefs.SetString(__FavoritesPrefKey, favoritesJson);
+            }
+            catch
+            {
+                // Ignore save errors
+            }
+        }
+
+        /// <summary>
+        /// Loads recently used models from EditorPrefs.
+        /// </summary>
+        private void LoadRecentlyUsed()
+        {
+            _recentlyUsed.Clear();
+            string recentlyUsedJson = EditorPrefs.GetString(__RecentlyUsedPrefKey, "[]");
+            try
+            {
+                string[] recentlyUsed = JsonUtility.FromJson<string[]>(recentlyUsedJson);
+                if (recentlyUsed != null)
+                {
+                    _recentlyUsed.AddRange(recentlyUsed);
+                }
+            }
+            catch
+            {
+                // If parsing fails, start with empty list
+            }
+        }
+
+        /// <summary>
+        /// Saves recently used models to EditorPrefs.
+        /// </summary>
+        private void SaveRecentlyUsed()
+        {
+            try
+            {
+                string recentlyUsedJson = JsonUtility.ToJson(_recentlyUsed.ToArray());
+                EditorPrefs.SetString(__RecentlyUsedPrefKey, recentlyUsedJson);
+            }
+            catch
+            {
+                // Ignore save errors
+            }
+        }
+
+        /// <summary>
+        /// Toggles the favorite status of a model.
+        /// </summary>
+        private void ToggleFavorite(string modelId)
+        {
+            if (string.IsNullOrEmpty(modelId))
+            {
+                return;
+            }
+
+            if (_favorites.Contains(modelId))
+            {
+                _favorites.Remove(modelId);
+            }
+            else
+            {
+                _favorites.Add(modelId);
+            }
+            
+            SaveFavorites();
+            Repaint();
+        }
+
+        /// <summary>
+        /// Adds a model to the recently used list.
+        /// </summary>
+        private void AddToRecentlyUsed(string modelId)
+        {
+            if (string.IsNullOrEmpty(modelId))
+            {
+                return;
+            }
+
+            // Remove if already exists
+            _recentlyUsed.Remove(modelId);
+            
+            // Add to beginning
+            _recentlyUsed.Insert(0, modelId);
+            
+            // Limit to max size
+            if (_recentlyUsed.Count > __MaxRecentlyUsed)
+            {
+                _recentlyUsed.RemoveRange(__MaxRecentlyUsed, _recentlyUsed.Count - __MaxRecentlyUsed);
+            }
+            
+            SaveRecentlyUsed();
+        }
+
         private static string SanitizeFolderName(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -1161,13 +1659,466 @@ namespace ModelLibrary.Editor.Windows
 
         private void InvalidateLocalInstall(string modelId) => _localInstallCache.Remove(modelId);
 
+        /// <summary>
+        /// Loads search history from EditorPrefs.
+        /// </summary>
+        private void LoadSearchHistory()
+        {
+            _searchHistory.Clear();
+            string historyJson = EditorPrefs.GetString(__SearchHistoryPrefKey, "[]");
+            try
+            {
+                string[] history = JsonUtility.FromJson<string[]>(historyJson);
+                if (history != null)
+                {
+                    _searchHistory.AddRange(history);
+                }
+            }
+            catch
+            {
+                // If parsing fails, start with empty history
+            }
+        }
+
+        /// <summary>
+        /// Saves search history to EditorPrefs.
+        /// </summary>
+        private void SaveSearchHistory()
+        {
+            try
+            {
+                string historyJson = JsonUtility.ToJson(_searchHistory.ToArray());
+                EditorPrefs.SetString(__SearchHistoryPrefKey, historyJson);
+            }
+            catch
+            {
+                // Ignore save errors
+            }
+        }
+
+        /// <summary>
+        /// Adds a search term to history if it's not already there.
+        /// Maintains maximum history size.
+        /// </summary>
+        private void AddToSearchHistory(string searchTerm)
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                return;
+            }
+
+            string trimmed = searchTerm.Trim();
+
+            // Remove if already exists
+            _searchHistory.RemoveAll(s => string.Equals(s, trimmed, StringComparison.OrdinalIgnoreCase));
+
+            // Add to beginning
+            _searchHistory.Insert(0, trimmed);
+
+            // Limit to max size
+            if (_searchHistory.Count > __MaxSearchHistory)
+            {
+                _searchHistory.RemoveRange(__MaxSearchHistory, _searchHistory.Count - __MaxSearchHistory);
+            }
+
+            SaveSearchHistory();
+        }
+
+        /// <summary>
+        /// Shows a context menu with search history.
+        /// </summary>
+        private void ShowSearchHistoryMenu()
+        {
+            GenericMenu menu = new GenericMenu();
+
+            if (_searchHistory.Count == 0)
+            {
+                menu.AddDisabledItem(new GUIContent("No search history"));
+            }
+            else
+            {
+                foreach (string historyItem in _searchHistory)
+                {
+                    string item = historyItem; // Capture for closure
+                    menu.AddItem(new GUIContent(item), false, () =>
+                    {
+                        _search = item;
+                        GUI.FocusControl(null);
+                        Repaint();
+                    });
+                }
+                menu.AddSeparator("");
+                menu.AddItem(new GUIContent("Clear History"), false, () =>
+                {
+                    _searchHistory.Clear();
+                    SaveSearchHistory();
+                });
+            }
+
+            menu.ShowAsContext();
+        }
+
+        /// <summary>
+        /// Loads filter presets from EditorPrefs.
+        /// </summary>
+        private void LoadFilterPresets()
+        {
+            _filterPresets.Clear();
+            string presetsJson = EditorPrefs.GetString(__FilterPresetsPrefKey, "[]");
+            try
+            {
+                FilterPreset[] presets = JsonUtility.FromJson<FilterPreset[]>(presetsJson);
+                if (presets != null)
+                {
+                    _filterPresets.AddRange(presets);
+                }
+            }
+            catch
+            {
+                // If parsing fails, start with empty presets
+            }
+        }
+
+        /// <summary>
+        /// Saves filter presets to EditorPrefs.
+        /// </summary>
+        private void SaveFilterPresets()
+        {
+            try
+            {
+                string presetsJson = JsonUtility.ToJson(_filterPresets.ToArray());
+                EditorPrefs.SetString(__FilterPresetsPrefKey, presetsJson);
+            }
+            catch
+            {
+                // Ignore save errors
+            }
+        }
+
+        /// <summary>
+        /// Shows a context menu with filter presets.
+        /// </summary>
+        private void ShowFilterPresetsMenu()
+        {
+            GenericMenu menu = new GenericMenu();
+
+            if (_filterPresets.Count == 0)
+            {
+                menu.AddDisabledItem(new GUIContent("No presets saved"));
+            }
+            else
+            {
+                foreach (FilterPreset preset in _filterPresets)
+                {
+                    string presetName = preset.name;
+                    FilterPreset presetCopy = preset; // Capture for closure
+                    menu.AddItem(new GUIContent(presetName), false, () =>
+                    {
+                        ApplyFilterPreset(presetCopy);
+                    });
+                }
+                menu.AddSeparator("");
+                menu.AddItem(new GUIContent("Manage Presets..."), false, () =>
+                {
+                    ShowManagePresetsDialog();
+                });
+            }
+
+            menu.ShowAsContext();
+        }
+
+        /// <summary>
+        /// Applies a filter preset to the current filters.
+        /// </summary>
+        private void ApplyFilterPreset(FilterPreset preset)
+        {
+            if (preset == null)
+            {
+                return;
+            }
+
+            _search = preset.searchQuery ?? string.Empty;
+            _selectedTags.Clear();
+            if (preset.selectedTags != null)
+            {
+                foreach (string tag in preset.selectedTags)
+                {
+                    _selectedTags.Add(tag);
+                }
+            }
+
+            GUI.FocusControl(null);
+            Repaint();
+        }
+
+        /// <summary>
+        /// Shows a dialog to save the current filter state as a preset.
+        /// </summary>
+        private void ShowSavePresetDialog()
+        {
+            string presetName = EditorInputDialog.Show("Save Filter Preset", "Enter a name for this preset:", "My Preset");
+            if (!string.IsNullOrWhiteSpace(presetName))
+            {
+                FilterPreset preset = new FilterPreset
+                {
+                    name = presetName.Trim(),
+                    searchQuery = _search,
+                    selectedTags = new List<string>(_selectedTags)
+                };
+
+                // Remove existing preset with same name
+                _filterPresets.RemoveAll(p => string.Equals(p.name, preset.name, StringComparison.OrdinalIgnoreCase));
+
+                // Add new preset
+                _filterPresets.Add(preset);
+                SaveFilterPresets();
+            }
+        }
+
+        /// <summary>
+        /// Shows a dialog to manage (rename/delete) filter presets.
+        /// </summary>
+        private void ShowManagePresetsDialog()
+        {
+            // Simple dialog using EditorUtility
+            string message = "Filter Presets:\n\n";
+            if (_filterPresets.Count == 0)
+            {
+                message += "No presets saved.";
+            }
+            else
+            {
+                for (int i = 0; i < _filterPresets.Count; i++)
+                {
+                    FilterPreset preset = _filterPresets[i];
+                    message += $"{i + 1}. {preset.name}\n";
+                    if (!string.IsNullOrEmpty(preset.searchQuery))
+                    {
+                        message += $"   Search: {preset.searchQuery}\n";
+                    }
+                    if (preset.selectedTags != null && preset.selectedTags.Count > 0)
+                    {
+                        message += $"   Tags: {string.Join(", ", preset.selectedTags)}\n";
+                    }
+                    message += "\n";
+                }
+            }
+
+            EditorUtility.DisplayDialog("Filter Presets", message, "OK");
+        }
+
+        /// <summary>
+        /// Performs bulk import of all selected models.
+        /// </summary>
+        private async Task BulkImportAsync()
+        {
+            if (_selectedModels.Count == 0)
+            {
+                return;
+            }
+
+            List<string> modelIds = _selectedModels.ToList();
+            int total = modelIds.Count;
+            int current = 0;
+            int successCount = 0;
+            int failCount = 0;
+
+            foreach (string modelId in modelIds)
+            {
+                current++;
+                try
+                {
+                    ModelIndex.Entry entry = _indexCache?.entries?.FirstOrDefault(e => e.id == modelId);
+                    if (entry == null)
+                    {
+                        failCount++;
+                        continue;
+                    }
+
+                    EditorUtility.DisplayProgressBar("Bulk Import", $"Importing {entry.name} ({current}/{total})...", (float)current / total);
+                    
+                    bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
+                    bool needsUpgrade = installed && !string.IsNullOrEmpty(localMeta.version) && NeedsUpgrade(localMeta.version, entry.latestVersion);
+                    
+                    await Import(entry.id, entry.latestVersion, needsUpgrade, installed ? localMeta.version : null);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Failed to import model {modelId}: {ex.Message}");
+                    failCount++;
+                }
+            }
+
+            EditorUtility.ClearProgressBar();
+            
+            string message = $"Bulk Import Complete!\n\nSuccessful: {successCount}\nFailed: {failCount}";
+            EditorUtility.DisplayDialog("Bulk Import Results", message, "OK");
+            
+            _selectedModels.Clear();
+            _bulkSelectionMode = false;
+            Repaint();
+        }
+
+        /// <summary>
+        /// Performs bulk update of all selected models that have available updates.
+        /// </summary>
+        private async Task BulkUpdateAsync()
+        {
+            if (_selectedModels.Count == 0)
+            {
+                return;
+            }
+
+            // Filter to only models with updates
+            List<string> modelsWithUpdates = new List<string>();
+            foreach (string modelId in _selectedModels)
+            {
+                if (_modelUpdateStatus.TryGetValue(modelId, out bool hasUpdate) && hasUpdate)
+                {
+                    modelsWithUpdates.Add(modelId);
+                }
+            }
+
+            if (modelsWithUpdates.Count == 0)
+            {
+                EditorUtility.DisplayDialog("No Updates", "None of the selected models have available updates.", "OK");
+                return;
+            }
+
+            int total = modelsWithUpdates.Count;
+            int current = 0;
+            int successCount = 0;
+            int failCount = 0;
+
+            foreach (string modelId in modelsWithUpdates)
+            {
+                current++;
+                try
+                {
+                    ModelIndex.Entry entry = _indexCache?.entries?.FirstOrDefault(e => e.id == modelId);
+                    if (entry == null)
+                    {
+                        failCount++;
+                        continue;
+                    }
+
+                    EditorUtility.DisplayProgressBar("Bulk Update", $"Updating {entry.name} ({current}/{total})...", (float)current / total);
+                    
+                    bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
+                    string previousVersion = installed ? localMeta.version : null;
+                    
+                    await Import(entry.id, entry.latestVersion, isUpgrade: true, previousVersion);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Failed to update model {modelId}: {ex.Message}");
+                    failCount++;
+                }
+            }
+
+            EditorUtility.ClearProgressBar();
+            
+            string message = $"Bulk Update Complete!\n\nSuccessful: {successCount}\nFailed: {failCount}";
+            EditorUtility.DisplayDialog("Bulk Update Results", message, "OK");
+            
+            _selectedModels.Clear();
+            _bulkSelectionMode = false;
+            Repaint();
+        }
+
+        /// <summary>
+        /// Sorts a list of model entries according to the specified sort mode.
+        /// </summary>
+        /// <param name="entries">List of entries to sort.</param>
+        /// <param name="mode">Sort mode to use.</param>
+        /// <returns>Sorted list of entries.</returns>
+        private List<ModelIndex.Entry> SortEntries(List<ModelIndex.Entry> entries, SortMode mode)
+        {
+            return mode switch
+            {
+                SortMode.Name => entries.OrderBy(e => e.name, StringComparer.OrdinalIgnoreCase).ToList(),
+                SortMode.Date => entries.OrderByDescending(e => e.updatedTimeTicks).ToList(),
+                SortMode.Version => entries.OrderByDescending(e =>
+                {
+                    if (SemVer.TryParse(e.latestVersion, out SemVer v))
+                    {
+                        return v;
+                    }
+                    return new SemVer(0, 0, 0);
+                }).ToList(),
+                _ => entries
+            };
+        }
+
+        /// <summary>
+        /// Handles keyboard shortcuts for common operations.
+        /// F5: Refresh index
+        /// Ctrl+F: Focus search field
+        /// Escape: Clear search
+        /// </summary>
+        private void HandleKeyboardShortcuts()
+        {
+            Event currentEvent = Event.current;
+
+            // Only process key events (not mouse events)
+            if (currentEvent.type != EventType.KeyDown)
+            {
+                return;
+            }
+
+            // F5: Refresh index
+            if (currentEvent.keyCode == KeyCode.F5)
+            {
+                if (_service != null && !_loadingIndex)
+                {
+                    _indexCache = null;
+                    _ = LoadIndexAsync();
+                    currentEvent.Use();
+                }
+            }
+            // Ctrl+F or Cmd+F: Focus search field
+            else if ((currentEvent.control || currentEvent.command) && currentEvent.keyCode == KeyCode.F)
+            {
+                GUI.FocusControl("SearchField");
+                currentEvent.Use();
+            }
+            // Escape: Clear search if search field is focused
+            else if (currentEvent.keyCode == KeyCode.Escape)
+            {
+                if (GUI.GetNameOfFocusedControl() == "SearchField" || !string.IsNullOrEmpty(_search))
+                {
+                    _search = string.Empty;
+                    GUI.FocusControl(null);
+                    currentEvent.Use();
+                }
+            }
+        }
+
         private async Task Download(string id, string version)
         {
-            ModelDownloader downloader = new ModelDownloader(_service);
-            EditorUtility.DisplayProgressBar("Downloading Model", "Fetching files...", 0.2f);
-            (string root, ModelMeta meta) = await downloader.DownloadAsync(id, version);
-            EditorUtility.ClearProgressBar();
-            EditorUtility.DisplayDialog("Downloaded", $"Cached at: {root}", "OK");
+            try
+            {
+                ModelDownloader downloader = new ModelDownloader(_service);
+                EditorUtility.DisplayProgressBar("Downloading Model", "Connecting to repository...", 0.1f);
+
+                (string root, ModelMeta meta) = await downloader.DownloadAsync(id, version);
+
+                EditorUtility.DisplayProgressBar("Downloading Model", "Download complete", 1.0f);
+                await Task.Delay(100); // Brief pause to show completion
+
+                EditorUtility.DisplayDialog("Downloaded", $"Cached at: {root}", "OK");
+            }
+            catch (Exception ex)
+            {
+                ErrorHandler.ShowErrorWithRetry("Download Failed", $"Failed to download model: {ex.Message}",
+                    () => _ = Download(id, version), ex);
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
         }
 
         /// <summary>
@@ -1191,9 +2142,13 @@ namespace ModelLibrary.Editor.Windows
 
             try
             {
+                titleContent.text = $"Model Library - {progressTitle}...";
+
                 ModelDownloader downloader = new ModelDownloader(_service);
-                EditorUtility.DisplayProgressBar(progressTitle, "Downloading...", 0.2f);
+                EditorUtility.DisplayProgressBar(progressTitle, "Downloading from repository...", 0.1f);
                 (string root, ModelMeta meta) = await downloader.DownloadAsync(id, version);
+
+                EditorUtility.DisplayProgressBar(progressTitle, "Preparing import...", 0.3f);
 
                 string defaultInstallPath = DetermineInstallPath(meta);
                 string chosenInstallPath = defaultInstallPath;
@@ -1207,6 +2162,7 @@ namespace ModelLibrary.Editor.Windows
 
                 if (choice == 2)
                 {
+                    titleContent.text = "Model Library";
                     return;
                 }
 
@@ -1215,16 +2171,28 @@ namespace ModelLibrary.Editor.Windows
                     string custom = PromptForInstallPath(defaultInstallPath);
                     if (string.IsNullOrEmpty(custom))
                     {
+                        titleContent.text = "Model Library";
                         return;
                     }
                     chosenInstallPath = custom;
                 }
 
-                EditorUtility.DisplayProgressBar(progressTitle, "Copying into Assets...", 0.6f);
+                EditorUtility.DisplayProgressBar(progressTitle, "Copying files to Assets folder...", 0.5f);
                 await ModelProjectImporter.ImportFromCacheAsync(root, meta, cleanDestination: true, overrideInstallPath: chosenInstallPath, isUpdate: isUpgrade);
+
+                EditorUtility.DisplayProgressBar(progressTitle, "Finalizing import...", 0.9f);
+                await Task.Delay(100); // Brief pause for UI update
+
                 InvalidateLocalInstall(id);
                 _localInstallCache[id] = meta;
 
+                // Track as recently used
+                AddToRecentlyUsed(id);
+
+                // Track analytics
+                AnalyticsService.RecordEvent(isUpgrade ? "update" : "import", id, version, meta.identity.name);
+
+                // Show completion dialog
                 string message = isUpgrade && !string.IsNullOrEmpty(previousVersion)
                     ? $"Updated '{meta.identity.name}' from v{previousVersion} to v{meta.version} at {chosenInstallPath}."
                     : $"Imported '{meta.identity.name}' v{meta.version} to {chosenInstallPath}.";
@@ -1233,12 +2201,15 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                EditorUtility.DisplayDialog(isUpgrade ? "Update Failed" : "Import Failed", ex.Message, "OK");
-                Debug.LogException(ex);
+                string operation = isUpgrade ? "Update" : "Import";
+                ErrorHandler.ShowErrorWithRetry($"{operation} Failed",
+                    $"Failed to {operation.ToLower()} model: {ex.Message}",
+                    () => _ = Import(id, version, isUpgrade, previousVersion), ex);
             }
             finally
             {
                 EditorUtility.ClearProgressBar();
+                titleContent.text = "Model Library";
                 _importsInProgress.Remove(id);
             }
         }

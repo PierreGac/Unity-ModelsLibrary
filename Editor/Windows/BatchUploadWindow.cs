@@ -6,6 +6,7 @@ using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Repository;
 using ModelLibrary.Editor.Services;
 using ModelLibrary.Editor.Settings;
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -243,8 +244,7 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (System.Exception ex)
             {
-                EditorUtility.DisplayDialog("Upload Error", $"An error occurred during batch upload:\n\n{ex.Message}", "OK");
-                Debug.LogException(ex);
+                ErrorHandler.ShowError("Upload Error", $"An error occurred during batch upload: {ex.Message}", ex);
             }
             finally
             {

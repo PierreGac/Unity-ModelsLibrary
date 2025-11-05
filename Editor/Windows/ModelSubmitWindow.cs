@@ -18,7 +18,7 @@ namespace ModelLibrary.Editor.Windows
     /// <summary>
     /// Wizard window for submitting new models or updating existing models to the repository.
     /// Provides a comprehensive form for entering model metadata, selecting assets, and managing versions.
-    /// Includes real-time validation for changelogs, paths, and version numbers.
+    /// Includes validation for changelogs, paths, and version numbers.
     /// Only accessible to users with the Artist role.
     /// </summary>
     public class ModelSubmitWindow : EditorWindow
@@ -26,12 +26,12 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Submission mode indicating whether this is a new model or an update to an existing one.
         /// </summary>
-        private enum SubmitMode 
-        { 
+        private enum SubmitMode
+        {
             /// <summary>Creating a new model entry in the repository.</summary>
-            New, 
+            New,
             /// <summary>Submitting a new version of an existing model.</summary>
-            Update 
+            Update
         }
 
         // UI Constants
@@ -43,6 +43,8 @@ namespace ModelLibrary.Editor.Windows
         private const int __TEXT_AREA_HEIGHT_DESCRIPTION = 60;
         /// <summary>Minimum height for the changelog text area.</summary>
         private const int __TEXT_AREA_HEIGHT_CHANGELOG = 40;
+        /// <summary>Control name for the changelog text area to maintain focus.</summary>
+        private const string __CHANGELOG_CONTROL_NAME = "ModelSubmitWindow_Changelog";
 
         // File Size Constants
         /// <summary>Maximum allowed image file size (50MB).</summary>
@@ -101,8 +103,8 @@ namespace ModelLibrary.Editor.Windows
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
             if (identityProvider.GetUserRole() != UserRole.Artist)
             {
-                EditorUtility.DisplayDialog("Access Denied", 
-                    "Model submission is only available for Artists. Please switch to Artist role in User Settings.", 
+                EditorUtility.DisplayDialog("Access Denied",
+                    "Model submission is only available for Artists. Please switch to Artist role in User Settings.",
                     "OK");
                 return;
             }
@@ -164,18 +166,6 @@ namespace ModelLibrary.Editor.Windows
             {
                 _version = EditorGUILayout.TextField("Version (SemVer)", _version);
                 _description = EditorGUILayout.TextArea(_description, GUILayout.MinHeight(__TEXT_AREA_HEIGHT_DESCRIPTION));
-
-                // Show validation errors in real-time
-                List<string> uiValidationErrors = GetValidationErrors();
-                if (uiValidationErrors.Count > 0)
-                {
-                    EditorGUILayout.Space();
-                    EditorGUILayout.HelpBox("Validation Issues:", MessageType.Warning);
-                    foreach (string error in uiValidationErrors)
-                    {
-                        EditorGUILayout.HelpBox($"• {error}", MessageType.Warning);
-                    }
-                }
 
                 EditorGUILayout.LabelField("Tags:", EditorStyles.boldLabel);
                 using (new EditorGUILayout.HorizontalScope())
@@ -417,8 +407,9 @@ namespace ModelLibrary.Editor.Windows
             List<string> validationErrors = GetValidationErrors();
             if (validationErrors.Count > 0)
             {
-                EditorUtility.DisplayDialog("Validation Error",
-                    "Please fix the following issues before submitting:\n\n" + string.Join("\n", validationErrors), "OK");
+                ErrorHandler.ShowErrorDialog("Validation Error",
+                    "Please fix the following issues before submitting:\n\n" + string.Join("\n• ", validationErrors),
+                    ErrorHandler.ErrorCategory.Validation);
                 return;
             }
 
@@ -450,14 +441,18 @@ namespace ModelLibrary.Editor.Windows
 
             try
             {
-                EditorUtility.DisplayProgressBar(progressTitle, "Preparing metadata...", 0.2f);
+                titleContent.text = $"Submit Model - {progressTitle}...";
+
+                EditorUtility.DisplayProgressBar(progressTitle, "Preparing metadata...", 0.1f);
                 ModelMeta meta = await ModelDeployer.BuildMetaFromSelectionAsync(identityName, identityId, _version, _description, _imageAbsPaths, _tags, _installPath, _relativePath, _idProvider);
 
                 temp = Path.Combine(Path.GetTempPath(), "ModelSubmit_" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(temp);
-                EditorUtility.DisplayProgressBar(progressTitle, "Copying files...", 0.5f);
+
+                EditorUtility.DisplayProgressBar(progressTitle, "Copying model files...", 0.3f);
                 await ModelDeployer.MaterializeLocalVersionFolderAsync(meta, temp);
 
+                EditorUtility.DisplayProgressBar(progressTitle, "Copying preview images...", 0.5f);
                 foreach (string abs in _imageAbsPaths)
                 {
                     try
@@ -472,9 +467,15 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
-                EditorUtility.DisplayProgressBar(progressTitle, "Uploading...", 0.8f);
+                EditorUtility.DisplayProgressBar(progressTitle, "Uploading to repository...", 0.7f);
                 string remoteRel = await _service.SubmitNewVersionAsync(meta, temp, summary);
+
+                EditorUtility.DisplayProgressBar(progressTitle, "Updating index...", 0.9f);
                 await _service.RefreshIndexAsync();
+
+                EditorUtility.DisplayProgressBar(progressTitle, "Complete", 1.0f);
+                await Task.Delay(100); // Brief pause to show completion
+
                 EditorUtility.DisplayDialog("Submitted", $"Uploaded to: {remoteRel}", "OK");
 
                 if (_mode == SubmitMode.Update)
@@ -490,11 +491,13 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                EditorUtility.DisplayDialog("Submission Failed", ex.Message, "OK");
+                ErrorHandler.ShowErrorWithRetry("Submission Failed", $"Failed to submit model: {ex.Message}",
+                    async () => await Submit(), ex);
             }
             finally
             {
                 EditorUtility.ClearProgressBar();
+                titleContent.text = "Submit Model";
                 _isSubmitting = false;
                 if (!string.IsNullOrEmpty(temp))
                 {
@@ -572,10 +575,11 @@ namespace ModelLibrary.Editor.Windows
             List<string> pathErrors = PathUtils.ValidateRelativePath(_relativePath);
             errors.AddRange(pathErrors);
 
-            // Validate changelog
-            bool isUpdateMode = (_mode == SubmitMode.Update);
-            List<string> changelogErrors = ChangelogValidator.ValidateChangelog(_changeSummary, isUpdateMode);
-            errors.AddRange(changelogErrors);
+            // Validate changelog - simple check
+            if (string.IsNullOrEmpty(_changeSummary))
+            {
+                errors.Add("Changelog is required");
+            }
 
             if (_mode == SubmitMode.New)
             {
@@ -790,153 +794,32 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Draws the changelog field with real-time validation feedback.
+        /// Draws the changelog field with simple validation.
         /// </summary>
         private void DrawChangelogField()
         {
             EditorGUILayout.LabelField("Change Summary", EditorStyles.boldLabel);
 
-            // Get validation errors for the current changelog
-            bool isUpdateMode = (_mode == SubmitMode.Update);
-            List<string> changelogErrors = ChangelogValidator.ValidateChangelog(_changeSummary, isUpdateMode);
-            bool hasChangelogErrors = changelogErrors.Count > 0;
-
-            // Set the text area color based on validation state
-            Color originalColor = GUI.color;
-            if (hasChangelogErrors)
-            {
-                GUI.color = Color.red;
-            }
+            // Set a stable control name BEFORE drawing - Unity uses this to track focus
+            GUI.SetNextControlName(__CHANGELOG_CONTROL_NAME);
 
             // Draw the text area
             string newChangeSummary = EditorGUILayout.TextArea(_changeSummary ?? string.Empty,
                 GUILayout.MinHeight(__TEXT_AREA_HEIGHT_CHANGELOG));
 
-            // Restore original color
-            GUI.color = originalColor;
-
-            // Update the field value
+            // Update the change summary when text changes
             if (newChangeSummary != _changeSummary)
             {
                 _changeSummary = newChangeSummary;
             }
 
-            // Show validation feedback
-            if (hasChangelogErrors)
+            // Simple validation feedback
+            if (string.IsNullOrEmpty(_changeSummary))
             {
-                EditorGUILayout.Space(2);
-
-                // Show error icon and message
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    EditorGUILayout.LabelField(new GUIContent("⚠", "Changelog validation error"),
-                        GUILayout.Width(20));
-
-                    // Show the first error message
-                    string firstError = changelogErrors[0];
-                    EditorGUILayout.LabelField(firstError, EditorStyles.helpBox);
-                }
-
-                // If there are multiple errors, show a tooltip with all errors
-                if (changelogErrors.Count > 1)
-                {
-                    EditorGUILayout.LabelField($"... and {changelogErrors.Count - 1} more error(s)",
-                        EditorStyles.miniLabel);
-                }
-
-                // Show helpful suggestions for common issues
-                ShowChangelogValidationSuggestions(changelogErrors);
-            }
-            else if (!string.IsNullOrWhiteSpace(_changeSummary))
-            {
-                // Show success indicator for valid changelogs
-                EditorGUILayout.Space(2);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    EditorGUILayout.LabelField(new GUIContent("✓", "Changelog is valid"),
-                        GUILayout.Width(20));
-                    EditorGUILayout.LabelField("Changelog is valid", EditorStyles.miniLabel);
-                }
-            }
-
-            // Show character count
-            int currentLength = _changeSummary?.Length ?? 0;
-            int maxLength = 1000; // From ChangelogValidator
-            string lengthText = $"{currentLength}/{maxLength} characters";
-            Color lengthColor = currentLength > maxLength ? Color.red :
-                               currentLength < 10 ? Color.yellow : Color.green;
-
-            EditorGUILayout.Space(2);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField("Character count:", EditorStyles.miniLabel);
-                GUI.color = lengthColor;
-                EditorGUILayout.LabelField(lengthText, EditorStyles.miniLabel);
-                GUI.color = originalColor;
+                EditorGUILayout.HelpBox("Changelog is required", MessageType.Warning);
             }
         }
 
-        // Changelog validation suggestion constants
-        private const string __ERROR_TYPE_REQUIRED = "required";
-        private const string __ERROR_TYPE_CHARACTERS = "characters";
-        private const string __ERROR_TYPE_AT_LEAST = "at least";
-        private const string __ERROR_TYPE_EXCEED = "exceed";
-        private const string __ERROR_TYPE_MEANINGFUL = "meaningful";
-
-        private const string __SUGGESTION_BULLET = "• ";
-        private const string __SUGGESTIONS_LABEL = "Suggestions:";
-        private const int __SUGGESTION_SPACING = 2;
-
-        /// <summary>
-        /// Shows helpful suggestions for common changelog validation errors.
-        /// </summary>
-        /// <param name="errors">List of validation errors</param>
-        private static void ShowChangelogValidationSuggestions(List<string> errors)
-        {
-            bool showSuggestions = false;
-            List<string> suggestions = new List<string>();
-
-            for (int i = 0; i < errors.Count; i++)
-            {
-                string error = errors[i];
-                if (error.Contains(__ERROR_TYPE_REQUIRED))
-                {
-                    suggestions.Add(__SUGGESTION_BULLET + "Provide a brief description of what changed");
-                    suggestions.Add(__SUGGESTION_BULLET + "Include the reason for the update");
-                    showSuggestions = true;
-                }
-                else if (error.Contains(__ERROR_TYPE_CHARACTERS))
-                {
-                    if (error.Contains(__ERROR_TYPE_AT_LEAST))
-                    {
-                        suggestions.Add(__SUGGESTION_BULLET + "Add more details about the changes made");
-                        suggestions.Add(__SUGGESTION_BULLET + "Explain the impact or benefit of the update");
-                    }
-                    else if (error.Contains(__ERROR_TYPE_EXCEED))
-                    {
-                        suggestions.Add(__SUGGESTION_BULLET + "Consider shortening the description");
-                        suggestions.Add(__SUGGESTION_BULLET + "Focus on the most important changes");
-                    }
-                    showSuggestions = true;
-                }
-                else if (error.Contains(__ERROR_TYPE_MEANINGFUL))
-                {
-                    suggestions.Add(__SUGGESTION_BULLET + "Provide specific details about what was changed");
-                    suggestions.Add(__SUGGESTION_BULLET + "Include version numbers or feature names");
-                    showSuggestions = true;
-                }
-            }
-
-            if (showSuggestions)
-            {
-                EditorGUILayout.Space(__SUGGESTION_SPACING);
-                EditorGUILayout.LabelField(__SUGGESTIONS_LABEL, EditorStyles.boldLabel);
-                for (int i = 0; i < suggestions.Count; i++)
-                {
-                    EditorGUILayout.LabelField(suggestions[i], EditorStyles.helpBox);
-                }
-            }
-        }
 
     }
 }

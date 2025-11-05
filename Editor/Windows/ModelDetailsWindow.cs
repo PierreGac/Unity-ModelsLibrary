@@ -106,11 +106,18 @@ namespace ModelLibrary.Editor.Windows
             _editedDescription = _meta.description;
             _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
             _editingTags = false;
+            
+            // Track view analytics
+            AnalyticsService.RecordEvent("view", _modelId, _version, _meta.identity.name);
+            
             Repaint();
         }
 
         private void OnGUI()
         {
+            // Handle keyboard shortcuts
+            HandleKeyboardShortcuts();
+
             if (_meta == null) { GUILayout.Label("Loading meta..."); return; }
 
             EditorGUILayout.LabelField(_meta.identity.name, EditorStyles.boldLabel);
@@ -125,7 +132,13 @@ namespace ModelLibrary.Editor.Windows
 
             // Description
             EditorGUILayout.LabelField("Description", EditorStyles.boldLabel);
-            _editedDescription = EditorGUILayout.TextArea(_editedDescription ?? string.Empty, GUILayout.MinHeight(60));
+            SimpleUserIdentityProvider identityProviderForDesc = new SimpleUserIdentityProvider();
+            bool isArtistForDesc = identityProviderForDesc.GetUserRole() == UserRole.Artist;
+            bool isAdminForDesc = identityProviderForDesc.GetUserRole() == UserRole.Admin;
+            using (new EditorGUI.DisabledScope(!isArtistForDesc && !isAdminForDesc))
+            {
+                _editedDescription = EditorGUILayout.TextArea(_editedDescription ?? string.Empty, GUILayout.MinHeight(60));
+            }
             EditorGUILayout.Space();
 
             // Tags section with editing
@@ -267,9 +280,17 @@ namespace ModelLibrary.Editor.Windows
             using (new EditorGUILayout.HorizontalScope())
             {
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button("Import to Project", GUILayout.Width(160)))
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    _ = ImportToProject();
+                    if (GUILayout.Button("Import to Project", GUILayout.Width(160)))
+                    {
+                        _ = ImportToProject();
+                    }
+                    
+                    if (GUILayout.Button("3D Preview", GUILayout.Width(120)))
+                    {
+                        ModelPreview3DWindow.Open(_modelId, _version);
+                    }
                 }
             }
         }
@@ -364,7 +385,8 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                EditorUtility.DisplayDialog("Save Failed", ex.Message, "OK");
+                ErrorHandler.ShowErrorWithRetry("Save Failed", $"Failed to save metadata: {ex.Message}",
+                    async () => await SaveMeta(), ex);
                 await Load();
             }
             finally
@@ -461,7 +483,7 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                EditorUtility.DisplayDialog("Note Submission Failed", ex.Message, "OK");
+                ErrorHandler.ShowError("Note Submission Failed", $"Failed to add note: {ex.Message}", ex);
             }
         }
 
@@ -469,22 +491,41 @@ namespace ModelLibrary.Editor.Windows
         {
             try
             {
-                EditorUtility.DisplayProgressBar("Importing Model", "Downloading and importing...", 0.1f);
+                titleContent.text = "Model Details - Importing...";
+                EditorUtility.DisplayProgressBar("Importing Model", "Connecting to repository...", 0.1f);
+
                 ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
                 IModelRepository repo = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.FileSystem
                     ? new Repository.FileSystemRepository(settings.repositoryRoot)
                     : new Repository.HttpRepository(settings.repositoryRoot);
                 ModelLibraryService service = new ModelLibraryService(repo);
+
+                EditorUtility.DisplayProgressBar("Importing Model", "Downloading model files...", 0.3f);
                 (string cacheRoot, Data.ModelMeta meta) = await service.DownloadModelVersionAsync(_modelId, _version);
-                EditorUtility.DisplayProgressBar("Importing Model", "Copying to Assets...", 0.5f);
+
+                EditorUtility.DisplayProgressBar("Importing Model", "Copying files to Assets folder...", 0.6f);
                 await ModelProjectImporter.ImportFromCacheAsync(cacheRoot, meta, cleanDestination: true);
+
+                EditorUtility.DisplayProgressBar("Importing Model", "Finalizing import...", 0.9f);
+                await Task.Delay(100); // Brief pause for UI update
+
                 EditorUtility.ClearProgressBar();
+                
+                // Track analytics
+                AnalyticsService.RecordEvent("import", _modelId, _version, meta.identity.name);
+                
+                // Show completion dialog
                 EditorUtility.DisplayDialog("Import Complete", $"Imported '{meta.identity.name}' v{meta.version} into Assets.", "OK");
             }
             catch (Exception ex)
             {
                 EditorUtility.ClearProgressBar();
-                EditorUtility.DisplayDialog("Import Failed", ex.Message, "OK");
+                ErrorHandler.ShowErrorWithRetry("Import Failed", $"Failed to import model: {ex.Message}",
+                    async () => await ImportToProject(), ex);
+            }
+            finally
+            {
+                titleContent.text = "Model Details";
             }
         }
 
@@ -618,18 +659,42 @@ namespace ModelLibrary.Editor.Windows
                 }
                 else
                 {
-                    EditorUtility.DisplayDialog("Deletion Failed",
+                    ErrorHandler.ShowError("Deletion Failed",
                         $"Failed to delete version {_version}. The version may not exist or there was an error accessing the repository.",
-                        "OK");
+                        null);
                 }
             }
             catch (Exception ex)
             {
                 EditorUtility.ClearProgressBar();
-                EditorUtility.DisplayDialog("Deletion Error",
-                    $"An error occurred while deleting the version:\n\n{ex.Message}",
-                    "OK");
-                Debug.LogException(ex);
+                ErrorHandler.ShowError("Deletion Error",
+                    $"An error occurred while deleting the version: {ex.Message}",
+                    ex);
+            }
+        }
+
+        /// <summary>
+        /// Handles keyboard shortcuts for the details window.
+        /// F5: Refresh metadata
+        /// </summary>
+        private void HandleKeyboardShortcuts()
+        {
+            Event currentEvent = Event.current;
+
+            // Only process key events
+            if (currentEvent.type != EventType.KeyDown)
+            {
+                return;
+            }
+
+            // F5: Refresh metadata
+            if (currentEvent.keyCode == KeyCode.F5)
+            {
+                if (_service != null && _meta != null)
+                {
+                    _ = Load();
+                    currentEvent.Use();
+                }
             }
         }
     }

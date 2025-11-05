@@ -23,11 +23,11 @@ namespace ModelLibrary.Editor.Services
             string destRel = ResolveDestinationPath(meta, overrideInstallPath);
             string destAbs = Path.GetFullPath(destRel);
 
-            Debug.Log($"[ModelProjectImporter] Importing model '{meta?.identity?.name}' to path: {destRel}");
+            Debug.Log($"[ModelProjectImporter] Importing model '{(meta != null && meta.identity != null ? meta.identity.name : "Unknown")}' to path: {destRel}");
 
             // Get existing GUIDs BEFORE import to avoid false positive conflicts
             HashSet<string> existingGuidsBeforeImport = new HashSet<string>();
-            if (!isUpdate && meta?.assetGuids != null && meta.assetGuids.Count > 0)
+            if (!isUpdate && meta != null && meta.assetGuids != null && meta.assetGuids.Count > 0)
             {
                 string[] allGuids = AssetDatabase.FindAssets(string.Empty);
                 existingGuidsBeforeImport = new HashSet<string>(allGuids);
@@ -284,7 +284,7 @@ namespace ModelLibrary.Editor.Services
             }
 
             // Priority 2: Meta relative path (with validation)
-            if (!string.IsNullOrEmpty(meta?.relativePath))
+            if (meta != null && !string.IsNullOrEmpty(meta.relativePath))
             {
                 // Validate the relative path before using it
                 List<string> pathErrors = PathUtils.ValidateRelativePath(meta.relativePath);
@@ -309,9 +309,9 @@ namespace ModelLibrary.Editor.Services
             }
 
             // Priority 3: Fallback to safe default
-            string safeName = SanitizeFolderName(meta?.identity?.name ?? "UnknownModel");
+            string safeName = SanitizeFolderName(meta != null && meta.identity != null ? meta.identity.name : "UnknownModel");
             string fallbackPath = $"Assets/Models/{safeName}";
-            Debug.Log($"[ModelProjectImporter] Using fallback path for model '{meta?.identity?.name}': {fallbackPath}");
+            Debug.Log($"[ModelProjectImporter] Using fallback path for model '{(meta != null && meta.identity != null ? meta.identity.name : "Unknown")}': {fallbackPath}");
             return fallbackPath;
         }
 
@@ -345,7 +345,7 @@ namespace ModelLibrary.Editor.Services
         {
             try
             {
-                if (meta?.assetGuids == null || meta.assetGuids.Count == 0)
+                if (meta == null || meta.assetGuids == null || meta.assetGuids.Count == 0)
                 {
                     return;
                 }
