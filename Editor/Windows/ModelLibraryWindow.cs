@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
+using ModelLibrary.Editor.Data;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Repository;
 using ModelLibrary.Editor.Services;
@@ -40,12 +41,8 @@ namespace ModelLibrary.Editor.Windows
         // UI State
         /// <summary>Current search query text entered by the user.</summary>
         private string _search = string.Empty;
-        /// <summary>Search history (last 10 searches).</summary>
-        private readonly List<string> _searchHistory = new List<string>();
-        /// <summary>EditorPrefs key for search history.</summary>
-        private const string __SearchHistoryPrefKey = "ModelLibrary.SearchHistory";
-        /// <summary>Maximum number of search history entries to keep.</summary>
-        private const int __MaxSearchHistory = 10;
+        /// <summary>Manager for search history persistence and UI.</summary>
+        private SearchHistoryManager _searchHistoryManager;
         /// <summary>Scroll position for the main model list/grid view.</summary>
         private Vector2 _scroll;
         /// <summary>Dictionary tracking which model entries are expanded in list view.</summary>
@@ -58,20 +55,16 @@ namespace ModelLibrary.Editor.Windows
         private ViewMode _viewMode = ViewMode.Grid;
 
         // Sorting
-        /// <summary>Sort mode for model entries.</summary>
-        private enum SortMode
-        {
-            /// <summary>Sort by model name (alphabetical).</summary>
-            Name,
-            /// <summary>Sort by update date (newest first).</summary>
-            Date,
-            /// <summary>Sort by version number (latest first).</summary>
-            Version
-        }
         /// <summary>Current sort mode.</summary>
-        private SortMode _sortMode = SortMode.Name;
+        private ModelSortMode _sortMode = ModelSortMode.Name;
         /// <summary>EditorPrefs key for storing sort preference.</summary>
         private const string __SortModePrefKey = "ModelLibrary.SortMode";
+        /// <summary>EditorPrefs key for search history.</summary>
+        private const string __SearchHistoryPrefKey = "ModelLibrary.SearchHistory";
+        /// <summary>Maximum number of search history entries to keep.</summary>
+        private const int __MaxSearchHistory = 10;
+        /// <summary>EditorPrefs key for filter presets.</summary>
+        private const string __FilterPresetsPrefKey = "ModelLibrary.FilterPresets";
 
         // Caching and Loading State
         /// <summary>Cache of loaded model metadata, keyed by "modelId@version".</summary>
@@ -104,30 +97,16 @@ namespace ModelLibrary.Editor.Windows
         // Tag Filtering
         /// <summary>Set of currently selected tags for filtering models (case-insensitive comparison).</summary>
         private readonly HashSet<string> _selectedTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Manager for tag cache operations.</summary>
+        private TagCacheManager _tagCacheManager = new TagCacheManager();
+        /// <summary>Manager for filter preset operations.</summary>
+        private FilterPresetManager _filterPresetManager;
 
         // Bulk Operations
         /// <summary>Set of model IDs selected for bulk operations.</summary>
         private readonly HashSet<string> _selectedModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         /// <summary>Flag indicating if bulk selection mode is active.</summary>
         private bool _bulkSelectionMode = false;
-
-        // Filter Presets
-        /// <summary>Data class for filter presets (search query + selected tags).</summary>
-        [System.Serializable]
-        private class FilterPreset
-        {
-            public string name;
-            public string searchQuery;
-            public List<string> selectedTags;
-        }
-        /// <summary>List of saved filter presets.</summary>
-        private readonly List<FilterPreset> _filterPresets = new List<FilterPreset>();
-        /// <summary>EditorPrefs key for filter presets.</summary>
-        private const string __FilterPresetsPrefKey = "ModelLibrary.FilterPresets";
-        /// <summary>Dictionary counting how many models use each tag (case-insensitive keys).</summary>
-        private readonly Dictionary<string, int> _tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        /// <summary>Sorted list of all available tags for display in the filter UI.</summary>
-        private readonly List<string> _sortedTags = new List<string>();
 
         // Update Detection
         /// <summary>Total count of models with available updates.</summary>
@@ -136,28 +115,20 @@ namespace ModelLibrary.Editor.Windows
         private readonly Dictionary<string, bool> _modelUpdateStatus = new Dictionary<string, bool>();
 
         // Favorites & Recently Used
-        /// <summary>Set of favorite model IDs.</summary>
-        private readonly HashSet<string> _favorites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        /// <summary>List of recently imported model IDs (most recent first).</summary>
-        private readonly List<string> _recentlyUsed = new List<string>();
+        /// <summary>Manager for favorites persistence.</summary>
+        private FavoritesManager _favoritesManager;
+        /// <summary>Manager for recently used models persistence.</summary>
+        private RecentlyUsedManager _recentlyUsedManager;
         /// <summary>EditorPrefs key for favorites.</summary>
         private const string __FavoritesPrefKey = "ModelLibrary.Favorites";
         /// <summary>EditorPrefs key for recently used models.</summary>
         private const string __RecentlyUsedPrefKey = "ModelLibrary.RecentlyUsed";
         /// <summary>Maximum number of recently used models to track.</summary>
         private const int __MaxRecentlyUsed = 20;
-        /// <summary>Filter mode for displaying models.</summary>
-        private enum FilterMode
-        {
-            /// <summary>Show all models.</summary>
-            All,
-            /// <summary>Show only favorite models.</summary>
-            Favorites,
-            /// <summary>Show only recently used models.</summary>
-            Recent
-        }
         /// <summary>Current filter mode.</summary>
-        private FilterMode _filterMode = FilterMode.All;
+        private ModelLibraryUIDrawer.FilterMode _filterMode = ModelLibraryUIDrawer.FilterMode.All;
+        /// <summary>Helper for install path operations.</summary>
+        private InstallPathHelper _installPathHelper = new InstallPathHelper();
         /// <summary>
         /// Menu item to open the Model Library browser window.
         /// </summary>
@@ -175,17 +146,13 @@ namespace ModelLibrary.Editor.Windows
         private void OnEnable()
         {
             // Load sort preference from EditorPrefs
-            _sortMode = (SortMode)EditorPrefs.GetInt(__SortModePrefKey, (int)SortMode.Name);
+            _sortMode = (ModelSortMode)EditorPrefs.GetInt(__SortModePrefKey, (int)ModelSortMode.Name);
 
-            // Load search history from EditorPrefs
-            LoadSearchHistory();
-
-            // Load filter presets from EditorPrefs
-            LoadFilterPresets();
-
-            // Load favorites and recently used from EditorPrefs
-            LoadFavorites();
-            LoadRecentlyUsed();
+            // Initialize managers
+            _searchHistoryManager = new SearchHistoryManager(__SearchHistoryPrefKey, __MaxSearchHistory);
+            _filterPresetManager = new FilterPresetManager(__FilterPresetsPrefKey);
+            _favoritesManager = new FavoritesManager(__FavoritesPrefKey);
+            _recentlyUsedManager = new RecentlyUsedManager(__RecentlyUsedPrefKey, __MaxRecentlyUsed);
 
             // Check if configuration is needed before creating services
             if (!FirstRunWizard.IsConfigured())
@@ -352,7 +319,12 @@ namespace ModelLibrary.Editor.Windows
                 // Search history dropdown button
                 if (GUILayout.Button("▼", EditorStyles.toolbarButton, GUILayout.Width(20)))
                 {
-                    ShowSearchHistoryMenu();
+                    _searchHistoryManager.ShowSearchHistoryMenu((item) =>
+                    {
+                        _search = item;
+                        GUI.FocusControl(null);
+                        Repaint();
+                    }, () => { });
                 }
 
                 using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(_search)))
@@ -426,7 +398,7 @@ namespace ModelLibrary.Editor.Windows
 
                 // Sort dropdown
                 GUILayout.Label("Sort:", EditorStyles.miniLabel, GUILayout.Width(35));
-                SortMode newSortMode = (SortMode)EditorGUILayout.EnumPopup(_sortMode, EditorStyles.toolbarPopup, GUILayout.Width(80));
+                ModelSortMode newSortMode = (ModelSortMode)EditorGUILayout.EnumPopup(_sortMode, EditorStyles.toolbarPopup, GUILayout.Width(80));
                 if (newSortMode != _sortMode)
                 {
                     _sortMode = newSortMode;
@@ -446,7 +418,14 @@ namespace ModelLibrary.Editor.Windows
             // Use cached index if available, otherwise show loading
             if (_indexCache == null)
             {
-                DrawEmptyState("Loading model index...", "Please wait while we fetch the latest models from the repository.");
+                ModelLibraryUIDrawer.DrawEmptyState("Loading model index...", "Please wait while we fetch the latest models from the repository.",
+                    () =>
+                    {
+                        _indexCache = null;
+                        _ = LoadIndexAsync();
+                        _ = RefreshManifestCacheAsync();
+                    },
+                    () => ModelSubmitWindow.Open());
                 return;
             }
 
@@ -454,27 +433,34 @@ namespace ModelLibrary.Editor.Windows
             DrawTagFilter(index);
             if (index == null || index.entries == null)
             {
-                DrawEmptyState("No models available",
-                    "The repository appears to be empty.\n\nTo get started:\n• Submit your first model using 'Submit Model'\n• Check your repository configuration");
+                ModelLibraryUIDrawer.DrawEmptyState("No models available",
+                    "The repository appears to be empty.\n\nTo get started:\n• Submit your first model using 'Submit Model'\n• Check your repository configuration",
+                    () =>
+                    {
+                        _indexCache = null;
+                        _ = LoadIndexAsync();
+                        _ = RefreshManifestCacheAsync();
+                    },
+                    () => ModelSubmitWindow.Open());
                 return;
             }
 
             IEnumerable<ModelIndex.Entry> query = index.entries;
 
             // Apply filter mode (All/Favorites/Recent)
-            if (_filterMode == FilterMode.Favorites)
+            if (_filterMode == ModelLibraryUIDrawer.FilterMode.Favorites)
             {
-                query = query.Where(e => _favorites.Contains(e.id));
+                query = query.Where(e => _favoritesManager.IsFavorite(e.id));
             }
-            else if (_filterMode == FilterMode.Recent)
+            else if (_filterMode == ModelLibraryUIDrawer.FilterMode.Recent)
             {
-                query = query.Where(e => _recentlyUsed.Contains(e.id));
+                query = query.Where(e => _recentlyUsedManager.RecentlyUsed.Contains(e.id));
             }
 
             string trimmedSearch = string.IsNullOrWhiteSpace(_search) ? null : _search.Trim();
             if (!string.IsNullOrEmpty(trimmedSearch))
             {
-                query = query.Where(e => EntryMatchesAdvancedSearch(e, trimmedSearch));
+                query = query.Where(e => ModelSearchUtils.EntryMatchesAdvancedSearch(e, trimmedSearch));
             }
 
             // All models are visible (no project restrictions)
@@ -487,16 +473,32 @@ namespace ModelLibrary.Editor.Windows
             List<ModelIndex.Entry> q = query.ToList();
 
             // Sort the results
-            q = SortEntries(q, _sortMode);
+            q = ModelSortUtils.SortEntries(q, _sortMode);
 
             // Filter mode tabs (All/Favorites/Recent)
-            DrawFilterModeTabs();
+            _filterMode = ModelLibraryUIDrawer.DrawFilterModeTabs(_filterMode, _favoritesManager.Favorites.Count, _recentlyUsedManager.RecentlyUsed.Count, (newMode) =>
+            {
+                _filterMode = newMode;
+                Repaint();
+            });
 
-            DrawFilterSummary(index.entries.Count, q.Count);
+            ModelLibraryUIDrawer.DrawFilterSummary(index.entries.Count, q.Count, _search, _selectedTags, () =>
+            {
+                _search = string.Empty;
+                _selectedTags.Clear();
+                GUI.FocusControl(null);
+            });
             if (q.Count == 0)
             {
-                DrawEmptyState("No models match your filters",
-                    $"Found {index.entries.Count} model(s) in repository, but none match your current search and filters.\n\nTry:\n• Clearing your search query\n• Removing some tag filters\n• Using different search terms");
+                ModelLibraryUIDrawer.DrawEmptyState("No models match your filters",
+                    $"Found {index.entries.Count} model(s) in repository, but none match your current search and filters.\n\nTry:\n• Clearing your search query\n• Removing some tag filters\n• Using different search terms",
+                    () =>
+                    {
+                        _indexCache = null;
+                        _ = LoadIndexAsync();
+                        _ = RefreshManifestCacheAsync();
+                    },
+                    () => ModelSubmitWindow.Open());
                 return;
             }
 
@@ -515,92 +517,7 @@ namespace ModelLibrary.Editor.Windows
             EditorGUILayout.EndScrollView();
         }
 
-        private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_search) || _selectedTags.Count > 0;
 
-        /// <summary>
-        /// Checks if an entry matches the advanced search query.
-        /// Supports AND/OR operators for tags: "tag1 AND tag2", "tag1 OR tag2"
-        /// Also matches against model name and description.
-        /// </summary>
-        private static bool EntryMatchesAdvancedSearch(ModelIndex.Entry entry, string query)
-        {
-            if (entry == null || string.IsNullOrEmpty(query))
-            {
-                return false;
-            }
-
-            string trimmedQuery = query.Trim();
-
-            // Check for AND/OR operators (case-insensitive)
-            if (trimmedQuery.IndexOf(" AND ", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                // AND operator: all terms must match
-                string[] terms = trimmedQuery.Split(new[] { " AND " }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string term in terms)
-                {
-                    if (!EntryMatchesTerm(entry, term.Trim()))
-                    {
-                        return false;
-                    }
-                }
-                return true;
-            }
-            else if (trimmedQuery.IndexOf(" OR ", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                // OR operator: at least one term must match
-                string[] terms = trimmedQuery.Split(new[] { " OR " }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string term in terms)
-                {
-                    if (EntryMatchesTerm(entry, term.Trim()))
-                    {
-                        return true;
-                    }
-                }
-                return false;
-            }
-            else
-            {
-                // Simple search: match the whole query
-                return EntryMatchesTerm(entry, trimmedQuery);
-            }
-        }
-
-        /// <summary>
-        /// Checks if an entry matches a single search term (name, description, or tags).
-        /// </summary>
-        private static bool EntryMatchesTerm(ModelIndex.Entry entry, string term)
-        {
-            if (string.IsNullOrEmpty(term))
-            {
-                return false;
-            }
-
-            // Match against name
-            if (!string.IsNullOrEmpty(entry.name) && entry.name.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return true;
-            }
-
-            // Match against description
-            if (!string.IsNullOrEmpty(entry.description) && entry.description.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return true;
-            }
-
-            // Match against tags
-            if (entry.tags != null)
-            {
-                foreach (string tag in entry.tags)
-                {
-                    if (!string.IsNullOrEmpty(tag) && tag.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
 
         private bool EntryHasAllSelectedTags(ModelIndex.Entry entry)
         {
@@ -621,108 +538,6 @@ namespace ModelLibrary.Editor.Windows
             return true;
         }
 
-        /// <summary>
-        /// Draws an empty state message with helpful guidance.
-        /// Used when there are no models to display or when loading.
-        /// </summary>
-        /// <param name="title">Title of the empty state.</param>
-        /// <param name="message">Helpful message explaining the situation and what to do.</param>
-        private void DrawEmptyState(string title, string message)
-        {
-            EditorGUILayout.Space(20);
-
-            using (new EditorGUILayout.VerticalScope())
-            {
-                GUILayout.FlexibleSpace();
-
-                // Title
-                EditorGUILayout.LabelField(title, EditorStyles.boldLabel, GUILayout.Height(24));
-                EditorGUILayout.Space(10);
-
-                // Message
-                EditorGUILayout.HelpBox(message, MessageType.Info);
-                EditorGUILayout.Space(10);
-
-                // Quick action buttons
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    GUILayout.FlexibleSpace();
-
-                    if (GUILayout.Button("Refresh", GUILayout.Width(100), GUILayout.Height(30)))
-                    {
-                        _indexCache = null;
-                        _ = LoadIndexAsync();
-                        _ = RefreshManifestCacheAsync(); // Also refresh manifest cache
-                    }
-
-                    SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-                    if (identityProvider.GetUserRole() == UserRole.Artist)
-                    {
-                        if (GUILayout.Button("Submit Model", GUILayout.Width(120), GUILayout.Height(30)))
-                        {
-                            ModelSubmitWindow.Open();
-                        }
-                    }
-
-                    GUILayout.FlexibleSpace();
-                }
-
-                GUILayout.FlexibleSpace();
-            }
-        }
-
-        /// <summary>
-        /// Draws filter mode tabs (All/Favorites/Recent).
-        /// </summary>
-        private void DrawFilterModeTabs()
-        {
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                string[] modeLabels = { "All", $"Favorites ({_favorites.Count})", $"Recent ({_recentlyUsed.Count})" };
-                int newMode = GUILayout.Toolbar((int)_filterMode, modeLabels, EditorStyles.toolbarButton);
-                if (newMode != (int)_filterMode)
-                {
-                    _filterMode = (FilterMode)newMode;
-                    Repaint();
-                }
-            }
-            EditorGUILayout.Space(5);
-        }
-
-        private void DrawFilterSummary(int totalCount, int filteredCount)
-        {
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
-            {
-                GUILayout.Label($"{filteredCount} of {totalCount} models", EditorStyles.boldLabel);
-
-                if (!string.IsNullOrWhiteSpace(_search))
-                {
-                    GUILayout.Label($"Search: \"{_search.Trim()}\"", EditorStyles.miniLabel);
-                }
-
-                if (_selectedTags.Count > 0)
-                {
-                    string tagPreview = string.Join(", ", _selectedTags.Take(3));
-                    if (_selectedTags.Count > 3)
-                    {
-                        tagPreview += $" (+{_selectedTags.Count - 3})";
-                    }
-                    GUILayout.Label($"Tags: {tagPreview}", EditorStyles.miniLabel);
-                }
-
-                GUILayout.FlexibleSpace();
-
-                using (new EditorGUI.DisabledScope(!HasActiveFilters))
-                {
-                    if (GUILayout.Button("Clear Filters", GUILayout.Width(110)))
-                    {
-                        _search = string.Empty;
-                        _selectedTags.Clear();
-                        GUI.FocusControl(null);
-                    }
-                }
-            }
-        }
 
         private void DrawTagFilter(ModelIndex index)
         {
@@ -742,7 +557,7 @@ namespace ModelLibrary.Editor.Windows
 
                 if (!ReferenceEquals(index, _tagSource))
                 {
-                    UpdateTagCache(index);
+                    _tagCacheManager.UpdateTagCache(index);
                     _tagSource = index;
                 }
 
@@ -751,14 +566,25 @@ namespace ModelLibrary.Editor.Windows
                     // Filter presets dropdown
                     if (GUILayout.Button("Presets ▼", EditorStyles.toolbarButton, GUILayout.Width(80)))
                     {
-                        ShowFilterPresetsMenu();
+                        _filterPresetManager.ShowFilterPresetsMenu((searchQuery, tags) =>
+                        {
+                            _search = searchQuery;
+                            _selectedTags.Clear();
+                            foreach (string tag in tags)
+                            {
+                                _selectedTags.Add(tag);
+                            }
+                            GUI.FocusControl(null);
+                            Repaint();
+                        }, () => _filterPresetManager.ShowManagePresetsDialog());
                     }
 
-                    using (new EditorGUI.DisabledScope(!HasActiveFilters))
+                    bool hasActiveFilters = !string.IsNullOrWhiteSpace(_search) || _selectedTags.Count > 0;
+                    using (new EditorGUI.DisabledScope(!hasActiveFilters))
                     {
                         if (GUILayout.Button("Save Preset", EditorStyles.toolbarButton, GUILayout.Width(90)))
                         {
-                            ShowSavePresetDialog();
+                            _filterPresetManager.ShowSavePresetDialog(_search, _selectedTags);
                         }
                     }
 
@@ -774,17 +600,18 @@ namespace ModelLibrary.Editor.Windows
                     GUILayout.FlexibleSpace();
                 }
 
-                if (_sortedTags.Count == 0)
+                if (_tagCacheManager.SortedTags.Count == 0)
                 {
                     EditorGUILayout.LabelField("No tags available.", EditorStyles.miniLabel);
                     return;
                 }
 
                 _tagScroll = EditorGUILayout.BeginScrollView(_tagScroll, GUILayout.MaxHeight(140));
-                foreach (string tag in _sortedTags)
+                for (int i = 0; i < _tagCacheManager.SortedTags.Count; i++)
                 {
+                    string tag = _tagCacheManager.SortedTags[i];
                     bool sel = _selectedTags.Contains(tag);
-                    bool newSel = EditorGUILayout.ToggleLeft($"{tag} ({_tagCounts[tag]})", sel);
+                    bool newSel = EditorGUILayout.ToggleLeft($"{tag} ({_tagCacheManager.TagCounts[tag]})", sel);
                     if (newSel != sel)
                     {
                         if (newSel)
@@ -801,47 +628,6 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        private void UpdateTagCache(ModelIndex index)
-        {
-            _tagCounts.Clear();
-            _sortedTags.Clear();
-
-            if (index?.entries == null)
-            {
-                return;
-            }
-
-            foreach (ModelIndex.Entry entry in index.entries)
-            {
-                if (entry?.tags == null)
-                {
-                    continue;
-                }
-
-                foreach (string tag in entry.tags)
-                {
-                    if (string.IsNullOrWhiteSpace(tag))
-                    {
-                        continue;
-                    }
-
-                    if (_tagCounts.TryGetValue(tag, out int count))
-                    {
-                        _tagCounts[tag] = count + 1;
-                    }
-                    else
-                    {
-                        _tagCounts[tag] = 1;
-                    }
-                }
-            }
-
-            if (_tagCounts.Count > 0)
-            {
-                _sortedTags.AddRange(_tagCounts.Keys);
-                _sortedTags.Sort(StringComparer.OrdinalIgnoreCase);
-            }
-        }
 
 
         /// <summary>
@@ -863,68 +649,12 @@ namespace ModelLibrary.Editor.Windows
             bool installed = TryGetLocalInstall(e, out ModelMeta localMeta);
             if (installed && localMeta != null && !string.IsNullOrEmpty(localMeta.version) && localMeta.version != "(unknown)")
             {
-                hasUpdateLocally = NeedsUpgrade(localMeta.version, e.latestVersion);
+                hasUpdateLocally = ModelVersionUtils.NeedsUpgrade(localMeta.version, e.latestVersion);
             }
 
             bool hasUpdate = hasUpdateFromCache || hasUpdateLocally;
 
-            // Draw notes badge if model has notes
-            if (hasNotes)
-            {
-                // Try multiple icon names for better compatibility
-                GUIContent notesIcon = EditorGUIUtility.IconContent("console.infoicon");
-                if (notesIcon == null || notesIcon.image == null)
-                {
-                    notesIcon = EditorGUIUtility.IconContent("d_console.infoicon");
-                }
-                if (notesIcon == null || notesIcon.image == null)
-                {
-                    notesIcon = EditorGUIUtility.IconContent("_Help");
-                }
-
-                if (notesIcon != null && notesIcon.image != null)
-                {
-                    notesIcon.tooltip = "This model has feedback notes";
-                    GUILayout.Label(notesIcon, GUILayout.Width(16), GUILayout.Height(16));
-                }
-                else
-                {
-                    // Fallback to emoji if icon not available
-                    GUILayout.Label("📝", GUILayout.Width(16), GUILayout.Height(16));
-                }
-            }
-
-            // Draw update badge if model has updates available
-            if (hasUpdate)
-            {
-                // Try multiple icon names for better compatibility
-                GUIContent updateIcon = EditorGUIUtility.IconContent("d_Refresh");
-                if (updateIcon == null || updateIcon.image == null)
-                {
-                    updateIcon = EditorGUIUtility.IconContent("Refresh");
-                }
-                if (updateIcon == null || updateIcon.image == null)
-                {
-                    updateIcon = EditorGUIUtility.IconContent("TreeEditor.Refresh");
-                }
-
-                if (updateIcon != null && updateIcon.image != null)
-                {
-                    updateIcon.tooltip = "Update available";
-                    GUILayout.Label(updateIcon, GUILayout.Width(16), GUILayout.Height(16));
-                }
-                else
-                {
-                    // Fallback to emoji if icon not available
-                    GUILayout.Label("🔄", GUILayout.Width(16), GUILayout.Height(16));
-                }
-            }
-
-            // Add spacing if any badges were shown
-            if (hasNotes || hasUpdate)
-            {
-                GUILayout.Space(4);
-            }
+            ModelLibraryUIDrawer.DrawNotificationBadges(hasNotes, hasUpdate);
         }
 
         /// <summary>
@@ -952,7 +682,7 @@ namespace ModelLibrary.Editor.Windows
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     // Favorite star button
-                    bool isFavorite = _favorites.Contains(e.id);
+                    bool isFavorite = _favoritesManager.IsFavorite(e.id);
                     string starText = isFavorite ? "★" : "☆";
                     Color originalColor = GUI.color;
                     if (isFavorite)
@@ -961,7 +691,8 @@ namespace ModelLibrary.Editor.Windows
                     }
                     if (GUILayout.Button(starText, EditorStyles.label, GUILayout.Width(20)))
                     {
-                        ToggleFavorite(e.id);
+                        _favoritesManager.ToggleFavorite(e.id);
+                        Repaint();
                     }
                     GUI.color = originalColor;
 
@@ -978,7 +709,7 @@ namespace ModelLibrary.Editor.Windows
 
                     // Only consider the model as properly installed if we have a valid local version
                     bool properlyInstalled = installed && !string.IsNullOrEmpty(localVersion) && localVersion != "(unknown)";
-                    bool needsUpgrade = properlyInstalled && NeedsUpgrade(localVersion, e.latestVersion);
+                    bool needsUpgrade = properlyInstalled && ModelVersionUtils.NeedsUpgrade(localVersion, e.latestVersion);
                     bool isBusy = _importsInProgress.Contains(e.id);
                     if (properlyInstalled)
                     {
@@ -1201,7 +932,7 @@ namespace ModelLibrary.Editor.Windows
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     // Favorite star button (compact)
-                    bool isFavorite = _favorites.Contains(entry.id);
+                    bool isFavorite = _favoritesManager.IsFavorite(entry.id);
                     string starText = isFavorite ? "★" : "☆";
                     Color originalColor = GUI.color;
                     if (isFavorite)
@@ -1210,7 +941,8 @@ namespace ModelLibrary.Editor.Windows
                     }
                     if (GUILayout.Button(starText, EditorStyles.miniLabel, GUILayout.Width(16)))
                     {
-                        ToggleFavorite(entry.id);
+                        _favoritesManager.ToggleFavorite(entry.id);
+                        Repaint();
                     }
                     GUI.color = originalColor;
 
@@ -1255,17 +987,10 @@ namespace ModelLibrary.Editor.Windows
             bool installed = TryGetLocalInstall(e, out ModelMeta localMeta);
             if (installed && localMeta != null && !string.IsNullOrEmpty(localMeta.version) && localMeta.version != "(unknown)")
             {
-                hasUpdate = hasUpdate || NeedsUpgrade(localMeta.version, e.latestVersion);
+                hasUpdate = hasUpdate || ModelVersionUtils.NeedsUpgrade(localMeta.version, e.latestVersion);
             }
 
-            if (hasNotes)
-            {
-                GUILayout.Label("📝", GUILayout.Width(12), GUILayout.Height(12));
-            }
-            if (hasUpdate)
-            {
-                GUILayout.Label("🔄", GUILayout.Width(12), GUILayout.Height(12));
-            }
+            ModelLibraryUIDrawer.DrawCompactNotificationBadges(hasNotes, hasUpdate);
         }
 
         private void OnDisable()
@@ -1342,255 +1067,7 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        /// <summary>
-        /// Determines if a local model version needs to be upgraded to the remote version.
-        /// Uses semantic versioning comparison when possible, falls back to string comparison.
-        /// Returns false for unknown local versions to prevent false "update available" messages.
-        /// </summary>
-        /// <param name="localVersion">The version currently installed locally.</param>
-        /// <param name="remoteVersion">The latest version available in the repository.</param>
-        /// <returns>True if the remote version is newer than the local version, false otherwise.</returns>
-        private static bool NeedsUpgrade(string localVersion, string remoteVersion)
-        {
-            if (string.IsNullOrEmpty(remoteVersion))
-            {
-                return false;
-            }
-            if (string.IsNullOrEmpty(localVersion) || localVersion == "(unknown)")
-            {
-                // Don't show as needing upgrade if we can't determine the local version
-                return false;
-            }
-            if (SemVer.TryParse(localVersion, out SemVer local) && SemVer.TryParse(remoteVersion, out SemVer remote))
-            {
-                return remote.CompareTo(local) > 0;
-            }
-            return !string.Equals(localVersion, remoteVersion, StringComparison.OrdinalIgnoreCase);
-        }
 
-        private string DetermineInstallPath(ModelMeta meta)
-        {
-            string modelName = meta?.identity?.name ?? "Model";
-            string candidate;
-
-            // First try the relative path from meta
-            if (!string.IsNullOrWhiteSpace(meta?.relativePath))
-            {
-                candidate = $"Assets/{meta.relativePath}";
-            }
-            // Then try the install path from meta
-            else if (!string.IsNullOrWhiteSpace(meta?.installPath))
-            {
-                candidate = meta.installPath;
-            }
-            // Finally fall back to default
-            else
-            {
-                candidate = BuildInstallPath(modelName);
-            }
-
-            return NormalizeInstallPath(candidate) ?? BuildInstallPath(modelName);
-        }
-
-        private string PromptForInstallPath(string defaultInstallPath)
-        {
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            string initialAbsolute = Path.Combine(projectRoot, defaultInstallPath.Replace('/', Path.DirectorySeparatorChar));
-            string selected = EditorUtility.OpenFolderPanel("Choose install folder", initialAbsolute, string.Empty);
-            if (string.IsNullOrEmpty(selected))
-            {
-                return null;
-            }
-
-            if (!TryConvertAbsoluteToProjectRelative(selected, out string relative))
-            {
-                EditorUtility.DisplayDialog("Invalid Folder", "Please select a folder inside this Unity project.", "OK");
-                return null;
-            }
-
-            return NormalizeInstallPath(relative);
-        }
-
-        private static bool TryConvertAbsoluteToProjectRelative(string absolutePath, out string relativePath)
-        {
-            relativePath = null;
-            if (string.IsNullOrEmpty(absolutePath))
-            {
-                return false;
-            }
-
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            string normalizedRoot = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string normalizedAbsolute = Path.GetFullPath(absolutePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            if (!normalizedAbsolute.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            string rel = normalizedAbsolute[normalizedRoot.Length..].TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            rel = PathUtils.SanitizePathSeparator(rel);
-            if (string.IsNullOrEmpty(rel) || !rel.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            relativePath = rel;
-            return true;
-        }
-
-        private string BuildInstallPath(string modelName) => $"Assets/Models/{SanitizeFolderName(modelName)}";
-
-        private static string NormalizeInstallPath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return null;
-            }
-
-            string normalized = PathUtils.SanitizePathSeparator(path.Trim());
-            if (!normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
-            {
-                normalized = $"Assets/{normalized.TrimStart('/')}";
-            }
-            return normalized;
-        }
-
-        /// <summary>
-        /// Loads favorites from EditorPrefs.
-        /// </summary>
-        private void LoadFavorites()
-        {
-            _favorites.Clear();
-            string favoritesJson = EditorPrefs.GetString(__FavoritesPrefKey, "[]");
-            try
-            {
-                string[] favorites = JsonUtility.FromJson<string[]>(favoritesJson);
-                if (favorites != null)
-                {
-                    foreach (string id in favorites)
-                    {
-                        _favorites.Add(id);
-                    }
-                }
-            }
-            catch
-            {
-                // If parsing fails, start with empty favorites
-            }
-        }
-
-        /// <summary>
-        /// Saves favorites to EditorPrefs.
-        /// </summary>
-        private void SaveFavorites()
-        {
-            try
-            {
-                string favoritesJson = JsonUtility.ToJson(_favorites.ToArray());
-                EditorPrefs.SetString(__FavoritesPrefKey, favoritesJson);
-            }
-            catch
-            {
-                // Ignore save errors
-            }
-        }
-
-        /// <summary>
-        /// Loads recently used models from EditorPrefs.
-        /// </summary>
-        private void LoadRecentlyUsed()
-        {
-            _recentlyUsed.Clear();
-            string recentlyUsedJson = EditorPrefs.GetString(__RecentlyUsedPrefKey, "[]");
-            try
-            {
-                string[] recentlyUsed = JsonUtility.FromJson<string[]>(recentlyUsedJson);
-                if (recentlyUsed != null)
-                {
-                    _recentlyUsed.AddRange(recentlyUsed);
-                }
-            }
-            catch
-            {
-                // If parsing fails, start with empty list
-            }
-        }
-
-        /// <summary>
-        /// Saves recently used models to EditorPrefs.
-        /// </summary>
-        private void SaveRecentlyUsed()
-        {
-            try
-            {
-                string recentlyUsedJson = JsonUtility.ToJson(_recentlyUsed.ToArray());
-                EditorPrefs.SetString(__RecentlyUsedPrefKey, recentlyUsedJson);
-            }
-            catch
-            {
-                // Ignore save errors
-            }
-        }
-
-        /// <summary>
-        /// Toggles the favorite status of a model.
-        /// </summary>
-        private void ToggleFavorite(string modelId)
-        {
-            if (string.IsNullOrEmpty(modelId))
-            {
-                return;
-            }
-
-            if (_favorites.Contains(modelId))
-            {
-                _favorites.Remove(modelId);
-            }
-            else
-            {
-                _favorites.Add(modelId);
-            }
-
-            SaveFavorites();
-            Repaint();
-        }
-
-        /// <summary>
-        /// Adds a model to the recently used list.
-        /// </summary>
-        private void AddToRecentlyUsed(string modelId)
-        {
-            if (string.IsNullOrEmpty(modelId))
-            {
-                return;
-            }
-
-            // Remove if already exists
-            _recentlyUsed.Remove(modelId);
-
-            // Add to beginning
-            _recentlyUsed.Insert(0, modelId);
-
-            // Limit to max size
-            if (_recentlyUsed.Count > __MaxRecentlyUsed)
-            {
-                _recentlyUsed.RemoveRange(__MaxRecentlyUsed, _recentlyUsed.Count - __MaxRecentlyUsed);
-            }
-
-            SaveRecentlyUsed();
-        }
-
-        private static string SanitizeFolderName(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return "Model";
-            }
-
-            char[] invalid = Path.GetInvalidFileNameChars();
-            char[] result = name.Trim().Select(c => invalid.Contains(c) ? '_' : c).ToArray();
-            return new string(result);
-        }
 
         /// <summary>
         /// Attempts to find a locally installed version of the specified model.
@@ -1710,253 +1187,6 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        /// <summary>
-        /// Loads search history from EditorPrefs.
-        /// </summary>
-        private void LoadSearchHistory()
-        {
-            _searchHistory.Clear();
-            string historyJson = EditorPrefs.GetString(__SearchHistoryPrefKey, "[]");
-            try
-            {
-                string[] history = JsonUtility.FromJson<string[]>(historyJson);
-                if (history != null)
-                {
-                    _searchHistory.AddRange(history);
-                }
-            }
-            catch
-            {
-                // If parsing fails, start with empty history
-            }
-        }
-
-        /// <summary>
-        /// Saves search history to EditorPrefs.
-        /// </summary>
-        private void SaveSearchHistory()
-        {
-            try
-            {
-                string historyJson = JsonUtility.ToJson(_searchHistory.ToArray());
-                EditorPrefs.SetString(__SearchHistoryPrefKey, historyJson);
-            }
-            catch
-            {
-                // Ignore save errors
-            }
-        }
-
-        /// <summary>
-        /// Adds a search term to history if it's not already there.
-        /// Maintains maximum history size.
-        /// </summary>
-        private void AddToSearchHistory(string searchTerm)
-        {
-            if (string.IsNullOrWhiteSpace(searchTerm))
-            {
-                return;
-            }
-
-            string trimmed = searchTerm.Trim();
-
-            // Remove if already exists
-            _searchHistory.RemoveAll(s => string.Equals(s, trimmed, StringComparison.OrdinalIgnoreCase));
-
-            // Add to beginning
-            _searchHistory.Insert(0, trimmed);
-
-            // Limit to max size
-            if (_searchHistory.Count > __MaxSearchHistory)
-            {
-                _searchHistory.RemoveRange(__MaxSearchHistory, _searchHistory.Count - __MaxSearchHistory);
-            }
-
-            SaveSearchHistory();
-        }
-
-        /// <summary>
-        /// Shows a context menu with search history.
-        /// </summary>
-        private void ShowSearchHistoryMenu()
-        {
-            GenericMenu menu = new GenericMenu();
-
-            if (_searchHistory.Count == 0)
-            {
-                menu.AddDisabledItem(new GUIContent("No search history"));
-            }
-            else
-            {
-                foreach (string historyItem in _searchHistory)
-                {
-                    string item = historyItem; // Capture for closure
-                    menu.AddItem(new GUIContent(item), false, () =>
-                    {
-                        _search = item;
-                        GUI.FocusControl(null);
-                        Repaint();
-                    });
-                }
-                menu.AddSeparator("");
-                menu.AddItem(new GUIContent("Clear History"), false, () =>
-                {
-                    _searchHistory.Clear();
-                    SaveSearchHistory();
-                });
-            }
-
-            menu.ShowAsContext();
-        }
-
-        /// <summary>
-        /// Loads filter presets from EditorPrefs.
-        /// </summary>
-        private void LoadFilterPresets()
-        {
-            _filterPresets.Clear();
-            string presetsJson = EditorPrefs.GetString(__FilterPresetsPrefKey, "[]");
-            try
-            {
-                FilterPreset[] presets = JsonUtility.FromJson<FilterPreset[]>(presetsJson);
-                if (presets != null)
-                {
-                    _filterPresets.AddRange(presets);
-                }
-            }
-            catch
-            {
-                // If parsing fails, start with empty presets
-            }
-        }
-
-        /// <summary>
-        /// Saves filter presets to EditorPrefs.
-        /// </summary>
-        private void SaveFilterPresets()
-        {
-            try
-            {
-                string presetsJson = JsonUtility.ToJson(_filterPresets.ToArray());
-                EditorPrefs.SetString(__FilterPresetsPrefKey, presetsJson);
-            }
-            catch
-            {
-                // Ignore save errors
-            }
-        }
-
-        /// <summary>
-        /// Shows a context menu with filter presets.
-        /// </summary>
-        private void ShowFilterPresetsMenu()
-        {
-            GenericMenu menu = new GenericMenu();
-
-            if (_filterPresets.Count == 0)
-            {
-                menu.AddDisabledItem(new GUIContent("No presets saved"));
-            }
-            else
-            {
-                foreach (FilterPreset preset in _filterPresets)
-                {
-                    string presetName = preset.name;
-                    FilterPreset presetCopy = preset; // Capture for closure
-                    menu.AddItem(new GUIContent(presetName), false, () =>
-                    {
-                        ApplyFilterPreset(presetCopy);
-                    });
-                }
-                menu.AddSeparator("");
-                menu.AddItem(new GUIContent("Manage Presets..."), false, () =>
-                {
-                    ShowManagePresetsDialog();
-                });
-            }
-
-            menu.ShowAsContext();
-        }
-
-        /// <summary>
-        /// Applies a filter preset to the current filters.
-        /// </summary>
-        private void ApplyFilterPreset(FilterPreset preset)
-        {
-            if (preset == null)
-            {
-                return;
-            }
-
-            _search = preset.searchQuery ?? string.Empty;
-            _selectedTags.Clear();
-            if (preset.selectedTags != null)
-            {
-                foreach (string tag in preset.selectedTags)
-                {
-                    _selectedTags.Add(tag);
-                }
-            }
-
-            GUI.FocusControl(null);
-            Repaint();
-        }
-
-        /// <summary>
-        /// Shows a dialog to save the current filter state as a preset.
-        /// </summary>
-        private void ShowSavePresetDialog()
-        {
-            string presetName = EditorInputDialog.Show("Save Filter Preset", "Enter a name for this preset:", "My Preset");
-            if (!string.IsNullOrWhiteSpace(presetName))
-            {
-                FilterPreset preset = new FilterPreset
-                {
-                    name = presetName.Trim(),
-                    searchQuery = _search,
-                    selectedTags = new List<string>(_selectedTags)
-                };
-
-                // Remove existing preset with same name
-                _filterPresets.RemoveAll(p => string.Equals(p.name, preset.name, StringComparison.OrdinalIgnoreCase));
-
-                // Add new preset
-                _filterPresets.Add(preset);
-                SaveFilterPresets();
-            }
-        }
-
-        /// <summary>
-        /// Shows a dialog to manage (rename/delete) filter presets.
-        /// </summary>
-        private void ShowManagePresetsDialog()
-        {
-            // Simple dialog using EditorUtility
-            string message = "Filter Presets:\n\n";
-            if (_filterPresets.Count == 0)
-            {
-                message += "No presets saved.";
-            }
-            else
-            {
-                for (int i = 0; i < _filterPresets.Count; i++)
-                {
-                    FilterPreset preset = _filterPresets[i];
-                    message += $"{i + 1}. {preset.name}\n";
-                    if (!string.IsNullOrEmpty(preset.searchQuery))
-                    {
-                        message += $"   Search: {preset.searchQuery}\n";
-                    }
-                    if (preset.selectedTags != null && preset.selectedTags.Count > 0)
-                    {
-                        message += $"   Tags: {string.Join(", ", preset.selectedTags)}\n";
-                    }
-                    message += "\n";
-                }
-            }
-
-            EditorUtility.DisplayDialog("Filter Presets", message, "OK");
-        }
 
         /// <summary>
         /// Performs bulk import of all selected models.
@@ -1989,7 +1219,7 @@ namespace ModelLibrary.Editor.Windows
                     EditorUtility.DisplayProgressBar("Bulk Import", $"Importing {entry.name} ({current}/{total})...", (float)current / total);
 
                     bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
-                    bool needsUpgrade = installed && !string.IsNullOrEmpty(localMeta.version) && NeedsUpgrade(localMeta.version, entry.latestVersion);
+                    bool needsUpgrade = installed && !string.IsNullOrEmpty(localMeta.version) && ModelVersionUtils.NeedsUpgrade(localMeta.version, entry.latestVersion);
 
                     await Import(entry.id, entry.latestVersion, needsUpgrade, installed ? localMeta.version : null);
                     successCount++;
@@ -2079,29 +1309,6 @@ namespace ModelLibrary.Editor.Windows
             Repaint();
         }
 
-        /// <summary>
-        /// Sorts a list of model entries according to the specified sort mode.
-        /// </summary>
-        /// <param name="entries">List of entries to sort.</param>
-        /// <param name="mode">Sort mode to use.</param>
-        /// <returns>Sorted list of entries.</returns>
-        private List<ModelIndex.Entry> SortEntries(List<ModelIndex.Entry> entries, SortMode mode)
-        {
-            return mode switch
-            {
-                SortMode.Name => entries.OrderBy(e => e.name, StringComparer.OrdinalIgnoreCase).ToList(),
-                SortMode.Date => entries.OrderByDescending(e => e.updatedTimeTicks).ToList(),
-                SortMode.Version => entries.OrderByDescending(e =>
-                {
-                    if (SemVer.TryParse(e.latestVersion, out SemVer v))
-                    {
-                        return v;
-                    }
-                    return new SemVer(0, 0, 0);
-                }).ToList(),
-                _ => entries
-            };
-        }
 
         /// <summary>
         /// Handles keyboard shortcuts for common operations.
@@ -2141,7 +1348,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 if (GUI.GetNameOfFocusedControl() == "SearchField" && !string.IsNullOrWhiteSpace(_search))
                 {
-                    AddToSearchHistory(_search);
+                    _searchHistoryManager.AddToSearchHistory(_search);
                     currentEvent.Use();
                 }
             }
@@ -2211,7 +1418,7 @@ namespace ModelLibrary.Editor.Windows
 
                 EditorUtility.DisplayProgressBar(progressTitle, "Preparing import...", 0.3f);
 
-                string defaultInstallPath = DetermineInstallPath(meta);
+                string defaultInstallPath = _installPathHelper.DetermineInstallPath(meta);
                 string chosenInstallPath = defaultInstallPath;
 
                 int choice = EditorUtility.DisplayDialogComplex(
@@ -2229,7 +1436,7 @@ namespace ModelLibrary.Editor.Windows
 
                 if (choice == 1)
                 {
-                    string custom = PromptForInstallPath(defaultInstallPath);
+                    string custom = _installPathHelper.PromptForInstallPath(defaultInstallPath);
                     if (string.IsNullOrEmpty(custom))
                     {
                         titleContent.text = "Model Library";
@@ -2250,7 +1457,7 @@ namespace ModelLibrary.Editor.Windows
                 _negativeCache.Remove(id); // Remove from negative cache if present
 
                 // Track as recently used
-                AddToRecentlyUsed(id);
+                _recentlyUsedManager.AddToRecentlyUsed(id);
 
                 // Track analytics
                 AnalyticsService.RecordEvent(isUpgrade ? "update" : "import", id, version, meta.identity.name);

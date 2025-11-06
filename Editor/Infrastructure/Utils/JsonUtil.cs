@@ -1,5 +1,6 @@
 ﻿
 using UnityEngine;
+using ModelLibrary.Data;
 using ModelLibrary.Editor.Serialization;
 
 namespace ModelLibrary.Editor.Utils
@@ -51,9 +52,9 @@ namespace ModelLibrary.Editor.Utils
         /// </summary>
         /// <param name="json">The JSON string to parse</param>
         /// <returns>ModelMeta object, or null if deserialization fails</returns>
-        public static Data.ModelMeta FromJsonModelMeta(string json)
+        public static ModelMeta FromJsonModelMeta(string json)
         {
-            return FromJsonWithMigration<Data.ModelMeta>(json);
+            return FromJsonWithMigration<ModelMeta>(json);
         }
     }
 }

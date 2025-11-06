@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using ModelLibrary.Data;
 using ModelLibrary.Editor.Repository;
 
 namespace ModelLibrary.Editor.Services
@@ -26,7 +27,7 @@ namespace ModelLibrary.Editor.Services
         /// <param name="id">The unique identifier of the model to download.</param>
         /// <param name="version">The version of the model to download.</param>
         /// <returns>A tuple containing the cache root path and the model metadata.</returns>
-        public Task<(string versionRoot, Data.ModelMeta meta)> DownloadAsync(string id, string version)
+        public Task<(string versionRoot, ModelMeta meta)> DownloadAsync(string id, string version)
             => _service.DownloadModelVersionAsync(id, version);
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ModelLibrary.Data;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Serialization
@@ -46,7 +47,7 @@ namespace ModelLibrary.Editor.Serialization
             }
 
             // Second attempt: Try with migration for ModelMeta specifically
-            if (typeof(T) == typeof(Data.ModelMeta))
+            if (typeof(T) == typeof(ModelMeta))
             {
                 return TryDeserializeWithMigration(json) as T;
             }
@@ -58,12 +59,12 @@ namespace ModelLibrary.Editor.Serialization
         /// <summary>
         /// Deserialize ModelMeta with specific migration handling.
         /// </summary>
-        private static Data.ModelMeta TryDeserializeWithMigration(string json)
+        private static ModelMeta TryDeserializeWithMigration(string json)
         {
             try
             {
                 // Try to deserialize as-is first
-                Data.ModelMeta modelMeta = JsonUtility.FromJson<Data.ModelMeta>(json);
+                ModelMeta modelMeta = JsonUtility.FromJson<ModelMeta>(json);
                 if (modelMeta != null)
                 {
                     // Apply migration if needed
@@ -85,11 +86,11 @@ namespace ModelLibrary.Editor.Serialization
         /// <summary>
         /// Fallback deserialization for ModelMeta that extracts available fields even if some are missing.
         /// </summary>
-        private static Data.ModelMeta TryDeserializeModelMetaFallback(string json)
+        private static ModelMeta TryDeserializeModelMetaFallback(string json)
         {
             try
             {
-                Data.ModelMeta modelMeta = new Data.ModelMeta();
+                ModelMeta modelMeta = new ModelMeta();
 
                 // Try to extract basic fields using simple JSON parsing
                 string jsonLower = json.ToLower();
@@ -153,18 +154,18 @@ namespace ModelLibrary.Editor.Serialization
 
                 // Initialize collections
                 modelMeta.payloadRelativePaths = new List<string>();
-                modelMeta.materials = new List<Data.AssetRef>();
-                modelMeta.textures = new List<Data.AssetRef>();
+                modelMeta.materials = new List<AssetRef>();
+                modelMeta.textures = new List<AssetRef>();
                 modelMeta.assetGuids = new List<string>();
                 modelMeta.imageRelativePaths = new List<string>();
-                modelMeta.notes = new List<Data.ModelNote>();
+                modelMeta.notes = new List<ModelNote>();
                 modelMeta.dependencies = new List<string>();
-                modelMeta.dependenciesDetailed = new List<Data.DependencyRef>();
+                modelMeta.dependenciesDetailed = new List<DependencyRef>();
                 modelMeta.extra = new Dictionary<string, string>();
-                modelMeta.modelImporters = new Dictionary<string, Data.ModelImporterSettings>();
-                modelMeta.changelog = new List<Data.ModelChangelogEntry>();
-                modelMeta.identity = new Data.ModelIdentity();
-                modelMeta.tags = new Data.Tags();
+                modelMeta.modelImporters = new Dictionary<string, ModelImporterSettings>();
+                modelMeta.changelog = new List<ModelChangelogEntry>();
+                modelMeta.identity = new ModelIdentity();
+                modelMeta.tags = new Tags();
 
                 // Set schema version to current
                 modelMeta.schemaVersion = ModelMetaMigration.CURRENT_SCHEMA_VERSION;
@@ -175,7 +176,7 @@ namespace ModelLibrary.Editor.Serialization
             catch (Exception ex)
             {
                 Debug.LogError($"VersionedJsonUtil: Fallback deserialization failed: {ex.Message}");
-                return new Data.ModelMeta(); // Return empty instance as last resort
+                return new ModelMeta(); // Return empty instance as last resort
             }
         }
 

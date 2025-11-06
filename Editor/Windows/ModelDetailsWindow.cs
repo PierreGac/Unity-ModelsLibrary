@@ -35,7 +35,7 @@ namespace ModelLibrary.Editor.Windows
 
         // Metadata
         /// <summary>The loaded model metadata.</summary>
-        private Data.ModelMeta _meta;
+        private ModelMeta _meta;
         /// <summary>Original metadata JSON for change detection when saving.</summary>
         private string _baselineMetaJson;
         /// <summary>Edited description text (may differ from _meta.description).</summary>
@@ -258,7 +258,7 @@ namespace ModelLibrary.Editor.Windows
                 }
                 else
                 {
-                    foreach (Data.ModelNote n in _meta.notes.OrderByDescending(n => n.createdTimeTicks))
+                    foreach (ModelNote n in _meta.notes.OrderByDescending(n => n.createdTimeTicks))
                     {
                         using (new EditorGUILayout.VerticalScope("box"))
                         {
@@ -331,7 +331,7 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            foreach (Data.ModelChangelogEntry entry in _meta.changelog.OrderByDescending(c => c.timestamp))
+            foreach (ModelChangelogEntry entry in _meta.changelog.OrderByDescending(c => c.timestamp))
             {
                 using (new EditorGUILayout.VerticalScope("box"))
                 {
@@ -354,7 +354,7 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            _meta.tags ??= new Data.Tags();
+            _meta.tags ??= new Tags();
 
             if (_editingTags)
             {
@@ -365,7 +365,7 @@ namespace ModelLibrary.Editor.Windows
             string trimmedDescription = string.IsNullOrEmpty(_editedDescription) ? string.Empty : _editedDescription.Trim();
             _meta.description = trimmedDescription;
 
-            Data.ModelMeta before = JsonUtil.FromJson<Data.ModelMeta>(_baselineMetaJson);
+            ModelMeta before = JsonUtil.FromJson<ModelMeta>(_baselineMetaJson);
             string summary = BuildMetadataChangeSummary(before, _meta);
             if (string.IsNullOrEmpty(summary))
             {
@@ -395,7 +395,7 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        private static string BuildMetadataChangeSummary(Data.ModelMeta before, Data.ModelMeta after)
+        private static string BuildMetadataChangeSummary(ModelMeta before, ModelMeta after)
         {
             if (after == null)
             {
@@ -468,7 +468,7 @@ namespace ModelLibrary.Editor.Windows
         {
             try
             {
-                Data.ModelNote note = new Data.ModelNote
+                ModelNote note = new ModelNote
                 {
                     author = new Identity.SimpleUserIdentityProvider().GetUserName(),
                     message = _newNoteMessage,
@@ -501,7 +501,7 @@ namespace ModelLibrary.Editor.Windows
                 ModelLibraryService service = new ModelLibraryService(repo);
 
                 EditorUtility.DisplayProgressBar("Importing Model", "Downloading model files...", 0.3f);
-                (string cacheRoot, Data.ModelMeta meta) = await service.DownloadModelVersionAsync(_modelId, _version);
+                (string cacheRoot, ModelMeta meta) = await service.DownloadModelVersionAsync(_modelId, _version);
 
                 EditorUtility.DisplayProgressBar("Importing Model", "Copying files to Assets folder...", 0.6f);
                 await ModelProjectImporter.ImportFromCacheAsync(cacheRoot, meta, cleanDestination: true);

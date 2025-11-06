@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ModelLibrary.Data;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Serialization
@@ -20,7 +21,7 @@ namespace ModelLibrary.Editor.Serialization
         /// </summary>
         /// <param name="modelMeta">The ModelMeta object to migrate</param>
         /// <returns>True if migration was successful, false otherwise</returns>
-        public static bool MigrateToCurrentVersion(ref Data.ModelMeta modelMeta)
+        public static bool MigrateToCurrentVersion(ref ModelMeta modelMeta)
         {
             if (modelMeta == null)
             {
@@ -66,7 +67,7 @@ namespace ModelLibrary.Editor.Serialization
         /// <param name="fromVersion">Source version</param>
         /// <param name="toVersion">Target version</param>
         /// <returns>True if migration was successful</returns>
-        private static bool ApplyMigration(Data.ModelMeta modelMeta, int fromVersion, int toVersion)
+        private static bool ApplyMigration(ModelMeta modelMeta, int fromVersion, int toVersion)
         {
             switch (fromVersion)
             {
@@ -87,7 +88,7 @@ namespace ModelLibrary.Editor.Serialization
         /// Migration from schema version 0 to 1.
         /// This handles the initial addition of schemaVersion field and any other changes.
         /// </summary>
-        private static bool MigrateFrom0To1(Data.ModelMeta modelMeta)
+        private static bool MigrateFrom0To1(ModelMeta modelMeta)
         {
             try
             {
@@ -96,10 +97,10 @@ namespace ModelLibrary.Editor.Serialization
                     modelMeta.payloadRelativePaths = new List<string>();
 
                 if (modelMeta.materials == null)
-                    modelMeta.materials = new List<Data.AssetRef>();
+                    modelMeta.materials = new List<AssetRef>();
 
                 if (modelMeta.textures == null)
-                    modelMeta.textures = new List<Data.AssetRef>();
+                    modelMeta.textures = new List<AssetRef>();
 
                 if (modelMeta.assetGuids == null)
                     modelMeta.assetGuids = new List<string>();
@@ -109,30 +110,30 @@ namespace ModelLibrary.Editor.Serialization
 
 
                 if (modelMeta.notes == null)
-                    modelMeta.notes = new List<Data.ModelNote>();
+                    modelMeta.notes = new List<ModelNote>();
 
                 if (modelMeta.dependencies == null)
                     modelMeta.dependencies = new List<string>();
 
                 if (modelMeta.dependenciesDetailed == null)
-                    modelMeta.dependenciesDetailed = new List<Data.DependencyRef>();
+                    modelMeta.dependenciesDetailed = new List<DependencyRef>();
 
                 if (modelMeta.extra == null)
                     modelMeta.extra = new Dictionary<string, string>();
 
                 if (modelMeta.modelImporters == null)
-                    modelMeta.modelImporters = new Dictionary<string, Data.ModelImporterSettings>();
+                    modelMeta.modelImporters = new Dictionary<string, ModelImporterSettings>();
 
                 if (modelMeta.changelog == null)
-                    modelMeta.changelog = new List<Data.ModelChangelogEntry>();
+                    modelMeta.changelog = new List<ModelChangelogEntry>();
 
                 // Initialize identity if null
                 if (modelMeta.identity == null)
-                    modelMeta.identity = new Data.ModelIdentity();
+                    modelMeta.identity = new ModelIdentity();
 
                 // Initialize tags if null
                 if (modelMeta.tags == null)
-                    modelMeta.tags = new Data.Tags();
+                    modelMeta.tags = new Tags();
 
                 return true;
             }
