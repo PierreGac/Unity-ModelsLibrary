@@ -104,7 +104,7 @@ namespace ModelLibrary.Editor.Windows
         // Tag Filtering
         /// <summary>Set of currently selected tags for filtering models (case-insensitive comparison).</summary>
         private readonly HashSet<string> _selectedTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        
+
         // Bulk Operations
         /// <summary>Set of model IDs selected for bulk operations.</summary>
         private readonly HashSet<string> _selectedModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -182,7 +182,7 @@ namespace ModelLibrary.Editor.Windows
 
             // Load filter presets from EditorPrefs
             LoadFilterPresets();
-            
+
             // Load favorites and recently used from EditorPrefs
             LoadFavorites();
             LoadRecentlyUsed();
@@ -347,12 +347,6 @@ namespace ModelLibrary.Editor.Windows
             {
                 GUI.SetNextControlName("SearchField");
                 string newSearch = GUILayout.TextField(_search, EditorStyles.toolbarSearchField, GUILayout.ExpandWidth(true), GUILayout.MinWidth(200));
-
-                // Check if search changed and add to history if not empty
-                if (newSearch != _search && !string.IsNullOrWhiteSpace(newSearch))
-                {
-                    AddToSearchHistory(newSearch);
-                }
                 _search = newSearch;
 
                 // Search history dropdown button
@@ -388,7 +382,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     _ = CheckForUpdatesAsync();
                 }
-                
+
                 // Bulk operations toggle
                 bool newBulkMode = GUILayout.Toggle(_bulkSelectionMode, "Select", EditorStyles.toolbarButton, GUILayout.Width(70));
                 if (newBulkMode != _bulkSelectionMode)
@@ -400,7 +394,7 @@ namespace ModelLibrary.Editor.Windows
                     }
                     Repaint();
                 }
-                
+
                 // Bulk operations buttons
                 using (new EditorGUI.DisabledScope(_selectedModels.Count == 0))
                 {
@@ -413,7 +407,7 @@ namespace ModelLibrary.Editor.Windows
                         _ = BulkUpdateAsync();
                     }
                 }
-                
+
                 // Only show Submit Model button for Artists
                 SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
                 if (identityProvider.GetUserRole() == UserRole.Artist)
@@ -466,7 +460,7 @@ namespace ModelLibrary.Editor.Windows
             }
 
             IEnumerable<ModelIndex.Entry> query = index.entries;
-            
+
             // Apply filter mode (All/Favorites/Recent)
             if (_filterMode == FilterMode.Favorites)
             {
@@ -476,7 +470,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 query = query.Where(e => _recentlyUsed.Contains(e.id));
             }
-            
+
             string trimmedSearch = string.IsNullOrWhiteSpace(_search) ? null : _search.Trim();
             if (!string.IsNullOrEmpty(trimmedSearch))
             {
@@ -491,13 +485,13 @@ namespace ModelLibrary.Editor.Windows
             }
 
             List<ModelIndex.Entry> q = query.ToList();
-            
+
             // Sort the results
             q = SortEntries(q, _sortMode);
 
             // Filter mode tabs (All/Favorites/Recent)
             DrawFilterModeTabs();
-            
+
             DrawFilterSummary(index.entries.Count, q.Count);
             if (q.Count == 0)
             {
@@ -658,6 +652,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         _indexCache = null;
                         _ = LoadIndexAsync();
+                        _ = RefreshManifestCacheAsync(); // Also refresh manifest cache
                     }
 
                     SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
@@ -969,7 +964,7 @@ namespace ModelLibrary.Editor.Windows
                         ToggleFavorite(e.id);
                     }
                     GUI.color = originalColor;
-                    
+
                     // Notification badges (notes and updates)
                     DrawNotificationBadges(e);
 
@@ -1149,7 +1144,7 @@ namespace ModelLibrary.Editor.Windows
                         GUILayout.FlexibleSpace();
                     }
                 }
-                
+
                 // Load metadata and thumbnail if needed
                 string key = entry.id + "@" + entry.latestVersion;
                 if (!_metaCache.ContainsKey(key) && !_loadingMeta.Contains(key))
@@ -1555,7 +1550,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 _favorites.Add(modelId);
             }
-            
+
             SaveFavorites();
             Repaint();
         }
@@ -1572,16 +1567,16 @@ namespace ModelLibrary.Editor.Windows
 
             // Remove if already exists
             _recentlyUsed.Remove(modelId);
-            
+
             // Add to beginning
             _recentlyUsed.Insert(0, modelId);
-            
+
             // Limit to max size
             if (_recentlyUsed.Count > __MaxRecentlyUsed)
             {
                 _recentlyUsed.RemoveRange(__MaxRecentlyUsed, _recentlyUsed.Count - __MaxRecentlyUsed);
             }
-            
+
             SaveRecentlyUsed();
         }
 
@@ -1992,10 +1987,10 @@ namespace ModelLibrary.Editor.Windows
                     }
 
                     EditorUtility.DisplayProgressBar("Bulk Import", $"Importing {entry.name} ({current}/{total})...", (float)current / total);
-                    
+
                     bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
                     bool needsUpgrade = installed && !string.IsNullOrEmpty(localMeta.version) && NeedsUpgrade(localMeta.version, entry.latestVersion);
-                    
+
                     await Import(entry.id, entry.latestVersion, needsUpgrade, installed ? localMeta.version : null);
                     successCount++;
                 }
@@ -2007,10 +2002,10 @@ namespace ModelLibrary.Editor.Windows
             }
 
             EditorUtility.ClearProgressBar();
-            
+
             string message = $"Bulk Import Complete!\n\nSuccessful: {successCount}\nFailed: {failCount}";
             EditorUtility.DisplayDialog("Bulk Import Results", message, "OK");
-            
+
             _selectedModels.Clear();
             _bulkSelectionMode = false;
             Repaint();
@@ -2060,10 +2055,10 @@ namespace ModelLibrary.Editor.Windows
                     }
 
                     EditorUtility.DisplayProgressBar("Bulk Update", $"Updating {entry.name} ({current}/{total})...", (float)current / total);
-                    
+
                     bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
                     string previousVersion = installed ? localMeta.version : null;
-                    
+
                     await Import(entry.id, entry.latestVersion, isUpgrade: true, previousVersion);
                     successCount++;
                 }
@@ -2075,10 +2070,10 @@ namespace ModelLibrary.Editor.Windows
             }
 
             EditorUtility.ClearProgressBar();
-            
+
             string message = $"Bulk Update Complete!\n\nSuccessful: {successCount}\nFailed: {failCount}";
             EditorUtility.DisplayDialog("Bulk Update Results", message, "OK");
-            
+
             _selectedModels.Clear();
             _bulkSelectionMode = false;
             Repaint();
@@ -2113,6 +2108,7 @@ namespace ModelLibrary.Editor.Windows
         /// F5: Refresh index
         /// Ctrl+F: Focus search field
         /// Escape: Clear search
+        /// Enter: Add search to history (handled in OnGUI for search field)
         /// </summary>
         private void HandleKeyboardShortcuts()
         {
@@ -2139,6 +2135,15 @@ namespace ModelLibrary.Editor.Windows
             {
                 GUI.FocusControl("SearchField");
                 currentEvent.Use();
+            }
+            // Enter: Add search to history if search field is focused
+            else if ((currentEvent.keyCode == KeyCode.Return || currentEvent.keyCode == KeyCode.KeypadEnter))
+            {
+                if (GUI.GetNameOfFocusedControl() == "SearchField" && !string.IsNullOrWhiteSpace(_search))
+                {
+                    AddToSearchHistory(_search);
+                    currentEvent.Use();
+                }
             }
             // Escape: Clear search if search field is focused
             else if (currentEvent.keyCode == KeyCode.Escape)
