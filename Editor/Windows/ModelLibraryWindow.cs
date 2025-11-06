@@ -80,6 +80,12 @@ namespace ModelLibrary.Editor.Windows
         private readonly HashSet<string> _loadingMeta = new();
         /// <summary>Cache of locally installed model metadata, keyed by model ID.</summary>
         private readonly Dictionary<string, ModelMeta> _localInstallCache = new();
+        /// <summary>Cache of all manifest files found in Assets folder, keyed by model ID.</summary>
+        private readonly Dictionary<string, ModelMeta> _manifestCache = new();
+        /// <summary>Flag indicating if the manifest cache has been initialized.</summary>
+        private bool _manifestCacheInitialized = false;
+        /// <summary>Set of model IDs that were checked but not found locally (negative cache).</summary>
+        private readonly HashSet<string> _negativeCache = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         /// <summary>Cache of loaded thumbnail textures for grid view, keyed by "modelId@version#thumb".</summary>
         private readonly Dictionary<string, Texture2D> _thumbnailCache = new();
         /// <summary>Set of thumbnail keys currently being loaded to prevent duplicate requests.</summary>
@@ -204,6 +210,7 @@ namespace ModelLibrary.Editor.Windows
                 : new Repository.HttpRepository(settings.repositoryRoot);
             _service = new ModelLibraryService(repo);
             _ = LoadIndexAsync();
+            _ = RefreshManifestCacheAsync();
         }
 
         /// <summary>
@@ -366,6 +373,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     _indexCache = null; // Clear cache to force reload
                     _ = LoadIndexAsync();
+                    _ = RefreshManifestCacheAsync(); // Also refresh manifest cache
                 }
 
                 // Update indicator and refresh button
@@ -1601,31 +1609,33 @@ namespace ModelLibrary.Editor.Windows
         /// <returns>True if the model is installed locally, false otherwise.</returns>
         private bool TryGetLocalInstall(ModelIndex.Entry entry, out ModelMeta meta)
         {
+            // Check negative cache first - if model was previously checked and not found, return immediately
+            if (_negativeCache.Contains(entry.id))
+            {
+                meta = null;
+                return false;
+            }
+
+            // Check local install cache first
             if (_localInstallCache.TryGetValue(entry.id, out meta) && meta != null)
             {
                 return true;
             }
 
-            // 1) Look for a marker manifest anywhere under Assets (supports custom install locations)
-            try
+            // 1) Look for model in manifest cache (populated at startup)
+            if (_manifestCacheInitialized)
             {
-                foreach (string manifestPath in Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", SearchOption.AllDirectories))
+                if (_manifestCache.TryGetValue(entry.id, out meta) && meta != null)
                 {
-                    try
-                    {
-                        string json = File.ReadAllText(manifestPath);
-                        ModelMeta parsed = JsonUtil.FromJson<ModelMeta>(json);
-                        if (parsed != null && parsed.identity != null && string.Equals(parsed.identity.id, entry.id, StringComparison.OrdinalIgnoreCase))
-                        {
-                            _localInstallCache[entry.id] = parsed;
-                            meta = parsed;
-                            return true;
-                        }
-                    }
-                    catch { /* ignore malformed marker files */ }
+                    _localInstallCache[entry.id] = meta;
+                    return true;
                 }
             }
-            catch { /* directory scan issues */ }
+            else
+            {
+                // If cache not initialized yet, trigger initialization (non-blocking)
+                _ = RefreshManifestCacheAsync();
+            }
 
             // 2) Fallback: GUID-based detection using known asset GUIDs from latest meta (if cached)
             string key = entry.id + "@" + entry.latestVersion;
@@ -1652,12 +1662,58 @@ namespace ModelLibrary.Editor.Windows
                 _ = LoadMetaAsync(entry.id, entry.latestVersion);
             }
 
+            // Model not found - add to negative cache to avoid repeated checks
+            _negativeCache.Add(entry.id);
             _localInstallCache.Remove(entry.id);
             meta = null;
             return false;
         }
 
-        private void InvalidateLocalInstall(string modelId) => _localInstallCache.Remove(modelId);
+        private void InvalidateLocalInstall(string modelId)
+        {
+            _localInstallCache.Remove(modelId);
+            _negativeCache.Remove(modelId);
+        }
+
+        /// <summary>
+        /// Refreshes the manifest cache by scanning all modelLibrary.meta.json files in the Assets folder.
+        /// This is called once at startup and can be manually triggered via the Refresh button.
+        /// </summary>
+        private async Task RefreshManifestCacheAsync()
+        {
+            _manifestCache.Clear();
+            _negativeCache.Clear();
+
+            try
+            {
+                // Enumerate all manifest files in Assets folder once
+                foreach (string manifestPath in Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", SearchOption.AllDirectories))
+                {
+                    try
+                    {
+                        string json = await File.ReadAllTextAsync(manifestPath);
+                        ModelMeta parsed = JsonUtil.FromJson<ModelMeta>(json);
+                        if (parsed != null && parsed.identity != null && !string.IsNullOrEmpty(parsed.identity.id))
+                        {
+                            _manifestCache[parsed.identity.id] = parsed;
+                            // Also update _localInstallCache for consistency
+                            _localInstallCache[parsed.identity.id] = parsed;
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore malformed manifest files
+                    }
+                }
+
+                _manifestCacheInitialized = true;
+            }
+            catch
+            {
+                // Ignore directory scan issues
+                _manifestCacheInitialized = true; // Still mark as initialized to avoid repeated failures
+            }
+        }
 
         /// <summary>
         /// Loads search history from EditorPrefs.
@@ -2185,6 +2241,8 @@ namespace ModelLibrary.Editor.Windows
 
                 InvalidateLocalInstall(id);
                 _localInstallCache[id] = meta;
+                _manifestCache[id] = meta; // Also update manifest cache
+                _negativeCache.Remove(id); // Remove from negative cache if present
 
                 // Track as recently used
                 AddToRecentlyUsed(id);
