@@ -286,6 +286,15 @@ namespace ModelLibrary.Editor.Windows
                                 if (loadedMat.shader.GetPropertyType(i) == UnityEngine.Rendering.ShaderPropertyType.Texture)
                                 {
                                     string propName = loadedMat.shader.GetPropertyName(i);
+
+                                    // Skip Unity internal properties that require Texture2DArray (like unity_Lightmaps)
+                                    // These properties cannot accept regular Texture2D and will cause dimension mismatch errors
+                                    if (propName == "unity_Lightmaps" || propName == "unity_LightmapsInd" || propName == "unity_ShadowMasks" ||
+                                        propName.StartsWith("unity_") && (propName.Contains("Lightmap") || propName.Contains("Shadow")))
+                                    {
+                                        continue; // Skip array texture properties
+                                    }
+
                                     Texture oldTex = loadedMat.GetTexture(propName);
 
                                     Texture2D matchingTex = null;
@@ -339,8 +348,15 @@ namespace ModelLibrary.Editor.Windows
 
                                     if (matchingTex != null)
                                     {
-                                        loadedMat.SetTexture(propName, matchingTex);
-                                        Debug.Log($"Re-linked texture '{matchingTex.name}' to property '{propName}' in material '{matName}'");
+                                        try
+                                        {
+                                            loadedMat.SetTexture(propName, matchingTex);
+                                            Debug.Log($"Re-linked texture '{matchingTex.name}' to property '{propName}' in material '{matName}'");
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Debug.LogWarning($"Failed to set texture '{matchingTex.name}' to property '{propName}' in material '{matName}': {ex.Message}. This property may require a different texture type.");
+                                        }
                                     }
                                     else
                                     {
@@ -659,7 +675,7 @@ namespace ModelLibrary.Editor.Windows
                 if (e.type == EventType.MouseDrag && e.button == 0)
                 {
                     _cameraRotation.y += e.delta.x * 0.5f;
-                    _cameraRotation.x -= e.delta.y * 0.5f;
+                    _cameraRotation.x += e.delta.y * 0.5f;
                     _cameraRotation.x = Mathf.Clamp(_cameraRotation.x, -90f, 90f);
                     Repaint();
                     e.Use();
