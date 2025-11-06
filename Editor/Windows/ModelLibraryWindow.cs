@@ -346,7 +346,7 @@ namespace ModelLibrary.Editor.Windows
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
                 GUI.SetNextControlName("SearchField");
-                string newSearch = GUILayout.TextField(_search, EditorStyles.toolbarSearchField);
+                string newSearch = GUILayout.TextField(_search, EditorStyles.toolbarSearchField, GUILayout.ExpandWidth(true), GUILayout.MinWidth(200));
 
                 // Check if search changed and add to history if not empty
                 if (newSearch != _search && !string.IsNullOrWhiteSpace(newSearch))
