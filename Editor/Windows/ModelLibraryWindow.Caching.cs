@@ -272,19 +272,28 @@ namespace ModelLibrary.Editor.Windows
                 return true;
             }
 
-            if (_manifestCacheInitialized)
+            // If cache is not initialized, trigger refresh but don't return false yet
+            // Check if cache is currently refreshing
+            if (!_manifestCacheInitialized)
             {
-                if (_manifestCache.TryGetValue(entry.id, out meta) && meta != null)
+                // Only trigger refresh if not already refreshing to avoid duplicate calls
+                if (!_refreshingManifest)
                 {
-                    _localInstallCache[entry.id] = meta;
-                    return true;
+                    _ = RefreshManifestCacheAsync();
                 }
-            }
-            else
-            {
-                _ = RefreshManifestCacheAsync();
+                // Don't return false immediately - check manifest cache first
+                // The cache might be populated by the time we check it
             }
 
+            // Check manifest cache (even if not initialized, it might have been populated)
+            if (_manifestCache.TryGetValue(entry.id, out meta) && meta != null)
+            {
+                _localInstallCache[entry.id] = meta;
+                return true;
+            }
+
+            // Fallback: Check if assets exist in project by GUID
+            // This works for models with identity.id but not for old manifests without it
             string key = entry.id + "@" + entry.latestVersion;
             if (TryGetMetaFromCache(key, out ModelMeta latestMeta) && latestMeta != null)
             {
@@ -308,8 +317,13 @@ namespace ModelLibrary.Editor.Windows
                 _ = LoadMetaAsync(entry.id, entry.latestVersion);
             }
 
-            _negativeCache.Add(entry.id);
-            _localInstallCache.Remove(entry.id);
+            // Only add to negative cache if manifest cache is initialized
+            // Otherwise, we might miss old manifests that are still being processed
+            if (_manifestCacheInitialized)
+            {
+                _negativeCache.Add(entry.id);
+                _localInstallCache.Remove(entry.id);
+            }
             meta = null;
             return false;
         }
@@ -355,6 +369,9 @@ namespace ModelLibrary.Editor.Windows
                 int total = manifestPaths.Count;
                 int processed = 0;
 
+                // Load index once to match old manifests by name
+                ModelIndex index = await _service.GetIndexAsync();
+
                 // Process files on main thread with progress updates
                 for (int i = 0; i < manifestPaths.Count; i++)
                 {
@@ -363,22 +380,92 @@ namespace ModelLibrary.Editor.Windows
 
                     // Update progress bar
                     float progress = (float)processed / total;
-                    EditorUtility.DisplayProgressBar("Refreshing Manifest Cache", 
+                    EditorUtility.DisplayProgressBar("Refreshing Manifest Cache",
                         $"Processing manifest {processed} of {total}...", progress);
 
                     try
                     {
                         string json = await File.ReadAllTextAsync(manifestPath);
                         ModelMeta parsed = JsonUtil.FromJson<ModelMeta>(json);
-                        if (parsed != null && parsed.identity != null && !string.IsNullOrEmpty(parsed.identity.id))
+                        if (parsed == null)
                         {
-                            _manifestCache[parsed.identity.id] = parsed;
-                            _localInstallCache[parsed.identity.id] = parsed;
+                            continue;
+                        }
+
+                        // Fallback: If identity is null, create it
+                        parsed.identity ??= new ModelIdentity();
+
+                        // Fallback: If identity name is null or empty, use FBX name from folder path
+                        if (string.IsNullOrEmpty(parsed.identity.name))
+                        {
+                            // Extract FBX name from folder path (e.g., "Assets/Models/Benne/Benne.FBX" -> "Benne")
+                            string folderPath = Path.GetDirectoryName(manifestPath);
+                            string folderName = Path.GetFileName(folderPath);
+
+                            // Remove extension if it's an FBX/OBJ folder name
+                            string fbxName = folderName;
+                            string ext = Path.GetExtension(folderName).ToLowerInvariant();
+                            if (ext == ".fbx" || ext == ".obj")
+                            {
+                                fbxName = Path.GetFileNameWithoutExtension(folderName);
+                            }
+
+                            parsed.identity.name = fbxName;
+                        }
+
+                        string modelId = null;
+
+                        // New format: has identity.id
+                        if (!string.IsNullOrEmpty(parsed.identity.id))
+                        {
+                            modelId = parsed.identity.id;
+                        }
+                        // Old format: try to match by folder name
+                        else if (index?.entries != null)
+                        {
+                            // Extract FBX name from folder path for matching
+                            string folderPath = Path.GetDirectoryName(manifestPath);
+                            string folderName = Path.GetFileName(folderPath);
+                            string fbxNameFromFolder = folderName;
+                            string folderExt = Path.GetExtension(folderName).ToLowerInvariant();
+                            if (folderExt == ".fbx" || folderExt == ".obj")
+                            {
+                                fbxNameFromFolder = Path.GetFileNameWithoutExtension(folderName);
+                            }
+
+                            // Try to match by name (sanitized or exact)
+                            for (int j = 0; j < index.entries.Count; j++)
+                            {
+                                ModelIndex.Entry entry = index.entries[j];
+                                if (entry == null || string.IsNullOrEmpty(entry.name))
+                                {
+                                    continue;
+                                }
+
+                                // Match by FBX name (sanitized model name) or exact name
+                                string sanitizedName = InstallPathUtils.SanitizeFolderName(entry.name);
+                                if (string.Equals(fbxNameFromFolder, sanitizedName, StringComparison.OrdinalIgnoreCase) ||
+                                    string.Equals(fbxNameFromFolder, entry.name, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    modelId = entry.id;
+                                    // Set the identity.id for future lookups
+                                    parsed.identity.id = entry.id;
+                                    Debug.Log($"[ModelLibraryWindow] Matched old manifest at {manifestPath} to model ID '{modelId}' by folder name '{fbxNameFromFolder}'");
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Cache the manifest if we found a model ID
+                        if (!string.IsNullOrEmpty(modelId))
+                        {
+                            _manifestCache[modelId] = parsed;
+                            _localInstallCache[modelId] = parsed;
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Silently skip invalid manifests
+                        Debug.LogWarning($"[ModelLibraryWindow] Failed to process manifest {manifestPath}: {ex.Message}");
                     }
 
                     // Yield periodically to keep UI responsive

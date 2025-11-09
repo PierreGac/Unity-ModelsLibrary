@@ -999,8 +999,50 @@ namespace ModelLibrary.Editor.Windows
 
                 if (properlyInstalled)
                 {
-                    string statusText = hasUpdate ? "Update" : "Installed";
-                    GUILayout.Label(statusText, EditorStyles.centeredGreyMiniLabel);
+                    // Draw colored "Installed" label with box background
+                    GUIStyle installedLabelStyle = new GUIStyle(EditorStyles.miniLabel)
+                    {
+                        alignment = TextAnchor.MiddleCenter,
+                        padding = new RectOffset(6, 6, 2, 2),
+                        normal = { textColor = new Color(0.1f, 0.7f, 0.2f) }, // Green text
+                        fontStyle = FontStyle.Bold
+                    };
+                    
+                    Color originalBgColor = GUI.backgroundColor;
+                    // Green background with transparency for better visibility
+                    GUI.backgroundColor = new Color(0.2f, 0.8f, 0.3f, 0.3f);
+                    
+                    string statusText = hasUpdate ? "Update Available" : "Installed";
+                    using (new EditorGUILayout.HorizontalScope("box"))
+                    {
+                        GUILayout.FlexibleSpace();
+                        GUILayout.Label(statusText, installedLabelStyle);
+                        GUILayout.FlexibleSpace();
+                    }
+                    
+                    GUI.backgroundColor = originalBgColor;
+                }
+                else if (installed && (string.IsNullOrEmpty(localVersion) || localVersion == "(unknown)"))
+                {
+                    // Draw colored label for installed but unknown version
+                    GUIStyle installedLabelStyle = new GUIStyle(EditorStyles.miniLabel)
+                    {
+                        alignment = TextAnchor.MiddleCenter,
+                        padding = new RectOffset(6, 6, 2, 2),
+                        normal = { textColor = new Color(0.5f, 0.5f, 0.5f) } // Grey text
+                    };
+                    
+                    Color originalBgColor = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(0.6f, 0.6f, 0.6f, 0.2f);
+                    
+                    using (new EditorGUILayout.HorizontalScope("box"))
+                    {
+                        GUILayout.FlexibleSpace();
+                        GUILayout.Label("Installed", installedLabelStyle);
+                        GUILayout.FlexibleSpace();
+                    }
+                    
+                    GUI.backgroundColor = originalBgColor;
                 }
             }
 
