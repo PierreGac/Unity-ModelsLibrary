@@ -25,6 +25,109 @@ A comprehensive Unity Editor tool that enables teams to version, browse, submit,
 - **⚙️ Hidden Metadata** - Manifest files automatically hidden from Project window
 - **🔄 Auto-Refresh** - Browser automatically refreshes after model submission
 
+## 📋 Prerequisites
+
+Before installing Model Library, ensure you meet the following requirements:
+
+- **Unity Version**: Unity 6.0.2 or later (tested with Unity 6000.2.6f2)
+- **.NET Compatibility**: .NET Standard 2.1
+  - ⚠️ **Note**: This package has been developed and tested with .NET Standard 2.1 only
+  - .NET Framework compatibility has **not been tested** and is not guaranteed
+- **Platform**: Windows, macOS, or Linux (Unity Editor)
+- **Editor Only**: This is an Editor-only package with no runtime dependencies
+
+### System Requirements
+
+- Unity Editor (not required in builds)
+- Sufficient disk space for model cache (configurable in settings)
+- Network access (if using HTTP repository backend)
+
+## 📦 Installation
+
+### Option 1: Unity Package Manager (Git URL) - Recommended
+
+This is the recommended installation method for easy updates and version management.
+
+1. Open your Unity project
+2. Open Unity Package Manager: `Window > Package Manager`
+3. Click the `+` button in the top-left corner
+4. Select `Add package from git URL...`
+5. Enter the following URL:
+
+   ```
+   https://github.com/PierreGac/Unity-ModelsLibrary.git?path=Assets/ModelLibrary
+   ```
+
+6. Click `Add`
+7. Unity will download and import the package automatically
+
+**Note**: For a specific version or branch, append `#version` or `#branch` to the URL:
+
+- Version: `https://github.com/PierreGac/Unity-ModelsLibrary.git?path=Assets/ModelLibrary#v1.0.0`
+- Branch: `https://github.com/PierreGac/Unity-ModelsLibrary.git?path=Assets/ModelLibrary#main`
+
+### Option 2: Manual Installation
+
+If you prefer to install manually or need to modify the source code:
+
+1. Download or clone the repository:
+
+   ```bash
+   git clone https://github.com/PierreGac/Unity-ModelsLibrary.git
+   ```
+
+2. Copy the `Assets/ModelLibrary` folder into your Unity project's `Assets` folder
+3. Unity will automatically detect and import the package
+4. Wait for Unity to finish importing all assets
+
+### Option 3: Unity Package Manager (Local Package)
+
+For development or testing:
+
+1. Clone the repository to a local directory
+2. In Unity Package Manager, click `+` → `Add package from disk...`
+3. Navigate to the cloned repository and select `Assets/ModelLibrary/package.json`
+4. Click `Open`
+
+### Post-Installation
+
+After installation:
+
+1. Open Unity Editor
+2. Navigate to `Tools > Model Library > Browser`
+3. The first-run wizard will guide you through initial configuration
+4. Set up your repository location and user identity
+
+### Updating
+
+**If installed via Git URL:**
+
+- Unity Package Manager will show available updates
+- Click `Update` in the Package Manager window
+
+**If installed manually:**
+
+- Pull the latest changes from the repository
+- Unity will automatically detect and reimport changed files
+
+### Troubleshooting
+
+**Package not appearing in Package Manager:**
+
+- Ensure you're using Unity 6.0.2 or later
+- Check that the Git URL is correct
+- Verify you have internet connectivity
+
+**Import errors:**
+
+- Close and reopen Unity Editor
+- Delete `Library` folder and let Unity regenerate it
+- Check Unity Console for specific error messages
+
+**First-run wizard not appearing:**
+
+- Manually open: `Tools > Model Library > Settings > Configuration Wizard`
+
 ## 🚀 Quick Start
 
 ### 1. Open the Browser Window
@@ -193,7 +296,7 @@ When submitting a model, the system intelligently prefills the model name:
 - View full version history in Model Details window
 - Changelog entries include version, date, author, and summary
 
-### Bulk Operations (needs testing)
+### Bulk Operations
 
 - **Bulk Import**: Import multiple models at once
 - **Bulk Update**: Update multiple installed models
@@ -209,7 +312,7 @@ When submitting a model, the system intelligently prefills the model name:
 - **Favorites**: Mark models as favorites for quick access
 - **Recent**: View recently used models
 
-### Update Detection (needs testing)
+### Update Detection
 
 - Automatic background checking for model updates
 - Visual indicators for models with available updates
@@ -309,7 +412,7 @@ On first launch, a guided wizard helps you:
 
 ### Repository Layout
 
-```
+```text
 <repository-root>/
   models_index.json              # Master index of all models
   <modelId>/
@@ -360,7 +463,7 @@ Each imported model creates a manifest file in the installation directory:
 
 ### Project Structure
 
-```
+```text
 Assets/ModelLibrary/
   Editor/
     Windows/                      # Editor windows
@@ -567,6 +670,145 @@ Contributions are welcome! Suggested areas:
 - .NET Standard 2.1 compatibility
 
 Please open an issue to discuss significant changes before submitting a PR.
+
+## 📜 Version History
+
+### Version 1.0.0 - Initial Release
+
+The first stable release of Model Library for Unity, featuring a comprehensive set of tools for managing 3D models in team environments.
+
+#### 🚀 Core Features
+
+##### Browser & Navigation
+
+- Full-featured browser window with grid and list views
+- Advanced search by name, tags, or description
+- Tag-based filtering with multi-select support
+- Favorites and recently used models tracking
+- Sort by name, date, or version
+- Visual installation status badges
+- Update available indicators
+
+##### Model Management
+
+- One-click import with preserved Unity GUIDs
+- Automatic update detection and version comparison
+- Smart installation status detection (supports old and new manifest formats)
+- Version comparison window for side-by-side analysis
+- Model details window with comprehensive metadata view
+- Automatic window refresh after model submission
+
+##### Model Submission
+
+- Submit new models or update existing ones
+- Smart name prefilling from FBX/OBJ files, folder names, or existing models
+- Comprehensive validation (paths, versions, changelog)
+- Drag-and-drop preview image upload
+- Draft saving and loading
+- Changelog entry management
+- Multi-tab interface (Basic Info, Assets, Images, Advanced)
+
+##### Version Control
+
+- Semantic versioning (SemVer) support
+- Automatic version suggestion for updates
+- Changelog tracking with author and timestamp
+- Version history viewing
+- Version deletion (with safeguards)
+
+##### Metadata Management
+
+- Rich metadata editing (description, tags)
+- Tag system with case-insensitive matching
+- Notes system with categorized feedback (remarks, bug, feature request)
+- Model structure visualization
+- Asset dependency tracking
+
+##### User & Permissions
+
+- Role-based access control (Developer, Artist, Admin)
+- User identity management
+- Permission-based UI elements
+- Analytics access control
+
+##### Repository Support
+
+- File System repository backend (fully tested)
+- HTTP repository backend (interface ready, needs testing)
+- Configurable repository locations
+- Local caching for offline access
+
+##### Advanced Features
+
+- Bulk operations (import, update, tagging)
+- Batch upload from directory
+- Analytics and usage statistics
+- 3D interactive preview window
+- Performance profiler
+- Error log viewer
+- Hidden metadata files (`.modelLibrary.meta.json`)
+
+#### ✨ User Experience
+
+- First-run configuration wizard
+- Comprehensive help system
+- Keyboard shortcuts support
+- Progress indicators for long operations
+- Real-time validation feedback
+- Context menu integration (right-click to submit)
+- Automatic refresh after operations
+- Window auto-close after successful import
+
+#### 🏗️ Architecture
+
+- Clean separation of concerns (Repository, Services, UI layers)
+- Dependency injection ready
+- Extensible repository interface
+- Comprehensive error handling
+- Backward compatibility with old manifest files
+- Migration system for metadata schema changes
+
+#### 🧪 Testing
+
+- Comprehensive unit test suite
+- Coverage for critical workflows
+- Performance testing infrastructure
+- Backward compatibility tests
+
+#### 📚 Documentation
+
+- Comprehensive README with screenshots
+- Architecture documentation
+- Code documentation (XML comments)
+- Development guidelines (AGENTS.md)
+- Changelog tracking
+
+#### 🔧 Technical Details
+
+- .NET Standard 2.1 compatible
+- Unity 6.0.2+ required
+- Editor-only (no runtime dependencies)
+- Async/await throughout for non-blocking operations
+- File system enumeration for hidden files
+- GUID preservation for reliable update detection
+
+#### 🐛 Bug Fixes & Improvements
+
+- Fixed Unity freeze issues with async operations
+- Improved manifest file discovery (old and new formats)
+- Enhanced installation status detection
+- Fixed path validation and sanitization
+- Improved error handling and user feedback
+- Performance optimizations
+- Code quality improvements (explicit typing, no magic numbers)
+
+#### 📝 Known Limitations
+
+- HTTP repository backend needs additional testing
+- Performance optimization ongoing for very large datasets (1000+ models)
+- Bulk operations may need additional validation in production environments
+
+---
 
 ## 📝 License
 
