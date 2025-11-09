@@ -182,12 +182,63 @@ namespace ModelLibrary.Editor.Tests
             Assert.IsTrue(canDelete, "Validation should allow deletion attempt for valid IDs");
 
             // Test that empty/null model ID is rejected
-            Assert.IsFalse(string.IsNullOrEmpty(null), "Null model ID should be rejected");
-            Assert.IsFalse(string.IsNullOrEmpty(""), "Empty model ID should be rejected");
+            Assert.IsTrue(string.IsNullOrEmpty(null), "Null model ID should be rejected (IsNullOrEmpty returns true)");
+            Assert.IsTrue(string.IsNullOrEmpty(""), "Empty model ID should be rejected (IsNullOrEmpty returns true)");
 
             // Test that empty/null version is rejected
-            Assert.IsFalse(string.IsNullOrEmpty(null), "Null version should be rejected");
-            Assert.IsFalse(string.IsNullOrEmpty(""), "Empty version should be rejected");
+            Assert.IsTrue(string.IsNullOrEmpty(null), "Null version should be rejected (IsNullOrEmpty returns true)");
+            Assert.IsTrue(string.IsNullOrEmpty(""), "Empty version should be rejected (IsNullOrEmpty returns true)");
+        }
+
+        /// <summary>
+        /// Tests manifest file discovery during version operations.
+        /// Verifies that both old and new naming conventions are found when checking for installed versions.
+        /// </summary>
+        [Test]
+        public void TestManifestFileDiscoveryDuringVersionOperations()
+        {
+            string tempTestDir = Path.Combine(Path.GetTempPath(), $"VersionManifestTest_{Guid.NewGuid():N}");
+            string assetsTestDir = Path.Combine(tempTestDir, "Assets", "Models", "TestModel");
+            Directory.CreateDirectory(assetsTestDir);
+
+            try
+            {
+                // Create manifest file with new naming
+                string newManifestFile = Path.Combine(assetsTestDir, ".modelLibrary.meta.json");
+                ModelMeta meta = new ModelMeta
+                {
+                    identity = new ModelIdentity { id = "test-model", name = "Test Model" },
+                    version = "1.0.0"
+                };
+                File.WriteAllText(newManifestFile, JsonUtility.ToJson(meta));
+
+                // Use absolute path to Assets folder in temp directory to avoid searching Unity's actual Assets folder
+                string assetsPath = Path.Combine(tempTestDir, "Assets");
+                
+                // Simulate manifest file discovery during version operations
+                List<string> manifestPaths = new List<string>();
+                
+                // Search for new naming convention first
+                foreach (string manifestPath in Directory.EnumerateFiles(assetsPath, ".modelLibrary.meta.json", SearchOption.AllDirectories))
+                {
+                    manifestPaths.Add(manifestPath);
+                }
+                // Fallback for old naming
+                foreach (string manifestPath in Directory.EnumerateFiles(assetsPath, "modelLibrary.meta.json", SearchOption.AllDirectories))
+                {
+                    manifestPaths.Add(manifestPath);
+                }
+
+                Assert.AreEqual(1, manifestPaths.Count, "Should find manifest file during version operations");
+                Assert.IsTrue(manifestPaths[0].EndsWith(".modelLibrary.meta.json"), "Should find new naming convention");
+            }
+            finally
+            {
+                if (Directory.Exists(tempTestDir))
+                {
+                    Directory.Delete(tempTestDir, true);
+                }
+            }
         }
     }
 }

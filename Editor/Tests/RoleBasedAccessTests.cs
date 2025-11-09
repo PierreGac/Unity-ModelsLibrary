@@ -154,9 +154,9 @@ namespace ModelLibrary.Editor.Tests
             Assert.AreEqual(0, (int)UserRole.Developer, "Developer should be enum value 0");
             Assert.AreEqual(1, (int)UserRole.Artist, "Artist should be enum value 1");
 
-            // Verify enum has exactly 2 values
+            // Verify enum has exactly 3 values (Developer, Artist, Admin)
             UserRole[] allRoles = (UserRole[])Enum.GetValues(typeof(UserRole));
-            Assert.AreEqual(2, allRoles.Length, "Should have exactly 2 roles defined");
+            Assert.AreEqual(3, allRoles.Length, "Should have exactly 3 roles defined (Developer, Artist, Admin)");
         }
     }
 }
