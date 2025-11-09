@@ -105,6 +105,17 @@ namespace ModelLibrary.Editor.Windows
             InitializeServices();
         }
 
+        /// <summary>
+        /// Refreshes the index cache and manifest cache to show newly submitted models.
+        /// Can be called from other windows (e.g., ModelSubmitWindow) after submission.
+        /// </summary>
+        public void RefreshIndex()
+        {
+            _indexCache = null;
+            _ = LoadIndexAsync();
+            _ = RefreshManifestCacheAsync();
+        }
+
         private void DrawConfigurationRequired()
         {
             EditorGUILayout.HelpBox("Model Library needs to be configured before use.", MessageType.Warning);

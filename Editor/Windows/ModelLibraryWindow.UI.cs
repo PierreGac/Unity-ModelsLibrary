@@ -322,7 +322,7 @@ namespace ModelLibrary.Editor.Windows
                             bulkMenu.AddItem(new GUIContent("Tags/Bulk Tag Editor..."), false, () => OpenBulkTagWindow());
                         }
                     }
-                    
+
                     // Add batch upload option for Artists
                     SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
                     if (identityProvider.GetUserRole() == UserRole.Artist)
@@ -330,7 +330,7 @@ namespace ModelLibrary.Editor.Windows
                         bulkMenu.AddSeparator(string.Empty);
                         bulkMenu.AddItem(new GUIContent("Batch Upload...", "Upload multiple models from a directory structure"), false, () => BatchUploadWindow.Open());
                     }
-                    
+
                     bulkMenu.ShowAsContext();
                 }
                 SimpleUserIdentityProvider roleProvider = new SimpleUserIdentityProvider();
@@ -347,14 +347,14 @@ namespace ModelLibrary.Editor.Windows
                     settingsMenu.AddSeparator(string.Empty);
                     settingsMenu.AddItem(new GUIContent("Error Log Viewer", "Review recent errors and clear suppressions"), false, () => ErrorLogViewerWindow.Open());
                     settingsMenu.AddItem(new GUIContent("Performance Profiler", "View async operation performance metrics"), false, () => PerformanceProfilerWindow.Open());
-                    
+
                     // Add analytics option for Admin and Artist roles
                     if (currentRole == UserRole.Admin || currentRole == UserRole.Artist)
                     {
                         settingsMenu.AddSeparator(string.Empty);
                         settingsMenu.AddItem(new GUIContent("Analytics", "View model usage statistics and reports"), false, () => AnalyticsWindow.Open());
                     }
-                    
+
                     settingsMenu.AddSeparator(string.Empty);
                     settingsMenu.AddItem(new GUIContent("Configuration Wizard", "Run the guided setup workflow"), false, () => FirstRunWizard.MaybeShow());
                     settingsMenu.ShowAsContext();

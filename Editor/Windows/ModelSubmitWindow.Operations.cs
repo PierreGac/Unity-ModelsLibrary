@@ -383,6 +383,21 @@ namespace ModelLibrary.Editor.Windows
                 ShowNotification("Submitted", $"Uploaded to: {remoteRel}");
                 Debug.Log($"Model submitted successfully: {remoteRel}");
 
+                // Refresh all open ModelLibraryWindow instances to show the new model
+                EditorApplication.delayCall += () =>
+                {
+                    ModelLibraryWindow[] openWindows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
+                    for (int i = 0; i < openWindows.Length; i++)
+                    {
+                        ModelLibraryWindow window = openWindows[i];
+                        if (window != null)
+                        {
+                            // Refresh index and manifest cache to show the newly submitted model
+                            window.RefreshIndex();
+                        }
+                    }
+                };
+
                 if (_mode == SubmitMode.Update)
                 {
                     _version = SuggestNextVersion(meta.version);
