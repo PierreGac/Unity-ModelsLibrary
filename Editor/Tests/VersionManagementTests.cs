@@ -51,8 +51,8 @@ namespace ModelLibrary.Editor.Tests
                     version = version2
                 };
 
-                File.WriteAllText(Path.Combine(version1Dir, "modelLibrary.meta.json"), JsonUtility.ToJson(meta1));
-                File.WriteAllText(Path.Combine(version2Dir, "modelLibrary.meta.json"), JsonUtility.ToJson(meta2));
+                File.WriteAllText(Path.Combine(version1Dir, ".modelLibrary.meta.json"), JsonUtility.ToJson(meta1));
+                File.WriteAllText(Path.Combine(version2Dir, ".modelLibrary.meta.json"), JsonUtility.ToJson(meta2));
 
                 // Create index
                 ModelIndex index = new ModelIndex
@@ -77,8 +77,8 @@ namespace ModelLibrary.Editor.Tests
                 // Verify versions exist before deletion
                 Assert.IsTrue(Directory.Exists(version1Dir), "Version 1 directory should exist");
                 Assert.IsTrue(Directory.Exists(version2Dir), "Version 2 directory should exist");
-                Assert.IsTrue(File.Exists(Path.Combine(version1Dir, "modelLibrary.meta.json")), "Version 1 metadata should exist");
-                Assert.IsTrue(File.Exists(Path.Combine(version2Dir, "modelLibrary.meta.json")), "Version 2 metadata should exist");
+                Assert.IsTrue(File.Exists(Path.Combine(version1Dir, ".modelLibrary.meta.json")), "Version 1 metadata should exist");
+                Assert.IsTrue(File.Exists(Path.Combine(version2Dir, ".modelLibrary.meta.json")), "Version 2 metadata should exist");
 
                 // Test deletion workflow validation
                 // Note: Actual deletion requires user confirmation, so we test the validation logic

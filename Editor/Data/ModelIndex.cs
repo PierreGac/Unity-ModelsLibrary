@@ -87,6 +87,12 @@ namespace ModelLibrary.Data
             }
             return null;
         }
+
+        /// <summary>
+        /// Optional map of model ID to known version list (if the repository includes historical versions in index).
+        /// This field may be empty when only the latest version is tracked.
+        /// </summary>
+        public Dictionary<string, List<string>> versions = new Dictionary<string, List<string>>();
     }
 }
 

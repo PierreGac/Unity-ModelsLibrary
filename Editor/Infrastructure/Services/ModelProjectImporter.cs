@@ -136,11 +136,19 @@ namespace ModelLibrary.Editor.Services
             }
 
             // Persist manifest for local version tracking
-            string manifestPath = Path.Combine(destAbs, "modelLibrary.meta.json");
+            // Use dot prefix to hide from Unity Project window
+            string manifestPath = Path.Combine(destAbs, ".modelLibrary.meta.json");
             File.WriteAllText(manifestPath, JsonUtil.ToJson(meta));
 
             // Refresh to register new files
             AssetDatabase.Refresh();
+
+            // Get the relative path for Unity (convert absolute to relative)
+            // File is already created with dot prefix, so it's already hidden
+            string manifestRelativePath = destRel + "/.modelLibrary.meta.json";
+            manifestRelativePath = PathUtils.SanitizePathSeparator(manifestRelativePath);
+
+            Debug.Log($"[ModelProjectImporter] Created hidden manifest file: {manifestRelativePath}");
 
             // Check for GUID conflicts after import (only for new imports, not updates)
             if (!isUpdate)
@@ -390,27 +398,57 @@ namespace ModelLibrary.Editor.Services
                 // Only show conflict dialog for actual conflicts (different models), not same-model GUIDs
                 if (conflictingGuids.Count > 0)
                 {
-                    string conflictMessage = $"GUID conflicts detected for model '{meta.identity.name}':\n";
-                    foreach (string guid in conflictingGuids)
+                    string conflictMessage = $"GUID conflicts detected for model '{meta.identity.name}':\n\n";
+                    int shownCount = 0;
+                    foreach (string guid in conflictingGuids.Take(5))
                     {
                         string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                        conflictMessage += $"• {guid} -> {assetPath}\n";
+                        string fileName = Path.GetFileName(assetPath);
+                        conflictMessage += $"• {fileName} ({guid})\n  → {assetPath}\n";
+                        shownCount++;
                     }
-                    conflictMessage += "\nThis may cause issues with asset references. Consider regenerating GUIDs for the imported model.";
+                    if (conflictingGuids.Count > 5)
+                    {
+                        conflictMessage += $"... and {conflictingGuids.Count - 5} more conflicts\n";
+                    }
+                    conflictMessage += "\nThis may cause issues with asset references.";
 
                     Debug.LogWarning($"[ModelProjectImporter] {conflictMessage}");
 
-                    // Show a dialog to the user
-                    bool regenerateGuids = EditorUtility.DisplayDialog(
+                    // Show improved dialog with multiple options
+                    int choice = EditorUtility.DisplayDialogComplex(
                         "GUID Conflicts Detected",
-                        conflictMessage + "\n\nWould you like to regenerate GUIDs for the imported model?",
+                        conflictMessage + "\n\nHow would you like to resolve these conflicts?",
                         "Regenerate GUIDs",
-                        "Ignore"
+                        "Keep Existing",
+                        "Cancel Import"
                     );
 
-                    if (regenerateGuids)
+                    if (choice == 0) // Regenerate GUIDs
                     {
                         await RegenerateGuidsForImportedModelAsync(destAbs);
+                        Debug.Log($"[ModelProjectImporter] Regenerated GUIDs for {conflictingGuids.Count} conflicting assets.");
+                    }
+                    else if (choice == 1) // Keep Existing
+                    {
+                        Debug.Log($"[ModelProjectImporter] Keeping existing assets with conflicting GUIDs. Imported model may have broken references.");
+                    }
+                    else // Cancel Import (choice == 2)
+                    {
+                        // Clean up the import
+                        if (Directory.Exists(destAbs))
+                        {
+                            try
+                            {
+                                Directory.Delete(destAbs, true);
+                                AssetDatabase.Refresh();
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.LogError($"[ModelProjectImporter] Failed to clean up cancelled import: {ex.Message}");
+                            }
+                        }
+                        throw new Exception("Import cancelled due to GUID conflicts.");
                     }
                 }
                 else if (sameModelGuids.Count > 0)

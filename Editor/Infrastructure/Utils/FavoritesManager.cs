@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -35,10 +35,7 @@ namespace ModelLibrary.Editor.Utils
         /// </summary>
         /// <param name="modelId">The model ID to check.</param>
         /// <returns>True if the model is favorited, false otherwise.</returns>
-        public bool IsFavorite(string modelId)
-        {
-            return _favorites.Contains(modelId);
-        }
+        public bool IsFavorite(string modelId) => _favorites.Contains(modelId);
 
         /// <summary>
         /// Loads favorites from EditorPrefs.

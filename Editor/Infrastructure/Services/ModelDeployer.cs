@@ -621,7 +621,10 @@ namespace ModelLibrary.Editor.Services
 
             // Images are not in project necessarily; skip here (handled by Submit window which copies them first)
             // Write meta.json to the folder for debugging
-            File.WriteAllText(Path.Combine(destinationAbsoluteFolder, ModelMeta.MODEL_JSON), JsonUtility.ToJson(meta, true));
+            // Use dot prefix to hide from Unity Project window
+            string jsonPath = Path.Combine(destinationAbsoluteFolder, "." + ModelMeta.MODEL_JSON);
+            File.WriteAllText(jsonPath, JsonUtility.ToJson(meta, true));
+
             return await Task.FromResult(destinationAbsoluteFolder);
         }
     }

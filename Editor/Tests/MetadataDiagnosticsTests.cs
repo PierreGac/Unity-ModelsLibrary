@@ -16,7 +16,22 @@ namespace ModelLibrary.Editor.Tests
         public void TestManifestFileDetection()
         {
             // Test that we can find manifest files in the project
-            string[] manifestFiles = UnityEditor.AssetDatabase.FindAssets("modelLibrary.meta");
+            // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
+            // Unity doesn't import files starting with dot, so they're not in the AssetDatabase
+            System.Collections.Generic.List<string> manifestPaths = new System.Collections.Generic.List<string>();
+            
+            // Search for new naming convention (.modelLibrary.meta.json) first, then old naming for backward compatibility
+            foreach (string manifestPath in System.IO.Directory.EnumerateFiles("Assets", ".modelLibrary.meta.json", System.IO.SearchOption.AllDirectories))
+            {
+                manifestPaths.Add(manifestPath);
+            }
+            // Fallback for old files created before the naming change
+            foreach (string manifestPath in System.IO.Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", System.IO.SearchOption.AllDirectories))
+            {
+                manifestPaths.Add(manifestPath);
+            }
+            
+            string[] manifestFiles = manifestPaths.ToArray();
 
             Debug.Log($"[MetadataDiagnostics] Found {manifestFiles.Length} manifest files in project");
 
@@ -27,11 +42,11 @@ namespace ModelLibrary.Editor.Tests
             }
 
             // Expect potential error messages that might be generated during file processing
-            LogAssert.Expect(LogType.Error, "[MetadataDiagnostics] Metadata has empty ID in Assets/Models/Benne/Benne.FBX/modelLibrary.meta.json");
+            LogAssert.Expect(LogType.Error, "[MetadataDiagnostics] Metadata has empty ID in Assets/Models/Benne/Benne.FBX/.modelLibrary.meta.json");
 
-            foreach (string guid in manifestFiles)
+            for (int i = 0; i < manifestFiles.Length; i++)
             {
-                string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                string path = manifestFiles[i];
                 Debug.Log($"[MetadataDiagnostics] Manifest file: {path}");
 
                 // Test reading the file

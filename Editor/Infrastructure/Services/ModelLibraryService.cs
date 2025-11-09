@@ -15,279 +15,48 @@ namespace ModelLibrary.Editor.Services
     /// <summary>
     /// Facade for all model library operations.
     /// Handles reading/writing the index and model metadata, downloads, submissions, and project scanning.
+    /// Delegates to specialized services for index, metadata, preview, and scanning operations.
     /// </summary>
     public class ModelLibraryService
     {
         private readonly IModelRepository _repo;
-        private ModelIndex _indexCache;
+        private readonly ModelIndexService _indexService;
+        private readonly ModelMetadataService _metadataService;
+        private readonly ModelPreviewService _previewService;
+        private readonly ModelScanService _scanService;
         private ModelUpdateDetector _updateDetector;
-        private readonly Dictionary<string, Texture2D> _previewCache = new Dictionary<string, Texture2D>();
 
         public ModelLibraryService(IModelRepository repo)
         {
             _repo = repo;
+            _indexService = new ModelIndexService(repo);
+            _metadataService = new ModelMetadataService(repo);
+            _previewService = new ModelPreviewService(repo);
+            _scanService = new ModelScanService(_indexService, repo);
             _updateDetector = new ModelUpdateDetector(this);
         }
 
         /// <summary>
         /// Get the cached index, loading it from repository if needed.
         /// </summary>
-        public async Task<ModelIndex> GetIndexAsync()
-        {
-            _indexCache ??= await _repo.LoadIndexAsync();
-
-            return _indexCache;
-        }
+        public async Task<ModelIndex> GetIndexAsync() => await _indexService.GetIndexAsync();
 
         /// <summary>
         /// Force refresh of the index cache from the repository.
         /// </summary>
-        public async Task RefreshIndexAsync() => _indexCache = await _repo.LoadIndexAsync();
+        public async Task RefreshIndexAsync() => await _indexService.RefreshIndexAsync();
 
-        public async Task<ModelMeta> GetMetaAsync(string id, string version) => await _repo.LoadMetaAsync(id, version);
+        public async Task<ModelMeta> GetMetaAsync(string id, string version)
+            => await _metadataService.GetMetaAsync(id, version);
 
         public async Task<Texture2D> GetPreviewTextureAsync(string id, string version, string relativePath)
-        {
-            if (string.IsNullOrWhiteSpace(relativePath))
-            {
-                return null;
-            }
-
-            string key = PathUtils.SanitizePathSeparator(($"{id}/{version}/{relativePath}")).ToLowerInvariant();
-            if (_previewCache.TryGetValue(key, out Texture2D cached) && cached != null)
-            {
-                return cached;
-            }
-
-            ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
-            string cacheRoot = EditorPaths.LibraryPath(Path.Combine(settings.localCacheRoot, id, version));
-            string localPath = Path.Combine(cacheRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
-
-            if (!File.Exists(localPath))
-            {
-                string directory = Path.GetDirectoryName(localPath);
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                string repoPath = PathUtils.SanitizePathSeparator(($"{id}/{version}/{relativePath}"));
-                await _repo.DownloadFileAsync(repoPath, localPath);
-            }
-
-            if (!File.Exists(localPath))
-            {
-                return null;
-            }
-
-            byte[] data = await File.ReadAllBytesAsync(localPath);
-            Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
-            {
-                hideFlags = HideFlags.HideAndDontSave
-            };
-
-            if (!texture.LoadImage(data))
-            {
-                UnityEngine.Object.DestroyImmediate(texture);
-                return null;
-            }
-
-            texture.Apply();
-
-            _previewCache[key] = texture;
-            return texture;
-        }
+            => await _previewService.GetPreviewTextureAsync(id, version, relativePath);
 
         /// <summary>
         /// Scan current project assets by GUIDs to detect presence of models and possible updates.
         /// </summary>
         public async Task<List<(ModelIndex.Entry entry, bool hasUpdate, string localVersion)>> ScanProjectForKnownModelsAsync()
-        {
-            ModelIndex index = await GetIndexAsync();
-            // Gather all asset GUIDs present in project
-            string[] allGuids = UnityEditor.AssetDatabase.FindAssets(string.Empty);
-            HashSet<string> guidSet = new HashSet<string>(allGuids);
-
-            List<(ModelIndex.Entry, bool, string)> results = new List<(ModelIndex.Entry, bool, string)>();
-
-            foreach (ModelIndex.Entry e in index.entries)
-            {
-                // All models are visible (no project restrictions)
-
-                // Try to find the actual local version by looking for modelLibrary.meta.json files
-                string foundLocalVersion = await FindLocalVersionAsync(e.id);
-
-                // If no local version found via manifest files, try GUID-based detection as fallback
-                if (string.IsNullOrEmpty(foundLocalVersion))
-                {
-                    foundLocalVersion = await FindLocalVersionByGuidsAsync(e.id, guidSet);
-                }
-
-                bool hasUpdate = false;
-                if (!string.IsNullOrEmpty(foundLocalVersion))
-                {
-                    if (SemVer.TryParse(foundLocalVersion, out SemVer local) && SemVer.TryParse(e.latestVersion, out SemVer remote))
-                    {
-                        hasUpdate = remote.CompareTo(local) > 0;
-                    }
-                }
-
-                results.Add((e, hasUpdate, foundLocalVersion));
-            }
-
-            return results;
-        }
-
-        /// <summary>
-        /// Finds the local version of a model by scanning for manifest files (modelLibrary.meta.json).
-        /// This is the primary method for local version detection, providing accurate version information.
-        /// Searches the entire Assets folder for manifest files and matches them by model ID.
-        /// </summary>
-        /// <param name="modelId">The unique identifier of the model to find.</param>
-        /// <returns>The local version string if found, null otherwise.</returns>
-        private async Task<string> FindLocalVersionAsync(string modelId)
-        {
-            try
-            {
-                // Look for modelLibrary.meta.json files in the project
-                string[] manifestFiles = UnityEditor.AssetDatabase.FindAssets("modelLibrary.meta");
-
-                foreach (string guid in manifestFiles)
-                {
-                    string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
-                    if (string.IsNullOrEmpty(path))
-                    {
-                        continue;
-                    }
-
-                    try
-                    {
-                        string content = await File.ReadAllTextAsync(path);
-                        if (string.IsNullOrEmpty(content))
-                        {
-                            Debug.LogWarning($"[ModelLibraryService] Manifest file {path} is empty");
-                            continue;
-                        }
-
-                        ModelMeta localMeta = JsonUtil.FromJson<ModelMeta>(content);
-                        if (localMeta == null)
-                        {
-                            Debug.LogWarning($"[ModelLibraryService] Failed to parse manifest file {path} - JSON deserialization returned null");
-                            continue;
-                        }
-
-                        if (localMeta.identity == null)
-                        {
-                            Debug.LogWarning($"[ModelLibraryService] Manifest file {path} has null identity");
-                            continue;
-                        }
-
-                        if (string.IsNullOrEmpty(localMeta.identity.id))
-                        {
-                            Debug.LogWarning($"[ModelLibraryService] Manifest file {path} has empty model ID");
-                            continue;
-                        }
-
-                        if (string.IsNullOrEmpty(localMeta.version))
-                        {
-                            Debug.LogWarning($"[ModelLibraryService] Manifest file {path} has empty version for model {localMeta.identity.id}");
-                            continue;
-                        }
-
-                        // Check if this manifest belongs to the model we're looking for
-                        if (localMeta.identity.id == modelId)
-                        {
-                            Debug.Log($"[ModelLibraryService] Found local version {localMeta.version} for model {modelId} at {path}");
-                            return localMeta.version;
-                        }
-                        else
-                        {
-                            Debug.Log($"[ModelLibraryService] Manifest file {path} belongs to model {localMeta.identity.id}, not {modelId}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogError($"[ModelLibraryService] Failed to read manifest file {path}: {ex.Message}\n{ex.StackTrace}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[ModelLibraryService] Error scanning for local versions of {modelId}: {ex.Message}");
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Finds the local version of a model by matching asset GUIDs from metadata against project GUIDs.
-        /// This is a fallback method when manifest files are not available.
-        /// Note: This method can only detect the latest version, not intermediate versions.
-        /// </summary>
-        /// <param name="modelId">The unique identifier of the model to find.</param>
-        /// <param name="projectGuids">Set of all asset GUIDs currently in the Unity project.</param>
-        /// <returns>The detected local version (typically the latest version), or null if not found.</returns>
-        private async Task<string> FindLocalVersionByGuidsAsync(string modelId, HashSet<string> projectGuids)
-        {
-            try
-            {
-                // Get the model index to find available versions
-                ModelIndex index = await GetIndexAsync();
-                ModelIndex.Entry entry = index.Get(modelId);
-                if (entry == null)
-                {
-                    return null;
-                }
-
-                // For now, we'll check the latest version since we don't have a versions list
-                // In a more complete implementation, we'd need to query the repository for all available versions
-                try
-                {
-                    ModelMeta meta = await _repo.LoadMetaAsync(modelId, entry.latestVersion);
-                    if (meta == null)
-                    {
-                        Debug.LogWarning($"[ModelLibraryService] Failed to load metadata for model {modelId} version {entry.latestVersion}");
-                        return null;
-                    }
-
-                    if (meta.assetGuids == null || meta.assetGuids.Count == 0)
-                    {
-                        Debug.LogWarning($"[ModelLibraryService] Model {modelId} version {entry.latestVersion} has no asset GUIDs");
-                        return null;
-                    }
-
-                    // Check if any GUIDs from this version exist in the project
-                    List<string> foundGuids = new List<string>();
-                    foreach (string guid in meta.assetGuids)
-                    {
-                        if (projectGuids.Contains(guid))
-                        {
-                            foundGuids.Add(guid);
-                        }
-                    }
-
-                    if (foundGuids.Count > 0)
-                    {
-                        Debug.Log($"[ModelLibraryService] Found local version {entry.latestVersion} for model {modelId} via GUID detection. Found {foundGuids.Count}/{meta.assetGuids.Count} GUIDs: {string.Join(", ", foundGuids.Take(3))}{(foundGuids.Count > 3 ? "..." : "")}");
-                        return entry.latestVersion;
-                    }
-                    else
-                    {
-                        Debug.Log($"[ModelLibraryService] Model {modelId} version {entry.latestVersion} has {meta.assetGuids.Count} GUIDs but none found in project");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"[ModelLibraryService] Error checking GUIDs for model {modelId}: {ex.Message}\n{ex.StackTrace}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[ModelLibraryService] Error in GUID-based version detection for {modelId}: {ex.Message}");
-            }
-
-            return null;
-        }
+            => await _scanService.ScanProjectForKnownModelsAsync();
 
         /// <summary>
         /// Get all models with available updates.
@@ -318,6 +87,15 @@ namespace ModelLibrary.Editor.Services
         /// </summary>
         public async Task RefreshAllUpdatesAsync()
             => await _updateDetector.RefreshAllUpdatesAsync();
+
+        /// <summary>
+        /// Enumerates all available versions for a specific model by inspecting repository contents.
+        /// Returns versions sorted in descending semantic order (latest first).
+        /// </summary>
+        /// <param name="modelId">Model identifier.</param>
+        /// <returns>List of available version strings.</returns>
+        public async Task<List<string>> GetAvailableVersionsAsync(string modelId)
+            => await _indexService.GetAvailableVersionsAsync(modelId);
 
         /// <summary>
         /// Delete a specific model version from the repository.
@@ -370,7 +148,8 @@ namespace ModelLibrary.Editor.Services
             Directory.CreateDirectory(cacheRoot);
 
             // Save meta too (for quick access)
-            string localMetaPath = Path.Combine(cacheRoot, ModelMeta.MODEL_JSON);
+            // Use dot prefix to hide from Unity Project window
+            string localMetaPath = Path.Combine(cacheRoot, "." + ModelMeta.MODEL_JSON);
             File.WriteAllText(localMetaPath, JsonUtil.ToJson(meta));
 
             // Pull all files present in the repository under id/version (payload, deps, images, etc.)
@@ -463,116 +242,9 @@ namespace ModelLibrary.Editor.Services
         /// <returns>The updated ModelMeta with the new version number.</returns>
         public async Task<ModelMeta> PublishMetadataUpdateAsync(ModelMeta updatedMeta, string baseVersion, string changeSummary, string author, Func<SemVer, SemVer> bumpStrategy = null)
         {
-            if (updatedMeta == null)
-            {
-                throw new ArgumentNullException(nameof(updatedMeta));
-            }
-
-            if (updatedMeta.identity == null || string.IsNullOrWhiteSpace(updatedMeta.identity.id))
-            {
-                throw new InvalidOperationException("Model identity required for metadata update.");
-            }
-
-            string sourceVersion = string.IsNullOrWhiteSpace(baseVersion) ? updatedMeta.version : baseVersion;
-            if (string.IsNullOrWhiteSpace(sourceVersion))
-            {
-                throw new InvalidOperationException("Base version required for metadata update.");
-            }
-
-            if (!SemVer.TryParse(sourceVersion, out SemVer parsedSource))
-            {
-                throw new InvalidOperationException($"Invalid base version '{sourceVersion}'.");
-            }
-
-            SemVer bumped = bumpStrategy != null ? bumpStrategy(parsedSource) : new SemVer(parsedSource.major, parsedSource.minor, parsedSource.patch + 1);
-            string newVersion = bumped.ToString();
-
-            long nowUtc = DateTime.Now.Ticks;
-            if (updatedMeta.createdTimeTicks <= 0)
-            {
-                updatedMeta.createdTimeTicks = nowUtc;
-            }
-            updatedMeta.updatedTimeTicks = nowUtc;
-            updatedMeta.version = newVersion;
-
-            string resolvedAuthor = string.IsNullOrWhiteSpace(author) ? "unknown" : author;
-            if (string.IsNullOrWhiteSpace(updatedMeta.author))
-            {
-                updatedMeta.author = resolvedAuthor;
-            }
-
-            EnsureChangelogEntry(updatedMeta, string.IsNullOrWhiteSpace(changeSummary) ? "Metadata updated" : changeSummary, resolvedAuthor, newVersion, nowUtc);
-
-            await CloneVersionFilesAsync(updatedMeta.identity.id, sourceVersion, newVersion);
-            await _repo.SaveMetaAsync(updatedMeta.identity.id, newVersion, updatedMeta);
-            await UpdateIndexWithLatestMetaAsync(updatedMeta);
-            return updatedMeta;
-        }
-
-        /// <summary>
-        /// Clones all files from a source version to a target version in the repository.
-        /// Used when creating metadata-only updates - copies all payload and image files to the new version.
-        /// Downloads files to a temporary location, then uploads them to the new version path.
-        /// </summary>
-        /// <param name="modelId">The unique identifier of the model.</param>
-        /// <param name="sourceVersion">The version to clone files from.</param>
-        /// <param name="targetVersion">The new version to clone files to.</param>
-        private async Task CloneVersionFilesAsync(string modelId, string sourceVersion, string targetVersion)
-        {
-            if (string.Equals(sourceVersion, targetVersion, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            string sourceRootRel = $"{modelId}/{sourceVersion}".Replace('\\', '/');
-            string targetRootRel = $"{modelId}/{targetVersion}".Replace('\\', '/');
-
-            await _repo.EnsureDirectoryAsync(targetRootRel);
-
-            List<string> files = await _repo.ListFilesAsync(sourceRootRel) ?? new List<string>();
-            if (files.Count == 0)
-            {
-                return;
-            }
-
-            string prefix = sourceRootRel.TrimEnd('/') + "/";
-            string tempRoot = Path.Combine(Path.GetTempPath(), "ModelClone_" + Guid.NewGuid().ToString("N"));
-            try
-            {
-                foreach (string repoRel in files)
-                {
-                    string normalized = PathUtils.SanitizePathSeparator(repoRel);
-                    if (!normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    string subRel = normalized[prefix.Length..];
-                    if (string.Equals(subRel, ModelMeta.MODEL_JSON, StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    string tempPath = Path.Combine(tempRoot, subRel.Replace('/', Path.DirectorySeparatorChar));
-                    Directory.CreateDirectory(Path.GetDirectoryName(tempPath) ?? tempRoot);
-                    await _repo.DownloadFileAsync(normalized, tempPath);
-                    await _repo.UploadFileAsync($"{targetRootRel}/{subRel}", tempPath);
-                }
-            }
-            finally
-            {
-                try
-                {
-                    if (Directory.Exists(tempRoot))
-                    {
-                        Directory.Delete(tempRoot, true);
-                    }
-                }
-                catch
-                {
-                    // Best effort cleanup
-                }
-            }
+            ModelMeta result = await _metadataService.PublishMetadataUpdateAsync(updatedMeta, baseVersion, changeSummary, author, bumpStrategy);
+            await _indexService.UpdateIndexWithLatestMetaAsync(result);
+            return result;
         }
 
         /// <summary>
@@ -583,52 +255,7 @@ namespace ModelLibrary.Editor.Services
         /// </summary>
         /// <param name="meta">Model metadata containing the latest version information.</param>
         private async Task UpdateIndexWithLatestMetaAsync(ModelMeta meta)
-        {
-            ModelIndex index = await GetIndexAsync();
-            ModelIndex.Entry entry = index.Get(meta.identity.id);
-            long timestamp = meta.updatedTimeTicks <= 0 ? DateTime.Now.Ticks : meta.updatedTimeTicks;
-            long releaseTimestamp = meta.uploadTimeTicks <= 0 ? timestamp : meta.uploadTimeTicks;
-            List<string> tags = meta.tags != null && meta.tags.values != null ? new List<string>(meta.tags.values) : new List<string>();
-
-            if (entry == null)
-            {
-                // Create a new index entry for this model
-                entry = new ModelIndex.Entry
-                {
-                    id = meta.identity.id,
-                    name = meta.identity.name,
-                    description = meta.description,
-                    latestVersion = meta.version,
-                    updatedTimeTicks = timestamp,
-                    releaseTimeTicks = releaseTimestamp,
-                    tags = tags,
-                };
-                index.entries.Add(entry);
-            }
-            else
-            {
-                // Update existing entry - only update latest version if new version is >= current
-                bool shouldUpdateVersion = true;
-                if (!string.IsNullOrEmpty(entry.latestVersion) && SemVer.TryParse(entry.latestVersion, out SemVer existing) && SemVer.TryParse(meta.version, out SemVer incoming))
-                {
-                    shouldUpdateVersion = incoming.CompareTo(existing) >= 0;
-                }
-
-                if (shouldUpdateVersion)
-                {
-                    entry.latestVersion = meta.version;
-                    entry.releaseTimeTicks = releaseTimestamp;
-                }
-                // Always update other fields (name, description, tags, timestamps)
-                entry.name = meta.identity.name;
-                entry.description = meta.description;
-                entry.updatedTimeTicks = timestamp;
-                entry.tags = tags;
-            }
-
-            await _repo.SaveIndexAsync(index);
-            _indexCache = index; // Update cache to reflect changes
-        }
+            => await _indexService.UpdateIndexWithLatestMetaAsync(meta);
 
         /// <summary>
         /// Ensures a changelog entry exists for the specified version in the model metadata.
@@ -666,7 +293,6 @@ namespace ModelLibrary.Editor.Services
                 existing.timestamp = sanitizedTimestamp;
             }
         }
-
     }
 }
 

@@ -20,7 +20,6 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>Current user role value from the form.</summary>
         private UserRole _role;
 
-        [MenuItem("Tools/Model Library/User Settings")]
         public static void Open()
         {
             UserSettingsWindow w = GetWindow<UserSettingsWindow>("User Settings");

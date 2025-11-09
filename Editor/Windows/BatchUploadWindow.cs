@@ -34,10 +34,9 @@ namespace ModelLibrary.Editor.Windows
         private BatchUploadService _batchService;
 
         /// <summary>
-        /// Menu item to open the batch upload window.
+        /// Opens the batch upload window.
         /// Checks user role and only allows Artists to access batch upload functionality.
         /// </summary>
-        [MenuItem("Tools/Model Library/Batch Upload", false, 1001)]
         public static void Open()
         {
             // Only allow Artists to use batch upload
@@ -52,19 +51,6 @@ namespace ModelLibrary.Editor.Windows
 
             BatchUploadWindow w = GetWindow<BatchUploadWindow>("Batch Upload");
             w.Show();
-        }
-
-        /// <summary>
-        /// Validation method for the batch upload menu item.
-        /// Only enables the menu item for users with the Artist role.
-        /// </summary>
-        /// <returns>True if the user is an Artist, false otherwise.</returns>
-        [MenuItem("Tools/Model Library/Batch Upload", true, 1001)]
-        public static bool ValidateBatchUpload()
-        {
-            // Only show menu item for Artists
-            SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            return identityProvider.GetUserRole() == UserRole.Artist;
         }
 
         private void OnEnable()

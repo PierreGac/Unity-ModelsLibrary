@@ -1,3 +1,4 @@
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -126,7 +127,7 @@ namespace ModelLibrary.Editor
 
             // Open Model Library window and focus on the model
             ModelLibraryWindow.Open();
-            ModelLibraryWindow window = UnityEditor.EditorWindow.GetWindow<ModelLibraryWindow>();
+            ModelLibraryWindow window = EditorWindow.GetWindow<ModelLibraryWindow>();
             _ = FocusModelInLibraryAsync(window, modelId);
         }
 
@@ -175,10 +176,7 @@ namespace ModelLibrary.Editor
         /// Validation method for check updates menu item.
         /// </summary>
         [MenuItem("Assets/Model Library/Check for Updates", true, 1002)]
-        public static bool ValidateCheckModelForUpdates()
-        {
-            return ValidateOpenModelInLibrary();
-        }
+        public static bool ValidateCheckModelForUpdates() => ValidateOpenModelInLibrary();
 
         /// <summary>
         /// Right-click context menu item to view model details.
@@ -210,10 +208,7 @@ namespace ModelLibrary.Editor
         /// Validation method for view details menu item.
         /// </summary>
         [MenuItem("Assets/Model Library/View Details", true, 1003)]
-        public static bool ValidateViewModelDetails()
-        {
-            return ValidateOpenModelInLibrary();
-        }
+        public static bool ValidateViewModelDetails() => ValidateOpenModelInLibrary();
 
         /// <summary>
         /// Finds the model ID for a given asset GUID by scanning manifest files.
@@ -226,10 +221,24 @@ namespace ModelLibrary.Editor
             }
 
             // Search for manifest files in the project
-            string[] manifestGuids = AssetDatabase.FindAssets("modelLibrary.meta");
-            foreach (string manifestGuid in manifestGuids)
+            // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
+            // Unity doesn't import files starting with dot, so they're not in the AssetDatabase
+            List<string> manifestPaths = new List<string>();
+            
+            // Search for new naming convention (.modelLibrary.meta.json) first, then old naming for backward compatibility
+            foreach (string manifestPath in Directory.EnumerateFiles("Assets", ".modelLibrary.meta.json", SearchOption.AllDirectories))
             {
-                string manifestPath = AssetDatabase.GUIDToAssetPath(manifestGuid);
+                manifestPaths.Add(manifestPath);
+            }
+            // Fallback for old files created before the naming change
+            foreach (string manifestPath in Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", SearchOption.AllDirectories))
+            {
+                manifestPaths.Add(manifestPath);
+            }
+            
+            for (int i = 0; i < manifestPaths.Count; i++)
+            {
+                string manifestPath = manifestPaths[i];
                 if (string.IsNullOrEmpty(manifestPath))
                 {
                     continue;
@@ -265,10 +274,24 @@ namespace ModelLibrary.Editor
             }
 
             // Search for manifest files in the project
-            string[] manifestGuids = AssetDatabase.FindAssets("modelLibrary.meta");
-            foreach (string manifestGuid in manifestGuids)
+            // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
+            // Unity doesn't import files starting with dot, so they're not in the AssetDatabase
+            List<string> manifestPaths = new List<string>();
+            
+            // Search for new naming convention (.modelLibrary.meta.json) first, then old naming for backward compatibility
+            foreach (string manifestPath in Directory.EnumerateFiles("Assets", ".modelLibrary.meta.json", SearchOption.AllDirectories))
             {
-                string manifestPath = AssetDatabase.GUIDToAssetPath(manifestGuid);
+                manifestPaths.Add(manifestPath);
+            }
+            // Fallback for old files created before the naming change
+            foreach (string manifestPath in Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", SearchOption.AllDirectories))
+            {
+                manifestPaths.Add(manifestPath);
+            }
+            
+            for (int i = 0; i < manifestPaths.Count; i++)
+            {
+                string manifestPath = manifestPaths[i];
                 if (string.IsNullOrEmpty(manifestPath))
                 {
                     continue;

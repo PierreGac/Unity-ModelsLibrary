@@ -19,10 +19,12 @@ namespace ModelLibrary.Editor.Utils
         private readonly Camera _cam;
         /// <summary>Directional light for illuminating the preview scene.</summary>
         private Light _light;
+        /// <summary>Reflection probe for adding reflections to the preview.</summary>
+        private ReflectionProbe _reflectionProbe;
 
         /// <summary>
         /// Initializes a new PreviewUtility3D instance.
-        /// Sets up the preview render utility with a camera and directional light.
+        /// Sets up the preview render utility with a camera, directional light, and reflection probe.
         /// </summary>
         public PreviewUtility3D()
         {
@@ -42,6 +44,42 @@ namespace ModelLibrary.Editor.Utils
             _light.intensity = 1.0f;
             _light.color = Color.white;
             _light.shadows = LightShadows.None;
+
+            // Add reflection probe for reflections
+            GameObject probeObj = new GameObject("ReflectionProbe");
+            probeObj.transform.SetParent(_root.transform);
+            probeObj.transform.position = Vector3.zero;
+            _reflectionProbe = probeObj.AddComponent<ReflectionProbe>();
+            _reflectionProbe.mode = UnityEngine.Rendering.ReflectionProbeMode.Realtime;
+            _reflectionProbe.resolution = 128; // Lower resolution for performance
+            _reflectionProbe.boxProjection = false;
+            _reflectionProbe.intensity = 1.0f;
+            _reflectionProbe.size = new Vector3(100f, 100f, 100f); // Large enough to cover the preview area
+
+            // Set up a simple skybox for reflections
+            // Use Unity's default skybox or create a simple gradient skybox
+            Material skyboxMaterial = RenderSettings.skybox;
+            if (skyboxMaterial == null)
+            {
+                // Try to find a default skybox material
+                Shader skyboxShader = Shader.Find("Skybox/Procedural");
+                if (skyboxShader != null)
+                {
+                    skyboxMaterial = new Material(skyboxShader);
+                    skyboxMaterial.SetColor("_SkyTint", new Color(0.5f, 0.5f, 0.5f, 1f));
+                    skyboxMaterial.SetColor("_GroundColor", new Color(0.2f, 0.2f, 0.2f, 1f));
+                    skyboxMaterial.SetFloat("_SunSize", 0.04f);
+                    skyboxMaterial.SetFloat("_SunSizeConvergence", 5f);
+                    skyboxMaterial.SetFloat("_AtmosphereThickness", 1f);
+                    skyboxMaterial.SetColor("_SunColor", Color.white);
+                }
+            }
+
+            // Set skybox for reflections
+            if (skyboxMaterial != null)
+            {
+                RenderSettings.skybox = skyboxMaterial;
+            }
 
             // Add ambient light settings
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
@@ -109,6 +147,13 @@ namespace ModelLibrary.Editor.Utils
             _light.transform.rotation = Quaternion.Euler(30, 30, 0);
             _light.transform.position = pos + Vector3.up * 2f;
 
+            // Position reflection probe at mesh center
+            if (_reflectionProbe != null)
+            {
+                _reflectionProbe.transform.position = bounds.center;
+                _reflectionProbe.RenderProbe();
+            }
+
             // Ensure camera is properly set up
             _cam.orthographic = false;
             _cam.clearFlags = CameraClearFlags.SolidColor;
@@ -173,6 +218,13 @@ namespace ModelLibrary.Editor.Utils
             _cam.transform.LookAt(lookAt);
             _light.transform.rotation = Quaternion.Euler(30, 30, 0);
             _light.transform.position = cameraPosition + Vector3.up * 2f;
+
+            // Position reflection probe at lookAt point (mesh center)
+            if (_reflectionProbe != null)
+            {
+                _reflectionProbe.transform.position = lookAt;
+                _reflectionProbe.RenderProbe();
+            }
 
             // Ensure camera is properly set up
             _cam.orthographic = false;

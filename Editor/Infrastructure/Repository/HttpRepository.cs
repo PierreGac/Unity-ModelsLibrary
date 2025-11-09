@@ -23,7 +23,7 @@ namespace ModelLibrary.Editor.Repository
         public async Task<ModelIndex> LoadIndexAsync()
         {
             using UnityWebRequest req = UnityWebRequest.Get(Url("models_index.json"));
-            await req.SendWebRequest();
+            await AsyncProfiler.MeasureAsync("HttpRepository.LoadIndex", () => req.SendWebRequest().ToTask());
             if (req.result != UnityWebRequest.Result.Success)
             {
                 return new ModelIndex();
@@ -39,13 +39,13 @@ namespace ModelLibrary.Editor.Repository
             req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
             req.downloadHandler = new DownloadHandlerBuffer();
             req.SetRequestHeader("Content-Type", "application/json");
-            await req.SendWebRequest();
+            await AsyncProfiler.MeasureAsync("HttpRepository.SaveIndex", () => req.SendWebRequest().ToTask());
         }
 
         public async Task<ModelMeta> LoadMetaAsync(string modelId, string version)
         {
             using UnityWebRequest req = UnityWebRequest.Get(Url(modelId, version, ModelMeta.MODEL_JSON));
-            await req.SendWebRequest();
+            await AsyncProfiler.MeasureAsync("HttpRepository.LoadMeta", () => req.SendWebRequest().ToTask());
             if (req.result != UnityWebRequest.Result.Success)
             {
                 throw new IOException(req.error);
@@ -61,7 +61,7 @@ namespace ModelLibrary.Editor.Repository
             req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
             req.downloadHandler = new DownloadHandlerBuffer();
             req.SetRequestHeader("Content-Type", "application/json");
-            await req.SendWebRequest();
+            await AsyncProfiler.MeasureAsync("HttpRepository.SaveMeta", () => req.SendWebRequest().ToTask());
         }
 
         public Task<bool> DirectoryExistsAsync(string relativePath) => Task.FromResult(true); // server decides
@@ -76,7 +76,7 @@ namespace ModelLibrary.Editor.Repository
         {
             // HTTP repository deletion would require a DELETE endpoint on the server
             // This is a stub implementation - actual HTTP repos should implement DELETE /models/{modelId}/{version}
-            UnityEngine.Debug.LogWarning("[HttpRepository] DeleteVersionAsync is not implemented for HTTP repositories. Requires server-side DELETE endpoint.");
+            Debug.LogWarning("[HttpRepository] DeleteVersionAsync is not implemented for HTTP repositories. Requires server-side DELETE endpoint.");
             return Task.FromResult(false);
         }
     }

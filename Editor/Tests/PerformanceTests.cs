@@ -60,7 +60,7 @@ namespace ModelLibrary.Editor.Tests
                         tags = new Tags { values = new List<string> { "test", "performance" } }
                     };
 
-                    string metaPath = Path.Combine(modelDir, "modelLibrary.meta.json");
+                    string metaPath = Path.Combine(modelDir, ".modelLibrary.meta.json");
                     File.WriteAllText(metaPath, JsonUtility.ToJson(meta));
                 }
 
@@ -142,7 +142,7 @@ namespace ModelLibrary.Editor.Tests
                     identity = new ModelIdentity { id = modelId, name = "Benchmark Model" },
                     version = "1.0.0"
                 };
-                File.WriteAllText(Path.Combine(modelDir, "modelLibrary.meta.json"), JsonUtility.ToJson(meta));
+                File.WriteAllText(Path.Combine(modelDir, ".modelLibrary.meta.json"), JsonUtility.ToJson(meta));
 
                 ModelIndex index = new ModelIndex
                 {

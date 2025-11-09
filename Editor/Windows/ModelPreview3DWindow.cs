@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -78,10 +78,7 @@ namespace ModelLibrary.Editor.Windows
         /// Unity lifecycle method called when the window is enabled.
         /// Initializes the preview utility.
         /// </summary>
-        private void OnEnable()
-        {
-            _previewUtil = new PreviewUtility3D();
-        }
+        private void OnEnable() => _previewUtil = new PreviewUtility3D();
 
         /// <summary>
         /// Unity lifecycle method called when the window is disabled.
@@ -100,7 +97,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 if (meshInfo.mesh != null)
                 {
-                    UnityEngine.Object.DestroyImmediate(meshInfo.mesh);
+                    DestroyImmediate(meshInfo.mesh);
                 }
                 // Don't destroy materials - they're assets that will be deleted with the temp directory
             }
@@ -406,7 +403,7 @@ namespace ModelLibrary.Editor.Windows
                         if (filter.sharedMesh != null)
                         {
                             // Create a copy of the mesh to avoid issues when asset is deleted
-                            Mesh meshCopy = UnityEngine.Object.Instantiate(filter.sharedMesh);
+                            Mesh meshCopy = Instantiate(filter.sharedMesh);
 
                             // Load material directly from the imported FBX asset
                             // Materials are sub-assets of the FBX, so they're loaded with the FBX

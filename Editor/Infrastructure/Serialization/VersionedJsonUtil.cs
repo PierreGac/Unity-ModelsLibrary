@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using ModelLibrary.Data;
 using UnityEngine;
@@ -24,7 +24,7 @@ namespace ModelLibrary.Editor.Serialization
             if (string.IsNullOrEmpty(json))
             {
                 Debug.LogWarning("VersionedJsonUtil: Attempting to deserialize null or empty JSON");
-                return default(T);
+                return default;
             }
 
             try
@@ -43,7 +43,7 @@ namespace ModelLibrary.Editor.Serialization
 
             if (!migrate)
             {
-                return default(T);
+                return default;
             }
 
             // Second attempt: Try with migration for ModelMeta specifically
@@ -183,7 +183,7 @@ namespace ModelLibrary.Editor.Serialization
         /// <summary>
         /// Generic fallback deserialization for other types.
         /// </summary>
-        private static T TryDeserializeWithFallback<T>(string json) where T : class, new()
+        private static T TryDeserializeWithFallback<T>(string _) where T : class, new()
         {
             try
             {
@@ -195,7 +195,7 @@ namespace ModelLibrary.Editor.Serialization
             catch (Exception ex)
             {
                 Debug.LogError($"VersionedJsonUtil: Fallback deserialization failed for {typeof(T).Name}: {ex.Message}");
-                return default(T);
+                return default;
             }
         }
 

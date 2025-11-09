@@ -41,10 +41,7 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="json">The JSON string to parse</param>
         /// <param name="migrate">Whether to attempt migration if deserialization fails (default: true)</param>
         /// <returns>Object of type T, or default(T) if all attempts fail</returns>
-        public static T FromJsonWithMigration<T>(string json, bool migrate = true) where T : class, new()
-        {
-            return VersionedJsonUtil.FromJsonWithMigration<T>(json, migrate);
-        }
+        public static T FromJsonWithMigration<T>(string json, bool migrate = true) where T : class, new() => VersionedJsonUtil.FromJsonWithMigration<T>(json, migrate);
 
         /// <summary>
         /// Deserialize ModelMeta with automatic migration support.
@@ -52,10 +49,7 @@ namespace ModelLibrary.Editor.Utils
         /// </summary>
         /// <param name="json">The JSON string to parse</param>
         /// <returns>ModelMeta object, or null if deserialization fails</returns>
-        public static ModelMeta FromJsonModelMeta(string json)
-        {
-            return FromJsonWithMigration<ModelMeta>(json);
-        }
+        public static ModelMeta FromJsonModelMeta(string json) => FromJsonWithMigration<ModelMeta>(json);
     }
 }
 

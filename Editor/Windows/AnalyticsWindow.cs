@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using ModelLibrary.Editor.Identity;
@@ -41,7 +41,6 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Opens the analytics window.
         /// </summary>
-        [MenuItem("Tools/Model Library/Analytics", false, 200)]
         public static void Open()
         {
             // Check if user has access (Admin or Artist)
@@ -61,23 +60,9 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Validation method for the analytics menu item.
-        /// </summary>
-        [MenuItem("Tools/Model Library/Analytics", true, 200)]
-        public static bool ValidateAnalytics()
-        {
-            SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            UserRole role = identityProvider.GetUserRole();
-            return role == UserRole.Admin || role == UserRole.Artist;
-        }
-
-        /// <summary>
         /// Unity lifecycle method called when the window is enabled.
         /// </summary>
-        private void OnEnable()
-        {
-            RefreshAnalytics();
-        }
+        private void OnEnable() => RefreshAnalytics();
 
         /// <summary>
         /// Refreshes the analytics data from the analytics service.

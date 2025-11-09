@@ -105,7 +105,7 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Draws a filter summary showing total and filtered model counts.
+        /// Draws a filter summary showing total and filtered model counts with colored badges for active filters.
         /// </summary>
         /// <param name="totalCount">Total number of models in repository.</param>
         /// <param name="filteredCount">Number of models matching current filters.</param>
@@ -119,22 +119,66 @@ namespace ModelLibrary.Editor.Windows
             using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
             {
                 GUILayout.Label($"{filteredCount} of {totalCount} models", EditorStyles.boldLabel);
+                GUILayout.Space(10);
 
+                // Search badge with color
                 if (!string.IsNullOrWhiteSpace(searchQuery))
                 {
-                    GUILayout.Label($"Search: \"{searchQuery.Trim()}\"", EditorStyles.miniLabel);
+                    GUIStyle searchBadgeStyle = new GUIStyle(EditorStyles.miniLabel);
+                    searchBadgeStyle.normal.textColor = new Color(0.2f, 0.6f, 1f); // Blue
+                    searchBadgeStyle.fontStyle = FontStyle.Bold;
+                    searchBadgeStyle.padding = new RectOffset(6, 6, 2, 2);
+                    
+                    string searchText = searchQuery.Trim();
+                    if (searchText.Length > 30)
+                    {
+                        searchText = searchText.Substring(0, 27) + "...";
+                    }
+                    
+                    Color originalColor = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(0.2f, 0.6f, 1f, 0.2f); // Light blue background
+                    GUILayout.Label($"🔍 {searchText}", searchBadgeStyle);
+                    GUI.backgroundColor = originalColor;
+                    GUILayout.Space(5);
                 }
 
+                // Tags badge with color
                 if (selectedTags != null && selectedTags.Count > 0)
                 {
-                    string tagPreview = string.Join(", ", selectedTags.Take(3));
-                    if (selectedTags.Count > 3)
+                    GUIStyle tagBadgeStyle = new GUIStyle(EditorStyles.miniLabel);
+                    tagBadgeStyle.normal.textColor = new Color(0.4f, 0.8f, 0.4f); // Green
+                    tagBadgeStyle.fontStyle = FontStyle.Bold;
+                    tagBadgeStyle.padding = new RectOffset(6, 6, 2, 2);
+                    
+                    string tagPreview = string.Join(", ", selectedTags.Take(2));
+                    if (selectedTags.Count > 2)
                     {
-                        tagPreview += $" (+{selectedTags.Count - 3})";
+                        tagPreview += $" (+{selectedTags.Count - 2})";
                     }
-                    GUILayout.Label($"Tags: {tagPreview}", EditorStyles.miniLabel);
+                    
+                    Color originalColor = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(0.4f, 0.8f, 0.4f, 0.2f); // Light green background
+                    GUILayout.Label($"🏷️ {tagPreview}", tagBadgeStyle);
+                    GUI.backgroundColor = originalColor;
+                    GUILayout.Space(5);
                 }
 
+                GUIContent filterHelpContent = EditorGUIUtility.IconContent("_Help");
+                if (filterHelpContent == null || filterHelpContent.image == null)
+                {
+                    filterHelpContent = new GUIContent("Help", "Learn about filtering, tags, and presets");
+                }
+                else
+                {
+                    filterHelpContent.tooltip = "Learn about filtering, tags, and presets";
+                }
+                float helpWidth = filterHelpContent.image != null ? 22f : 45f;
+                if (GUILayout.Button(filterHelpContent, EditorStyles.miniButton, GUILayout.Width(helpWidth)))
+                {
+                    ModelLibraryHelpWindow.OpenToSection(ModelLibraryHelpWindow.HelpSection.Filtering);
+                }
+
+                GUILayout.Space(4f);
                 GUILayout.FlexibleSpace();
 
                 using (new EditorGUI.DisabledScope(!hasActiveFilters))
@@ -152,11 +196,17 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         /// <param name="hasNotes">Whether the model has feedback notes.</param>
         /// <param name="hasUpdate">Whether the model has updates available.</param>
-        public static void DrawNotificationBadges(bool hasNotes, bool hasUpdate)
+        /// <param name="notesTooltip">Optional tooltip text for notes badge showing note preview.</param>
+        public static void DrawNotificationBadges(bool hasNotes, bool hasUpdate, string notesTooltip = null)
         {
             // Draw notes badge if model has notes
             if (hasNotes)
             {
+                // Create a more prominent style for notes badge
+                GUIStyle notesBadgeStyle = new GUIStyle(GUI.skin.label);
+                notesBadgeStyle.normal.textColor = new Color(0.3f, 0.7f, 1f); // Light blue
+                notesBadgeStyle.fontStyle = FontStyle.Bold;
+                
                 // Try multiple icon names for better compatibility
                 GUIContent notesIcon = EditorGUIUtility.IconContent("console.infoicon");
                 if (notesIcon == null || notesIcon.image == null)
@@ -170,19 +220,30 @@ namespace ModelLibrary.Editor.Windows
 
                 if (notesIcon != null && notesIcon.image != null)
                 {
-                    notesIcon.tooltip = "This model has feedback notes";
-                    GUILayout.Label(notesIcon, GUILayout.Width(16), GUILayout.Height(16));
+                    notesIcon.tooltip = !string.IsNullOrEmpty(notesTooltip) ? notesTooltip : "This model has feedback notes - Click to view";
+                    // Make icon larger and more visible
+                    GUILayout.Label(notesIcon, GUILayout.Width(20), GUILayout.Height(20));
                 }
                 else
                 {
-                    // Fallback to emoji if icon not available
-                    GUILayout.Label("📝", GUILayout.Width(16), GUILayout.Height(16));
+                    // Fallback to emoji if icon not available - make it larger and colored
+                    Color originalColor = GUI.color;
+                    GUI.color = new Color(0.3f, 0.7f, 1f); // Light blue
+                    string tooltip = !string.IsNullOrEmpty(notesTooltip) ? notesTooltip : "This model has feedback notes - Click to view";
+                    GUIContent notesContent = new GUIContent("📝", tooltip);
+                    GUILayout.Label(notesContent, notesBadgeStyle, GUILayout.Width(20), GUILayout.Height(20));
+                    GUI.color = originalColor;
                 }
             }
 
             // Draw update badge if model has updates available
             if (hasUpdate)
             {
+                // Create a more prominent style for update badge
+                GUIStyle updateBadgeStyle = new GUIStyle(GUI.skin.label);
+                updateBadgeStyle.normal.textColor = Color.yellow;
+                updateBadgeStyle.fontStyle = FontStyle.Bold;
+                
                 // Try multiple icon names for better compatibility
                 GUIContent updateIcon = EditorGUIUtility.IconContent("d_Refresh");
                 if (updateIcon == null || updateIcon.image == null)
@@ -196,13 +257,17 @@ namespace ModelLibrary.Editor.Windows
 
                 if (updateIcon != null && updateIcon.image != null)
                 {
-                    updateIcon.tooltip = "Update available";
-                    GUILayout.Label(updateIcon, GUILayout.Width(16), GUILayout.Height(16));
+                    updateIcon.tooltip = "Update available - Click to view details and update";
+                    // Make icon larger and more visible
+                    GUILayout.Label(updateIcon, GUILayout.Width(20), GUILayout.Height(20));
                 }
                 else
                 {
-                    // Fallback to emoji if icon not available
-                    GUILayout.Label("🔄", GUILayout.Width(16), GUILayout.Height(16));
+                    // Fallback to emoji if icon not available - make it larger and colored
+                    Color originalColor = GUI.color;
+                    GUI.color = Color.yellow;
+                    GUILayout.Label("🔄", updateBadgeStyle, GUILayout.Width(20), GUILayout.Height(20));
+                    GUI.color = originalColor;
                 }
             }
 
@@ -222,11 +287,17 @@ namespace ModelLibrary.Editor.Windows
         {
             if (hasNotes)
             {
-                GUILayout.Label("📝", GUILayout.Width(12), GUILayout.Height(12));
+                GUILayout.Label("📝", GUILayout.Width(14), GUILayout.Height(14));
             }
             if (hasUpdate)
             {
-                GUILayout.Label("🔄", GUILayout.Width(12), GUILayout.Height(12));
+                // Make update badge more prominent in grid view
+                GUIStyle updateStyle = new GUIStyle(GUI.skin.label);
+                updateStyle.normal.textColor = Color.yellow;
+                Color originalColor = GUI.color;
+                GUI.color = Color.yellow;
+                GUILayout.Label("🔄", updateStyle, GUILayout.Width(16), GUILayout.Height(16));
+                GUI.color = originalColor;
             }
         }
     }

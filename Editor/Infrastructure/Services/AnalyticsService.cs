@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -237,10 +237,7 @@ namespace ModelLibrary.Editor.Services
         /// <summary>
         /// Clears all analytics data.
         /// </summary>
-        public static void ClearAnalytics()
-        {
-            EditorPrefs.DeleteKey(__AnalyticsPrefKey);
-        }
+        public static void ClearAnalytics() => EditorPrefs.DeleteKey(__AnalyticsPrefKey);
     }
 
     /// <summary>

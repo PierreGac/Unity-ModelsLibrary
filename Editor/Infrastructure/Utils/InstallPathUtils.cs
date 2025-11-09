@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using ModelLibrary.Editor.Utils;
@@ -85,10 +85,7 @@ namespace ModelLibrary.Editor.Utils
         /// </summary>
         /// <param name="modelName">The name of the model.</param>
         /// <returns>A default install path in the format "Assets/Models/{sanitizedModelName}".</returns>
-        public static string BuildInstallPath(string modelName)
-        {
-            return $"Assets/Models/{SanitizeFolderName(modelName)}";
-        }
+        public static string BuildInstallPath(string modelName) => $"Assets/Models/{SanitizeFolderName(modelName)}";
     }
 }
 

@@ -116,7 +116,9 @@ namespace ModelLibrary.Editor.Utils
                 for (int i = 0; i < _searchHistory.Count; i++)
                 {
                     string item = _searchHistory[i]; // Capture for closure
-                    menu.AddItem(new GUIContent(item), false, () => onItemSelected?.Invoke(item));
+                    // Show timestamp if available (for future enhancement)
+                    string menuText = item;
+                    menu.AddItem(new GUIContent(menuText), false, () => onItemSelected?.Invoke(item));
                 }
                 menu.AddSeparator("");
                 menu.AddItem(new GUIContent("Clear History"), false, () =>

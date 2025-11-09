@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEditor;
 using UnityEngine;
 
@@ -51,37 +51,18 @@ namespace ModelLibrary.Editor.Utils
                 Debug.LogError($"[ModelLibrary] {title}: {message}");
             }
 
+            // Also log to persistent error log
+            ErrorLogger.LogError(title, message, category, exception);
+
             // Build the full message with guidance
             string fullMessage = BuildErrorMessage(message, category, exception);
 
             // Show dialog with or without retry option
             if (showRetry && retryAction != null)
             {
-                int choice = EditorUtility.DisplayDialogComplex(
-                    title,
-                    fullMessage,
-                    "Retry",
-                    "OK",
-                    "Details");
-                
-                if (choice == 0) // Retry
-                {
-                    try
-                    {
-                        retryAction();
-                        return true;
-                    }
-                    catch (Exception retryEx)
-                    {
-                        ShowErrorDialog(title, $"Retry failed: {retryEx.Message}", category, retryEx, false, null);
-                    }
-                }
-                else if (choice == 2) // Details
-                {
-                    ShowDetailedErrorDialog(title, message, exception);
-                }
-                
-                return false;
+                // Use custom dialog window for better UX with retry and "don't show again"
+                Windows.ErrorDialogWindow.Show(title, fullMessage, category, exception, retryAction);
+                return false; // Custom window handles retry internally
             }
             else
             {
@@ -99,51 +80,174 @@ namespace ModelLibrary.Editor.Utils
         /// </summary>
         private static string BuildErrorMessage(string message, ErrorCategory category, Exception exception)
         {
-            string guidance = GetCategoryGuidance(category);
+            // Translate technical error messages to user-friendly language
+            string userFriendlyMessage = TranslateErrorMessage(message, exception);
             
-            string fullMessage = message;
+            string guidance = GetCategoryGuidance(category, exception);
+            
+            string fullMessage = userFriendlyMessage;
             if (!string.IsNullOrEmpty(guidance))
             {
-                fullMessage += $"\n\n{guidance}";
-            }
-
-            // Add exception details if available and relevant
-            if (exception != null && ShouldIncludeExceptionDetails(category))
-            {
-                fullMessage += $"\n\nTechnical details: {exception.GetType().Name}";
-                if (!string.IsNullOrEmpty(exception.Message) && exception.Message != message)
-                {
-                    fullMessage += $"\n{exception.Message}";
-                }
+                fullMessage += $"\n\nWhat you can try:\n{guidance}";
             }
 
             return fullMessage;
         }
 
         /// <summary>
+        /// Translates technical error messages into user-friendly language.
+        /// </summary>
+        private static string TranslateErrorMessage(string message, Exception exception)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                return "An unexpected error occurred.";
+            }
+
+            string lowerMessage = message.ToLowerInvariant();
+            string exceptionType = exception?.GetType().Name ?? "";
+
+            // Connection errors
+            if (lowerMessage.Contains("connection") || lowerMessage.Contains("timeout") || 
+                lowerMessage.Contains("unreachable") || lowerMessage.Contains("network") ||
+                exceptionType.Contains("Http") || exceptionType.Contains("Web"))
+            {
+                if (lowerMessage.Contains("timeout"))
+                {
+                    return "The connection to the repository timed out. The server may be slow or unavailable.";
+                }
+                if (lowerMessage.Contains("unreachable") || lowerMessage.Contains("could not be reached"))
+                {
+                    return "Unable to reach the repository server. Please check your network connection and repository settings.";
+                }
+                return "Unable to connect to the repository. Please verify your network connection and repository location.";
+            }
+
+            // File system errors
+            if (lowerMessage.Contains("file not found") || lowerMessage.Contains("directory not found") ||
+                exceptionType.Contains("FileNotFound") || exceptionType.Contains("DirectoryNotFound"))
+            {
+                if (lowerMessage.Contains("model") || lowerMessage.Contains("meta"))
+                {
+                    return "The model file or metadata could not be found. It may have been moved or deleted from the repository.";
+                }
+                return "A required file or folder could not be found. Please check that all files are in their expected locations.";
+            }
+
+            if (lowerMessage.Contains("access denied") || lowerMessage.Contains("permission") ||
+                exceptionType.Contains("UnauthorizedAccess"))
+            {
+                return "You don't have permission to access this file or folder. Please check file permissions or contact your administrator.";
+            }
+
+            if (lowerMessage.Contains("disk") || lowerMessage.Contains("space") || lowerMessage.Contains("full"))
+            {
+                return "There isn't enough disk space to complete this operation. Please free up some space and try again.";
+            }
+
+            if (lowerMessage.Contains("path") && (lowerMessage.Contains("invalid") || lowerMessage.Contains("too long")))
+            {
+                return "The file path is invalid or too long. Please choose a different location or shorten the path.";
+            }
+
+            // Validation errors
+            if (lowerMessage.Contains("invalid") || lowerMessage.Contains("validation") ||
+                lowerMessage.Contains("required") || lowerMessage.Contains("missing"))
+            {
+                if (lowerMessage.Contains("version") || lowerMessage.Contains("semver"))
+                {
+                    return "The version format is invalid. Please use semantic versioning (e.g., 1.0.0).";
+                }
+                if (lowerMessage.Contains("name") || lowerMessage.Contains("model name"))
+                {
+                    return "The model name is invalid or already exists. Please choose a different name.";
+                }
+                return "Some required information is missing or invalid. Please check all fields and try again.";
+            }
+
+            // Import/Download specific errors
+            if (lowerMessage.Contains("failed to download") || lowerMessage.Contains("download failed"))
+            {
+                return "The model could not be downloaded from the repository. Please check your connection and try again.";
+            }
+
+            if (lowerMessage.Contains("failed to import") || lowerMessage.Contains("import failed"))
+            {
+                return "The model could not be imported into your project. Please check for file conflicts or permission issues.";
+            }
+
+            if (lowerMessage.Contains("failed to update") || lowerMessage.Contains("update failed"))
+            {
+                return "The model could not be updated. Please check for file conflicts or permission issues.";
+            }
+
+            // Configuration errors
+            if (lowerMessage.Contains("configuration") || lowerMessage.Contains("not configured") ||
+                lowerMessage.Contains("settings"))
+            {
+                return "The Model Library is not properly configured. Please run the Configuration Wizard from the Settings menu.";
+            }
+
+            // If we can't translate it, return the original but make it more user-friendly
+            // Remove technical jargon and make it clearer
+            string cleaned = message;
+            if (cleaned.Contains("Exception:"))
+            {
+                cleaned = cleaned.Substring(0, cleaned.IndexOf("Exception:")).Trim();
+            }
+            if (string.IsNullOrWhiteSpace(cleaned))
+            {
+                cleaned = "An unexpected error occurred while performing this operation.";
+            }
+
+            return cleaned;
+        }
+
+        /// <summary>
         /// Gets category-specific guidance for the user.
         /// </summary>
-        private static string GetCategoryGuidance(ErrorCategory category)
+        private static string GetCategoryGuidance(ErrorCategory category, Exception exception = null)
         {
-            return category switch
+            string baseGuidance = category switch
             {
-                ErrorCategory.Connection => "• Check your network connection\n• Verify the repository location in settings\n• Ensure the repository server is accessible",
-                ErrorCategory.FileSystem => "• Check file permissions\n• Ensure sufficient disk space\n• Verify the file paths are valid",
-                ErrorCategory.Validation => "• Review the input data for errors\n• Check required fields are filled\n• Verify data format is correct",
-                ErrorCategory.Permission => "• Check file/folder permissions\n• Verify user role has required access\n• Contact administrator if needed",
-                ErrorCategory.Configuration => "• Run the configuration wizard\n• Check repository settings\n• Verify user settings are correct",
-                _ => "• Check the Unity Console for more details\n• Try refreshing or restarting the operation"
+                ErrorCategory.Connection => "• Check your internet connection\n• Open Settings (Ctrl+,) and verify the Repository Root path or URL\n• Try using the 'Test Connection' button in Settings\n• If using a network drive, ensure it's accessible",
+                ErrorCategory.FileSystem => "• Check that you have write permissions for the target folder\n• Ensure you have enough free disk space\n• Verify the file paths don't contain invalid characters\n• Try choosing a different installation location",
+                ErrorCategory.Validation => "• Review all form fields for errors (highlighted in red)\n• Check that required fields are filled\n• Verify data formats match the requirements (e.g., version numbers)\n• Look for inline error messages below each field",
+                ErrorCategory.Permission => "• Check file and folder permissions in Windows\n• Ensure you're not trying to write to a read-only location\n• Verify your user account has the necessary access\n• Contact your system administrator if needed",
+                ErrorCategory.Configuration => "• Open Settings (Ctrl+,) and check Repository Settings\n• Run the Configuration Wizard from the Settings menu\n• Verify the Repository Root path or URL is correct\n• Test the connection using the 'Test Connection' button",
+                _ => "• Check the Unity Console (Window > General > Console) for more details\n• Try refreshing the window (F5)\n• Restart Unity if the problem persists"
             };
+
+            // Add specific guidance based on exception details
+            if (exception != null)
+            {
+                string exceptionMessage = exception.Message?.ToLowerInvariant() ?? "";
+                
+                if (exceptionMessage.Contains("timeout"))
+                {
+                    baseGuidance += "\n• The server may be slow or overloaded - try again in a few moments";
+                }
+                else if (exceptionMessage.Contains("404") || exceptionMessage.Contains("not found"))
+                {
+                    baseGuidance += "\n• The model or file may have been removed from the repository";
+                }
+                else if (exceptionMessage.Contains("unauthorized") || exceptionMessage.Contains("401") || exceptionMessage.Contains("403"))
+                {
+                    baseGuidance += "\n• Your credentials may be incorrect or expired";
+                    baseGuidance += "\n• Check your user role settings in Settings > User Settings";
+                }
+            }
+
+            return baseGuidance;
         }
 
         /// <summary>
         /// Determines if exception details should be included in the user-facing message.
+        /// Technical details are now only shown in the "Details" dialog, not in the main message.
         /// </summary>
-        private static bool ShouldIncludeExceptionDetails(ErrorCategory category)
-        {
-            // Include details for technical errors that might be actionable
-            return category == ErrorCategory.FileSystem || category == ErrorCategory.Validation;
-        }
+        private static bool ShouldIncludeExceptionDetails(ErrorCategory category) =>
+            // Don't include technical details in the main message - they're available in the Details dialog
+            false;
 
         /// <summary>
         /// Shows a detailed error dialog with full exception information.

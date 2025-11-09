@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
@@ -178,10 +179,7 @@ namespace ModelLibrary.Editor.Repository
         /// </summary>
         /// <param name="path">Absolute path to the directory to check.</param>
         /// <returns>True if the directory exists, false otherwise.</returns>
-        private bool DirectoryExistsCached(string path)
-        {
-            return _directoryExistsCache.GetOrAdd(path, p => Directory.Exists(p));
-        }
+        private bool DirectoryExistsCached(string path) => _directoryExistsCache.GetOrAdd(path, p => Directory.Exists(p));
 
         /// <summary>
         /// Invalidates file existence cache for a specific path.
@@ -242,7 +240,7 @@ namespace ModelLibrary.Editor.Repository
             }
 
             // Read the JSON file asynchronously to avoid blocking the UI thread
-            string json = await File.ReadAllTextAsync(path);
+            string json = await AsyncProfiler.MeasureAsync("FileSystemRepository.ReadIndex", () => File.ReadAllTextAsync(path));
 
             // Parse the JSON into a ModelIndex object, or return empty if parsing fails
             return JsonUtil.FromJson<ModelIndex>(json) ?? new ModelIndex();
@@ -266,7 +264,7 @@ namespace ModelLibrary.Editor.Repository
             string json = JsonUtil.ToJson(index);
 
             // Write the JSON file asynchronously to avoid blocking the UI thread
-            await File.WriteAllTextAsync(path, json);
+            await AsyncProfiler.MeasureAsync("FileSystemRepository.WriteIndex", () => File.WriteAllTextAsync(path, json));
 
             // Invalidate cache since we just created/updated the file
             InvalidateFileCache(path);
@@ -292,7 +290,7 @@ namespace ModelLibrary.Editor.Repository
             }
 
             // Read the JSON file asynchronously
-            string json = await File.ReadAllTextAsync(path);
+            string json = await AsyncProfiler.MeasureAsync("FileSystemRepository.ReadMeta", () => File.ReadAllTextAsync(path));
 
             // Parse and return the metadata
             return JsonUtil.FromJson<ModelMeta>(json);
@@ -318,7 +316,7 @@ namespace ModelLibrary.Editor.Repository
             string json = JsonUtil.ToJson(meta);
 
             // Write the JSON file asynchronously
-            await File.WriteAllTextAsync(path, json);
+            await AsyncProfiler.MeasureAsync("FileSystemRepository.WriteMeta", () => File.WriteAllTextAsync(path, json));
 
             // Invalidate cache since we just created/updated the file
             InvalidateFileCache(path);
@@ -363,6 +361,8 @@ namespace ModelLibrary.Editor.Repository
         /// <returns>List of file paths relative to the repository root.</returns>
         public Task<List<string>> ListFilesAsync(string relativeDir)
         {
+            Stopwatch stopwatch = AsyncProfiler.Enabled ? Stopwatch.StartNew() : null;
+
             // Build the absolute path to the directory
             string abs = Join(Root, relativeDir);
             List<string> list = new List<string>();
@@ -382,6 +382,13 @@ namespace ModelLibrary.Editor.Repository
                     list.Add(rel);
                 }
             }
+
+            if (stopwatch != null)
+            {
+                stopwatch.Stop();
+                AsyncProfiler.Record("FileSystemRepository.ListFiles", stopwatch.Elapsed.TotalMilliseconds);
+            }
+
             return Task.FromResult(list);
         }
 
@@ -395,7 +402,7 @@ namespace ModelLibrary.Editor.Repository
             Directory.CreateDirectory(Path.GetDirectoryName(dst));
 
             // Copy the file asynchronously, overwriting if it already exists
-            await Task.Run(() => File.Copy(localAbsolutePath, dst, overwrite: true));
+            await AsyncProfiler.MeasureAsync("FileSystemRepository.UploadFile", () => Task.Run(() => File.Copy(localAbsolutePath, dst, overwrite: true)));
 
             // Invalidate cache since we just created/updated the file
             InvalidateFileCache(dst);
@@ -417,7 +424,7 @@ namespace ModelLibrary.Editor.Repository
             }
 
             // Copy the file asynchronously, overwriting if it already exists
-            await Task.Run(() => File.Copy(src, localAbsolutePath, overwrite: true));
+            await AsyncProfiler.MeasureAsync("FileSystemRepository.DownloadFile", () => Task.Run(() => File.Copy(src, localAbsolutePath, overwrite: true)));
         }
 
         /// <summary>
@@ -442,10 +449,10 @@ namespace ModelLibrary.Editor.Repository
             try
             {
                 // Delete the entire version directory asynchronously to avoid blocking the UI thread
-                await Task.Run(() =>
+                await AsyncProfiler.MeasureAsync("FileSystemRepository.DeleteVersion", () => Task.Run(() =>
                 {
                     Directory.Delete(normalizedVersionDir, recursive: true);
-                });
+                }));
 
                 // Invalidate caches for this path to ensure fresh data on subsequent operations
                 _directoryExistsCache.TryRemove(normalizedVersionDir, out _);

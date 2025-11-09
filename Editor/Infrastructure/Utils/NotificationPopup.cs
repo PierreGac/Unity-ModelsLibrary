@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
@@ -329,34 +329,22 @@ namespace ModelLibrary.Editor.Utils
         /// <summary>
         /// Shows a success notification.
         /// </summary>
-        public static void ShowSuccess(string title, string message, Action onClickAction = null)
-        {
-            Show(title, message, NotificationType.Success, onClickAction);
-        }
+        public static void ShowSuccess(string title, string message, Action onClickAction = null) => Show(title, message, NotificationType.Success, onClickAction);
 
         /// <summary>
         /// Shows a warning notification.
         /// </summary>
-        public static void ShowWarning(string title, string message, Action onClickAction = null)
-        {
-            Show(title, message, NotificationType.Warning, onClickAction);
-        }
+        public static void ShowWarning(string title, string message, Action onClickAction = null) => Show(title, message, NotificationType.Warning, onClickAction);
 
         /// <summary>
         /// Shows an error notification.
         /// </summary>
-        public static void ShowError(string title, string message, Action onClickAction = null)
-        {
-            Show(title, message, NotificationType.Error, onClickAction);
-        }
+        public static void ShowError(string title, string message, Action onClickAction = null) => Show(title, message, NotificationType.Error, onClickAction);
 
         /// <summary>
         /// Shows an info notification.
         /// </summary>
-        public static void ShowInfo(string title, string message, Action onClickAction = null)
-        {
-            Show(title, message, NotificationType.Info, onClickAction);
-        }
+        public static void ShowInfo(string title, string message, Action onClickAction = null) => Show(title, message, NotificationType.Info, onClickAction);
     }
 }
 
