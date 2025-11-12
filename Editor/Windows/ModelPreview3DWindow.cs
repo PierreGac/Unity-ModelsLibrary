@@ -679,7 +679,7 @@ namespace ModelLibrary.Editor.Windows
                 }
                 else if (e.type == EventType.ScrollWheel)
                 {
-                    _cameraDistance = Mathf.Clamp(_cameraDistance - e.delta.y * 0.1f, 1f, 20f);
+                    _cameraDistance = Mathf.Clamp(_cameraDistance + e.delta.y * 0.1f, 1f, 20f);
                     Repaint();
                     e.Use();
                 }
