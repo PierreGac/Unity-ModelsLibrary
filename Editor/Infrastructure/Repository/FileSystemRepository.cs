@@ -467,5 +467,61 @@ namespace ModelLibrary.Editor.Repository
                 return false;
             }
         }
+
+        /// <summary>
+        /// Deletes an entire model from the repository.
+        /// Recursively removes the entire model directory including all versions, payload files, images, and metadata.
+        /// Invalidates all relevant caches after deletion.
+        /// </summary>
+        /// <param name="modelId">The unique identifier of the model.</param>
+        /// <returns>True if the model was successfully deleted; false if it didn't exist or deletion failed.</returns>
+        public async Task<bool> DeleteModelAsync(string modelId)
+        {
+            string modelDir = Path.Combine(Root, modelId);
+            string normalizedModelDir = PathUtils.NormalizePath(modelDir);
+
+            // Check if the model directory exists
+            if (!Directory.Exists(normalizedModelDir))
+            {
+                return false; // Model doesn't exist
+            }
+
+            try
+            {
+                // Delete the entire model directory asynchronously to avoid blocking the UI thread
+                await AsyncProfiler.MeasureAsync("FileSystemRepository.DeleteModel", () => Task.Run(() =>
+                {
+                    Directory.Delete(normalizedModelDir, recursive: true);
+                }));
+
+                // Invalidate caches for this path and all subdirectories to ensure fresh data on subsequent operations
+                _directoryExistsCache.TryRemove(normalizedModelDir, out _);
+                _directoryContentsCache.TryRemove(normalizedModelDir, out _);
+                _directoryCacheTimestamps.TryRemove(normalizedModelDir, out _);
+
+                // Also invalidate any cached entries that start with the model directory path
+                var keysToRemove = new List<string>();
+                foreach (string key in _directoryExistsCache.Keys)
+                {
+                    if (key.StartsWith(normalizedModelDir, StringComparison.OrdinalIgnoreCase))
+                    {
+                        keysToRemove.Add(key);
+                    }
+                }
+                foreach (string key in keysToRemove)
+                {
+                    _directoryExistsCache.TryRemove(key, out _);
+                    _directoryContentsCache.TryRemove(key, out _);
+                    _directoryCacheTimestamps.TryRemove(key, out _);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError($"[FileSystemRepository] Failed to delete model {modelId}: {ex.Message}");
+                return false;
+            }
+        }
     }
 }

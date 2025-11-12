@@ -79,5 +79,13 @@ namespace ModelLibrary.Editor.Repository
             Debug.LogWarning("[HttpRepository] DeleteVersionAsync is not implemented for HTTP repositories. Requires server-side DELETE endpoint.");
             return Task.FromResult(false);
         }
+
+        public Task<bool> DeleteModelAsync(string modelId)
+        {
+            // HTTP repository deletion would require a DELETE endpoint on the server
+            // This is a stub implementation - actual HTTP repos should implement DELETE /models/{modelId}
+            Debug.LogWarning("[HttpRepository] DeleteModelAsync is not implemented for HTTP repositories. Requires server-side DELETE endpoint.");
+            return Task.FromResult(false);
+        }
     }
 }

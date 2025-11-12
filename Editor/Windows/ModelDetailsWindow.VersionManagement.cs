@@ -18,7 +18,7 @@ namespace ModelLibrary.Editor.Windows
     public partial class ModelDetailsWindow
     {
         /// <summary>
-        /// Draws the delete version button with comprehensive safety checks.
+        /// Draws the delete buttons with comprehensive safety checks.
         /// Only visible to Artists/Admins. Shows contextual warnings and blocks deletion when unsafe.
         /// </summary>
         private void DrawDeleteVersionButton()
@@ -45,32 +45,57 @@ namespace ModelLibrary.Editor.Windows
             }
 
             bool onlyVersion = !_hasOlderVersions;
+            bool canDeleteVersion = !onlyVersion && !_deletingVersion && !_deletingModel;
+            bool canDeleteModel = !_deletingVersion && !_deletingModel;
 
-            if (onlyVersion)
+            // Only show version deletion UI if there are older versions available
+            if (!onlyVersion)
             {
-                EditorGUILayout.HelpBox("This is the only version of this model. Keep at least one version in the library, so deletion is disabled.", MessageType.Warning);
-            }
-            else if (_isLatestVersion)
-            {
-                EditorGUILayout.HelpBox("You are viewing the latest version. Deleting it will promote the previous version to be the new latest version.", MessageType.Warning);
-            }
-            else
-            {
-                EditorGUILayout.HelpBox("Deleting removes this version's payload, metadata, and preview files from the repository. Projects that already imported it keep their local copies.", MessageType.Info);
+                if (_isLatestVersion)
+                {
+                    EditorGUILayout.HelpBox("You are viewing the latest version. Deleting it will promote the previous version to be the new latest version.", MessageType.Warning);
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox("Deleting removes this version's payload, metadata, and preview files from the repository. Projects that already imported it keep their local copies.", MessageType.Info);
+                }
+
+                // Delete version button
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.FlexibleSpace();
+                    using (new EditorGUI.DisabledScope(!canDeleteVersion))
+                    {
+                        Color originalColor = GUI.color;
+                        GUI.color = Color.red;
+                        if (GUILayout.Button("Delete this version and restore previous", GUILayout.Width(250), GUILayout.Height(26)))
+                        {
+                            if (ConfirmVersionDeletion())
+                            {
+                                _ = DeleteVersionAsync();
+                            }
+                        }
+                        GUI.color = originalColor;
+                    }
+                }
+
+                EditorGUILayout.Space(5);
             }
 
+            // Delete model button
+            EditorGUILayout.HelpBox("⚠️ WARNING: Deleting the entire model will permanently remove all versions, metadata, and files from the repository. This action cannot be undone.", MessageType.Warning);
             using (new EditorGUILayout.HorizontalScope())
             {
                 GUILayout.FlexibleSpace();
-                using (new EditorGUI.DisabledScope(onlyVersion || _deletingVersion))
+                using (new EditorGUI.DisabledScope(!canDeleteModel))
                 {
                     Color originalColor = GUI.color;
-                    GUI.color = Color.red;
-                    if (GUILayout.Button("Delete This Version", GUILayout.Width(160), GUILayout.Height(26)))
+                    GUI.color = new Color(1f, 0.3f, 0.3f); // Darker red for model deletion
+                    if (GUILayout.Button("Delete this model", GUILayout.Width(200), GUILayout.Height(26)))
                     {
-                        if (ConfirmDeletion())
+                        if (ConfirmModelDeletion())
                         {
-                            _ = DeleteVersionAsync();
+                            _ = DeleteModelAsync();
                         }
                     }
                     GUI.color = originalColor;
@@ -78,7 +103,7 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        private bool ConfirmDeletion()
+        private bool ConfirmVersionDeletion()
         {
             bool confirmed = EditorUtility.DisplayDialog(
                 "Delete Version",
@@ -104,6 +129,108 @@ namespace ModelLibrary.Editor.Windows
             return true;
         }
 
+        private bool ConfirmModelDeletion()
+        {
+            bool confirmed = EditorUtility.DisplayDialog(
+                "Delete Model",
+                $"⚠️ WARNING: Are you sure you want to delete the entire model '{_meta.identity.name}'?\n\n" +
+                "This will permanently remove:\n" +
+                "• All versions of this model\n" +
+                "• All payload files, metadata, and preview images\n" +
+                "• The model entry from the index\n\n" +
+                "This action CANNOT be undone!",
+                "Yes, Delete Model",
+                "Cancel");
+
+            if (!confirmed)
+            {
+                return false;
+            }
+
+            // Double confirmation for model deletion
+            return EditorUtility.DisplayDialog(
+                "Final Confirmation",
+                $"You are about to PERMANENTLY DELETE '{_meta.identity.name}' and all its versions.\n\n" +
+                "Are you absolutely sure?",
+                "Yes, I'm Sure",
+                "Cancel");
+        }
+
+        /// <summary>
+        /// Asynchronously deletes the entire model from the repository, updating open windows afterwards.
+        /// </summary>
+        private async Task DeleteModelAsync()
+        {
+            if (_deletingModel || _service == null)
+            {
+                return;
+            }
+
+            _deletingModel = true;
+            try
+            {
+                EditorUtility.DisplayProgressBar("Deleting Model", $"Deleting {_meta.identity.name} and all versions...", 0.4f);
+
+                // Yield to allow UI to update before starting the deletion
+
+                await Task.Yield();
+
+
+                bool deleted = await _service.DeleteModelAsync(_modelId);
+                EditorUtility.ClearProgressBar();
+
+                if (!deleted)
+                {
+                    // Schedule error dialog on main thread to avoid blocking
+                    EditorApplication.delayCall += () =>
+                    {
+                        ErrorHandler.ShowError("Deletion Failed", $"The repository returned an error while deleting model '{_meta.identity.name}'.");
+                    };
+                    return;
+                }
+
+                // Store values for use in delayCall (capture before closing window)
+                string deletedModelName = _meta.identity.name;
+
+                // Schedule all UI operations on the main thread to avoid blocking
+                EditorApplication.delayCall += () =>
+                {
+                    // Show success dialog on main thread
+                    EditorUtility.DisplayDialog("Model Deleted", $"Removed '{deletedModelName}' and all its versions from the repository.", "OK");
+
+                    // Refresh Model Library windows
+                    ModelLibraryWindow[] windows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
+                    for (int i = 0; i < windows.Length; i++)
+                    {
+                        windows[i].ReinitializeAfterConfiguration();
+                    }
+
+                    // Close current window
+                    ModelDetailsWindow currentWindow = GetWindow<ModelDetailsWindow>();
+                    if (currentWindow != null)
+                    {
+                        currentWindow.Close();
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.ClearProgressBar();
+
+                // Schedule error dialog on main thread to avoid blocking
+
+                string errorMessage = ex.Message;
+                EditorApplication.delayCall += () =>
+                {
+                    ErrorHandler.ShowError("Deletion Failed", $"Failed to delete model: {errorMessage}", ex);
+                };
+            }
+            finally
+            {
+                _deletingModel = false;
+            }
+        }
+
         /// <summary>
         /// Asynchronously deletes the current model version from the repository, updating open windows afterwards.
         /// </summary>
@@ -118,10 +245,12 @@ namespace ModelLibrary.Editor.Windows
             try
             {
                 EditorUtility.DisplayProgressBar("Deleting Version", $"Deleting {_meta.identity.name} v{_version}...", 0.4f);
-                
+
                 // Yield to allow UI to update before starting the deletion
+
                 await Task.Yield();
-                
+
+
                 bool deleted = await _service.DeleteVersionAsync(_modelId, _version);
                 EditorUtility.ClearProgressBar();
 
@@ -170,8 +299,9 @@ namespace ModelLibrary.Editor.Windows
             catch (Exception ex)
             {
                 EditorUtility.ClearProgressBar();
-                
+
                 // Schedule error dialog on main thread to avoid blocking
+
                 string errorMessage = ex.Message;
                 EditorApplication.delayCall += () =>
                 {
@@ -207,24 +337,29 @@ namespace ModelLibrary.Editor.Windows
                 await Task.Delay(100); // Brief pause for UI update
 
                 EditorUtility.ClearProgressBar();
-                
+
                 // Track analytics
+
                 AnalyticsService.RecordEvent("import", _modelId, _version, meta.identity.name);
-                
+
                 // Refresh installation status after import
+
                 _ = CheckInstallationStatusAsync();
-                
+
                 // Store values for use in delayCall (capture before closing window)
+
                 string importedModelName = meta.identity.name;
                 string importedVersion = meta.version;
-                
+
                 // Schedule UI operations on the main thread to avoid blocking
+
                 EditorApplication.delayCall += () =>
                 {
                     // Show completion dialog on main thread
                     EditorUtility.DisplayDialog("Import Complete", $"Imported '{importedModelName}' v{importedVersion} into Assets.", "OK");
-                    
+
                     // Close the Model Details window after successful import
+
                     ModelDetailsWindow currentWindow = GetWindow<ModelDetailsWindow>();
                     if (currentWindow != null)
                     {

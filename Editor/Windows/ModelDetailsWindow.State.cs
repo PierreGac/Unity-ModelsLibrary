@@ -65,6 +65,7 @@ namespace ModelLibrary.Editor.Windows
         private bool _hasOlderVersions;
         private bool _isLatestVersion;
         private bool _deletingVersion;
+        private bool _deletingModel;
 
         // Installation status
         private bool _isInstalled;

@@ -132,6 +132,48 @@ namespace ModelLibrary.Editor.Services
         }
 
         /// <summary>
+        /// Delete an entire model from the repository and remove it from the index.
+        /// This permanently removes all versions of the model, including metadata, payload, and images.
+        /// </summary>
+        /// <param name="modelId">The model ID (GUID).</param>
+        /// <returns>True if deletion was successful; false otherwise.</returns>
+        public async Task<bool> DeleteModelAsync(string modelId)
+        {
+            try
+            {
+                // Delete the model from repository
+                bool deleted = await _repo.DeleteModelAsync(modelId);
+                if (!deleted)
+                {
+                    return false;
+                }
+
+                // Remove the model from the index
+                ModelIndex index = await GetIndexAsync();
+                if (index?.entries != null)
+                {
+                    ModelIndex.Entry entryToRemove = index.entries.FirstOrDefault(e => e.id == modelId);
+                    if (entryToRemove != null)
+                    {
+                        index.entries.Remove(entryToRemove);
+                        await _repo.SaveIndexAsync(index);
+                        // Update cache to reflect changes
+                        await _indexService.RefreshIndexAsync();
+                        Debug.Log($"[ModelLibraryService] Removed model {modelId} from index");
+                    }
+                }
+
+                Debug.Log($"[ModelLibraryService] Successfully deleted model {modelId}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ModelLibraryService] Error deleting model {modelId}: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Downloads a specific model version from the repository into the local editor cache.
         /// Downloads all payload files, dependencies, images, and metadata to a local cache directory.
         /// Creates the cache directory structure and saves metadata for quick access.

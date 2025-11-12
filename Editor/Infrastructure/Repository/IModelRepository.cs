@@ -59,6 +59,14 @@ namespace ModelLibrary.Editor.Repository
         Task<bool> DeleteVersionAsync(string modelId, string version);
 
         /// <summary>
+        /// Delete an entire model from the repository.
+        /// This removes the entire model folder including all versions, metadata, payload, and images.
+        /// </summary>
+        /// <param name="modelId">The model ID (GUID).</param>
+        /// <returns>True if the model was successfully deleted; false if it didn't exist or deletion failed.</returns>
+        Task<bool> DeleteModelAsync(string modelId);
+
+        /// <summary>
         /// Repository root string (absolute path or base URL).
         /// </summary>
         string Root { get; }
