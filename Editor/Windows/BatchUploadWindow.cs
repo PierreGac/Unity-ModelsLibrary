@@ -28,17 +28,13 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Gets or creates the word-wrapped text area style.
         /// </summary>
-        private static GUIStyle WordWrappedTextAreaStyle
+        private static GUIStyle GetWordWrappedTextAreaStyle()
         {
-            get
+            _wordWrappedTextAreaStyle ??= new GUIStyle(EditorStyles.textArea)
             {
-                if (_wordWrappedTextAreaStyle == null)
-                {
-                    _wordWrappedTextAreaStyle = new GUIStyle(EditorStyles.textArea);
-                    _wordWrappedTextAreaStyle.wordWrap = true;
-                }
-                return _wordWrappedTextAreaStyle;
-            }
+                wordWrap = true
+            };
+            return _wordWrappedTextAreaStyle;
         }
         /// <summary>Selected source directory containing model folders.</summary>
         private string _sourceDirectory = string.Empty;
@@ -184,7 +180,7 @@ namespace ModelLibrary.Editor.Windows
                 item.version = EditorGUILayout.TextField("Version", item.version);
                 // Constrain text area to available width and enable word wrapping for automatic line breaks
                 Rect textAreaRect = GUILayoutUtility.GetRect(0, 40, GUILayout.ExpandWidth(true));
-                item.description = EditorGUI.TextArea(textAreaRect, item.description, WordWrappedTextAreaStyle);
+                item.description = EditorGUI.TextArea(textAreaRect, item.description, GetWordWrappedTextAreaStyle());
 
                 // Tags
                 EditorGUILayout.LabelField("Tags (comma-separated):");

@@ -18,23 +18,18 @@ namespace ModelLibrary.Editor.Windows
         /// Word-wrapped text area style for automatic line wrapping.
         /// </summary>
         private static GUIStyle _wordWrappedTextAreaStyle;
-        
+
+
         /// <summary>
         /// Gets or creates the word-wrapped text area style.
         /// </summary>
-        private static GUIStyle _WordWrappedTextAreaStyle
+        private static GUIStyle GetWordWrappedTextAreaStyle()
         {
-            get
+            _wordWrappedTextAreaStyle ??= new GUIStyle(EditorStyles.textArea)
             {
-                if (_wordWrappedTextAreaStyle == null)
-                {
-                    _wordWrappedTextAreaStyle = new GUIStyle(EditorStyles.textArea)
-                    {
-                        wordWrap = true
-                    };
-                }
-                return _wordWrappedTextAreaStyle;
-            }
+                wordWrap = true
+            };
+            return _wordWrappedTextAreaStyle;
         }
         private void OnGUI()
         {
@@ -62,7 +57,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 // Constrain text area to available width and enable word wrapping for automatic line breaks
                 Rect textAreaRect = GUILayoutUtility.GetRect(0, 60, GUILayout.ExpandWidth(true));
-                _editedDescription = EditorGUI.TextArea(textAreaRect, _editedDescription ?? string.Empty, _WordWrappedTextAreaStyle);
+                _editedDescription = EditorGUI.TextArea(textAreaRect, _editedDescription ?? string.Empty, GetWordWrappedTextAreaStyle());
             }
             EditorGUILayout.Space();
 
@@ -162,7 +157,7 @@ namespace ModelLibrary.Editor.Windows
                 EditorGUILayout.LabelField("Add Note:", EditorStyles.boldLabel);
                 // Constrain text area to available width and enable word wrapping for automatic line breaks
                 Rect textAreaRect = GUILayoutUtility.GetRect(0, 60, GUILayout.ExpandWidth(true));
-                _newNoteMessage = EditorGUI.TextArea(textAreaRect, _newNoteMessage, _WordWrappedTextAreaStyle);
+                _newNoteMessage = EditorGUI.TextArea(textAreaRect, _newNoteMessage, GetWordWrappedTextAreaStyle());
                 int currentIndex = Array.IndexOf(_noteTags, _newNoteTag);
                 if (currentIndex == -1)
                 {
