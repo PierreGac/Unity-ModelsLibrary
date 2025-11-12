@@ -292,30 +292,10 @@ namespace ModelLibrary.Editor.Windows
                 return true;
             }
 
-            // Fallback: Check if assets exist in project by GUID
-            // This works for models with identity.id but not for old manifests without it
-            string key = entry.id + "@" + entry.latestVersion;
-            if (TryGetMetaFromCache(key, out ModelMeta latestMeta) && latestMeta != null)
-            {
-                try
-                {
-                    string[] allGuids = AssetDatabase.FindAssets(string.Empty);
-                    HashSet<string> set = new HashSet<string>(allGuids);
-                    bool any = latestMeta.assetGuids != null && latestMeta.assetGuids.Any(guid => set.Contains(guid));
-                    if (any)
-                    {
-                        meta = null;
-                        return false;
-                    }
-                }
-                catch
-                {
-                }
-            }
-            else if (!_loadingMeta.Contains(key))
-            {
-                _ = LoadMetaAsync(entry.id, entry.latestVersion);
-            }
+            // REMOVED: Blocking AssetDatabase.FindAssets call that was causing freezes
+            // The manifest cache refresh will handle detection of installed models
+            // If we don't have it in cache yet, we'll show "not installed" until cache is ready
+            // This is better than blocking the UI thread with expensive operations
 
             // Only add to negative cache if manifest cache is initialized
             // Otherwise, we might miss old manifests that are still being processed
