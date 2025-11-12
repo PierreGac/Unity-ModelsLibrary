@@ -14,6 +14,28 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public partial class ModelDetailsWindow
     {
+        /// <summary>
+        /// Word-wrapped text area style for automatic line wrapping.
+        /// </summary>
+        private static GUIStyle _wordWrappedTextAreaStyle;
+        
+        /// <summary>
+        /// Gets or creates the word-wrapped text area style.
+        /// </summary>
+        private static GUIStyle _WordWrappedTextAreaStyle
+        {
+            get
+            {
+                if (_wordWrappedTextAreaStyle == null)
+                {
+                    _wordWrappedTextAreaStyle = new GUIStyle(EditorStyles.textArea)
+                    {
+                        wordWrap = true
+                    };
+                }
+                return _wordWrappedTextAreaStyle;
+            }
+        }
         private void OnGUI()
         {
             // Handle keyboard shortcuts
@@ -38,7 +60,9 @@ namespace ModelLibrary.Editor.Windows
             bool isAdminForDesc = identityProviderForDesc.GetUserRole() == UserRole.Admin;
             using (new EditorGUI.DisabledScope(!isArtistForDesc && !isAdminForDesc))
             {
-                _editedDescription = EditorGUILayout.TextArea(_editedDescription ?? string.Empty, GUILayout.MinHeight(60));
+                // Constrain text area to available width and enable word wrapping for automatic line breaks
+                Rect textAreaRect = GUILayoutUtility.GetRect(0, 60, GUILayout.ExpandWidth(true));
+                _editedDescription = EditorGUI.TextArea(textAreaRect, _editedDescription ?? string.Empty, _WordWrappedTextAreaStyle);
             }
             EditorGUILayout.Space();
 
@@ -136,7 +160,9 @@ namespace ModelLibrary.Editor.Windows
             {
                 // Add new note
                 EditorGUILayout.LabelField("Add Note:", EditorStyles.boldLabel);
-                _newNoteMessage = EditorGUILayout.TextArea(_newNoteMessage, GUILayout.Height(60));
+                // Constrain text area to available width and enable word wrapping for automatic line breaks
+                Rect textAreaRect = GUILayoutUtility.GetRect(0, 60, GUILayout.ExpandWidth(true));
+                _newNoteMessage = EditorGUI.TextArea(textAreaRect, _newNoteMessage, _WordWrappedTextAreaStyle);
                 int currentIndex = Array.IndexOf(_noteTags, _newNoteTag);
                 if (currentIndex == -1)
                 {

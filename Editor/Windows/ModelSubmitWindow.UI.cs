@@ -15,6 +15,28 @@ namespace ModelLibrary.Editor.Windows
     public partial class ModelSubmitWindow
     {
         /// <summary>
+        /// Word-wrapped text area style for automatic line wrapping.
+        /// </summary>
+        private static GUIStyle _wordWrappedTextAreaStyle;
+        
+        /// <summary>
+        /// Gets or creates the word-wrapped text area style.
+        /// </summary>
+        private static GUIStyle _WordWrappedTextAreaStyle
+        {
+            get
+            {
+                if (_wordWrappedTextAreaStyle == null)
+                {
+                    _wordWrappedTextAreaStyle = new GUIStyle(EditorStyles.textArea)
+                    {
+                        wordWrap = true
+                    };
+                }
+                return _wordWrappedTextAreaStyle;
+            }
+        }
+        /// <summary>
         /// Draws the Basic Info tab content (name, version, description, tags).
         /// </summary>
         private void DrawBasicInfoTab()
@@ -39,7 +61,9 @@ namespace ModelLibrary.Editor.Windows
 
             EditorGUILayout.Space(5);
             EditorGUILayout.LabelField("Description", EditorStyles.boldLabel);
-            _description = EditorGUILayout.TextArea(_description, GUILayout.MinHeight(__TEXT_AREA_HEIGHT_DESCRIPTION));
+            // Constrain text area to available width and enable word wrapping for automatic line breaks
+            Rect textAreaRect = GUILayoutUtility.GetRect(0, __TEXT_AREA_HEIGHT_DESCRIPTION, GUILayout.ExpandWidth(true));
+            _description = EditorGUI.TextArea(textAreaRect, _description, _WordWrappedTextAreaStyle);
 
             // Auto-save draft if fields changed
             if (previousName != _name || previousVersion != _version || previousDescription != _description)
@@ -505,8 +529,9 @@ namespace ModelLibrary.Editor.Windows
             }
 
             // Draw the text area
-            string newChangeSummary = EditorGUILayout.TextArea(_changeSummary ?? string.Empty,
-                GUILayout.MinHeight(__TEXT_AREA_HEIGHT_CHANGELOG));
+            // Constrain text area to available width and enable word wrapping for automatic line breaks
+            Rect textAreaRect = GUILayoutUtility.GetRect(0, __TEXT_AREA_HEIGHT_CHANGELOG, GUILayout.ExpandWidth(true));
+            string newChangeSummary = EditorGUI.TextArea(textAreaRect, _changeSummary ?? string.Empty, WordWrappedTextAreaStyle);
             GUI.color = originalColor;
 
             // Update the change summary when text changes

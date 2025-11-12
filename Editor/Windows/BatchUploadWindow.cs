@@ -20,6 +20,26 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public class BatchUploadWindow : EditorWindow
     {
+        /// <summary>
+        /// Word-wrapped text area style for automatic line wrapping.
+        /// </summary>
+        private static GUIStyle _wordWrappedTextAreaStyle;
+        
+        /// <summary>
+        /// Gets or creates the word-wrapped text area style.
+        /// </summary>
+        private static GUIStyle WordWrappedTextAreaStyle
+        {
+            get
+            {
+                if (_wordWrappedTextAreaStyle == null)
+                {
+                    _wordWrappedTextAreaStyle = new GUIStyle(EditorStyles.textArea);
+                    _wordWrappedTextAreaStyle.wordWrap = true;
+                }
+                return _wordWrappedTextAreaStyle;
+            }
+        }
         /// <summary>Selected source directory containing model folders.</summary>
         private string _sourceDirectory = string.Empty;
         /// <summary>List of model items found during directory scanning.</summary>
@@ -162,7 +182,9 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 item.version = EditorGUILayout.TextField("Version", item.version);
-                item.description = EditorGUILayout.TextArea(item.description, GUILayout.Height(40));
+                // Constrain text area to available width and enable word wrapping for automatic line breaks
+                Rect textAreaRect = GUILayoutUtility.GetRect(0, 40, GUILayout.ExpandWidth(true));
+                item.description = EditorGUI.TextArea(textAreaRect, item.description, WordWrappedTextAreaStyle);
 
                 // Tags
                 EditorGUILayout.LabelField("Tags (comma-separated):");
