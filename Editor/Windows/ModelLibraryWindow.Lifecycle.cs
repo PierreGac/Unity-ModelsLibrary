@@ -96,9 +96,11 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Reinitializes services after configuration changes.
+        /// Fully refreshes the model library by recreating services and reloading all caches.
+        /// This ensures that changes to repository location or settings are properly reflected.
+        /// Use this method for a complete refresh that matches the initialization process.
         /// </summary>
-        public void ReinitializeAfterConfiguration()
+        public void FullRefresh()
         {
             _indexCache = null;
             _loadingIndex = false;
@@ -106,7 +108,18 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
+        /// Reinitializes services after configuration changes.
+        /// This is an alias for FullRefresh() to maintain backward compatibility.
+        /// </summary>
+        public void ReinitializeAfterConfiguration()
+        {
+            FullRefresh();
+        }
+
+        /// <summary>
         /// Refreshes the index cache and manifest cache to show newly submitted models.
+        /// This does NOT recreate the service, so it won't pick up repository location changes.
+        /// For a full refresh that includes service recreation, use FullRefresh() instead.
         /// Can be called from other windows (e.g., ModelSubmitWindow) after submission.
         /// </summary>
         public void RefreshIndex()

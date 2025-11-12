@@ -36,9 +36,7 @@ namespace ModelLibrary.Editor.Windows
                 ModelLibraryUIDrawer.DrawEmptyState("Loading model index...", "Please wait while we fetch the latest models from the repository.",
                     () =>
                     {
-                        _indexCache = null;
-                        _ = LoadIndexAsync();
-                        _ = RefreshManifestCacheAsync();
+                        FullRefresh();
                     },
                     () => ModelSubmitWindow.Open());
                 return;
@@ -52,9 +50,7 @@ namespace ModelLibrary.Editor.Windows
                     "The repository appears to be empty.\n\nTo get started:\n• Submit your first model using 'Submit Model'\n• Check your repository configuration",
                     () =>
                     {
-                        _indexCache = null;
-                        _ = LoadIndexAsync();
-                        _ = RefreshManifestCacheAsync();
+                        FullRefresh();
                     },
                     () => ModelSubmitWindow.Open());
                 return;
@@ -124,9 +120,7 @@ namespace ModelLibrary.Editor.Windows
                         string refreshLabel = _refreshingManifest ? "Refreshing..." : "Refresh";
                         if (GUILayout.Button(refreshLabel, GUILayout.Width(100), GUILayout.Height(30)))
                         {
-                            _indexCache = null;
-                            _ = LoadIndexAsync();
-                            _ = RefreshManifestCacheAsync();
+                            FullRefresh();
                         }
                     }
 
@@ -150,9 +144,7 @@ namespace ModelLibrary.Editor.Windows
                     $"Found {index.entries.Count} model(s) in repository, but none match your current search and filters.\n\nTry:\n• Clearing your search query\n• Removing some tag filters\n• Using different search terms",
                     () =>
                     {
-                        _indexCache = null;
-                        _ = LoadIndexAsync();
-                        _ = RefreshManifestCacheAsync();
+                        FullRefresh();
                     },
                     () => ModelSubmitWindow.Open());
                 return;
@@ -233,9 +225,7 @@ namespace ModelLibrary.Editor.Windows
                         string refreshLabel = _refreshingManifest ? "Refreshing..." : "Refresh";
                         actionsMenu.AddItem(new GUIContent(refreshLabel, "Reload the index and manifest cache"), false, () =>
                         {
-                            _indexCache = null;
-                            _ = LoadIndexAsync();
-                            _ = RefreshManifestCacheAsync();
+                            FullRefresh();
                         });
                     }
                     actionsMenu.AddItem(new GUIContent("Check Updates", "Run an immediate update check for all models"), false, () => _ = CheckForUpdatesAsync());
@@ -1017,11 +1007,11 @@ namespace ModelLibrary.Editor.Windows
                     {
                         GUILayout.FlexibleSpace();
                         GUILayout.Label(statusText, installedLabelStyle);
-                        GUILayout.FlexibleSpace();
+    GUILayout.FlexibleSpace();
                     }
                     
                     GUI.backgroundColor = originalBgColor;
-                }
+
                 else if (installed && (string.IsNullOrEmpty(localVersion) || localVersion == "(unknown)"))
                 {
                     // Draw colored label for installed but unknown version
@@ -1029,7 +1019,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         alignment = TextAnchor.MiddleCenter,
                         padding = new RectOffset(6, 6, 2, 2),
-                        normal = { textColor = new Color(0.5f, 0.5f, 0.5f) } // Grey text
+    normal = { textColor = new Color(0.5f, 0.5f, 0.5f) } // Grey text
                     };
                     
                     Color originalBgColor = GUI.backgroundColor;
@@ -1041,17 +1031,17 @@ namespace ModelLibrary.Editor.Windows
                         GUILayout.Label("Installed", installedLabelStyle);
                         GUILayout.FlexibleSpace();
                     }
-                    
+
                     GUI.backgroundColor = originalBgColor;
                 }
-            }
+
 
             GUI.backgroundColor = originalBackground;
         }
 
         private void DrawImageOnlyCard(ModelIndex.Entry entry, float thumbnailSize, bool highlight = false)
         {
-            string key = entry.id + "@" + entry.latestVersion;
+ey = entry.id + "@" + entry.latestVersion;
             if (!_metaCache.ContainsKey(key) && !_loadingMeta.Contains(key))
             {
                 _ = LoadMetaAsync(entry.id, entry.latestVersion);
