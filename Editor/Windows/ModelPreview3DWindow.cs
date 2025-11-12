@@ -219,12 +219,29 @@ namespace ModelLibrary.Editor.Windows
 
                 // IMPORTANT: Import textures FIRST, then materials, so we can re-link textures
                 // Find and copy texture files from cache to temp directory
+                // Exclude preview images (in "images" folder or named "auto_preview")
                 string[] textureExtensions = new[] { "*.png", "*.jpg", "*.jpeg", "*.tga", "*.psd" };
                 List<string> textureFiles = new List<string>();
 
                 foreach (string ext in textureExtensions)
                 {
-                    textureFiles.AddRange(Directory.GetFiles(cacheRoot, ext, SearchOption.AllDirectories));
+                    string[] allTextures = Directory.GetFiles(cacheRoot, ext, SearchOption.AllDirectories);
+                    foreach (string textureFile in allTextures)
+                    {
+                        // Skip preview images - exclude files in "images" folder or named "auto_preview"
+                        string textureRelativePath = PathUtils.SanitizePathSeparator(textureFile[cacheRoot.Length..].TrimStart(Path.DirectorySeparatorChar));
+                        string textureFileName = Path.GetFileNameWithoutExtension(textureFile).ToLowerInvariant();
+
+
+                        if (textureRelativePath.StartsWith("images/", StringComparison.OrdinalIgnoreCase) ||
+                            textureFileName == "auto_preview" || textureFileName.StartsWith("auto_preview"))
+                        {
+                            continue; // Skip preview images
+                        }
+
+
+                        textureFiles.Add(textureFile);
+                    }
                 }
 
                 // Copy and import texture files first - they get new GUIDs
@@ -238,6 +255,27 @@ namespace ModelLibrary.Editor.Windows
                     {
                         File.Copy(textureFile, tempTexturePath, overwrite: true);
                         AssetDatabase.ImportAsset(tempTexturePath, ImportAssetOptions.ForceUpdate);
+
+                        // Check if this is a normal map texture and configure it accordingly
+                        string textureNameLower = Path.GetFileNameWithoutExtension(textureFile).ToLowerInvariant();
+                        bool isNormalMap = textureNameLower.Contains("normal") ||
+                                          textureNameLower.Contains("bump") ||
+                                          textureNameLower.Contains("nrm") ||
+                                          textureNameLower.Contains("_n") ||
+                                          textureNameLower.EndsWith("_normal") ||
+                                          textureNameLower.EndsWith("_bump");
+
+                        if (isNormalMap)
+                        {
+                            TextureImporter textureImporter = AssetImporter.GetAtPath(tempTexturePath) as TextureImporter;
+                            if (textureImporter != null)
+                            {
+                                textureImporter.textureType = TextureImporterType.NormalMap;
+                                textureImporter.SaveAndReimport();
+                                Debug.Log($"Configured normal map: {textureFileName}");
+                            }
+                        }
+
                         _tempAssets.Add(tempTexturePath);
 
                         // Load the texture asset
@@ -294,26 +332,59 @@ namespace ModelLibrary.Editor.Windows
 
                                     Texture oldTex = loadedMat.GetTexture(propName);
 
-                                    Texture2D matchingTex = null;
-
-                                    if (oldTex != null)
+                                    // Golden rule: Only re-link textures if the source material had a texture
+                                    // If oldTex is null, preserve that null value - don't try to fill it
+                                    if (oldTex == null)
                                     {
-                                        // Try to find matching texture by the referenced texture's name
-                                        string texName = oldTex.name;
-                                        // Remove common suffixes Unity adds
-                                        if (texName.Contains(" (Texture2D)"))
-                                        {
-                                            texName = texName.Replace(" (Texture2D)", "");
-                                        }
-
-                                        loadedTextures.TryGetValue(texName, out matchingTex);
+                                        // Source material has no texture for this property - keep it null
+                                        continue;
                                     }
 
-                                    // If still not found, try matching by property name and common texture naming patterns
+                                    // Try to find matching texture by the referenced texture's name
+                                    string texName = oldTex.name;
+                                    // Remove common suffixes Unity adds
+                                    if (texName.Contains(" (Texture2D)"))
+                                    {
+                                        texName = texName.Replace(" (Texture2D)", "");
+                                    }
+
+                                    Texture2D matchingTex = null;
+                                    loadedTextures.TryGetValue(texName, out matchingTex);
+
+                                    // Check if this is a normal map property (used for configuration)
+                                    bool isNormalMapProperty = propName.Contains("Bump") ||
+                                                               propName.Contains("Normal") ||
+                                                               propName == "_BumpMap" ||
+                                                               propName == "_NormalMap" ||
+                                                               propName == "_DetailNormalMap" ||
+                                                               propName == "_BumpTex";
+
+                                    // If still not found by exact name, try matching by property name and common texture naming patterns
                                     if (matchingTex == null && loadedTextures.Count > 0)
                                     {
+                                        if (isNormalMapProperty)
+                                        {
+                                            // Try common names for normal/bump textures
+                                            string[] normalMapNames = { "normal", "bump", "nrm", "_n", "_normal", "_bump" };
+                                            foreach (string normalName in normalMapNames)
+                                            {
+                                                foreach (string texKey in loadedTextures.Keys)
+                                                {
+                                                    if (texKey.ToLower().Contains(normalName))
+                                                    {
+                                                        matchingTex = loadedTextures[texKey];
+                                                        Debug.Log($"Matched normal map texture '{texKey}' to property '{propName}' by pattern '{normalName}'");
+                                                        break;
+                                                    }
+                                                }
+                                                if (matchingTex != null)
+                                                {
+                                                    break;
+                                                }
+                                            }
+                                        }
                                         // Common mappings: _BaseMap/_MainTex -> diffuse/albedo/base textures
-                                        if (propName == "_BaseMap" || propName == "_MainTex")
+                                        else if (propName == "_BaseMap" || propName == "_MainTex")
                                         {
                                             // Try common names for base/diffuse textures
                                             string[] commonNames = { "diffuse", "albedo", "base", "color", "texture", matName.ToLower() };
@@ -334,17 +405,29 @@ namespace ModelLibrary.Editor.Windows
                                                 }
                                             }
                                         }
-
-                                        // If still not found, use first available texture as fallback
-                                        if (matchingTex == null)
-                                        {
-                                            matchingTex = loadedTextures.Values.First();
-                                            Debug.LogWarning($"Using first available texture '{matchingTex.name}' as fallback for property '{propName}' in material '{matName}'");
-                                        }
                                     }
 
                                     if (matchingTex != null)
                                     {
+                                        // Configure texture as normal map if this is a normal map property
+                                        if (isNormalMapProperty)
+                                        {
+                                            string texturePath = textureNameToPath.ContainsKey(matchingTex.name)
+                                                ? textureNameToPath[matchingTex.name]
+                                                : AssetDatabase.GetAssetPath(matchingTex);
+
+                                            if (!string.IsNullOrEmpty(texturePath) && File.Exists(texturePath))
+                                            {
+                                                TextureImporter textureImporter = AssetImporter.GetAtPath(texturePath) as TextureImporter;
+                                                if (textureImporter != null && textureImporter.textureType != TextureImporterType.NormalMap)
+                                                {
+                                                    textureImporter.textureType = TextureImporterType.NormalMap;
+                                                    textureImporter.SaveAndReimport();
+                                                    Debug.Log($"Configured normal map from property '{propName}': {matchingTex.name}");
+                                                }
+                                            }
+                                        }
+
                                         try
                                         {
                                             loadedMat.SetTexture(propName, matchingTex);
@@ -357,8 +440,150 @@ namespace ModelLibrary.Editor.Windows
                                     }
                                     else
                                     {
-                                        Debug.LogWarning($"Could not find texture for property '{propName}' in material '{matName}'. Available textures: {string.Join(", ", loadedTextures.Keys)}");
+                                        // Could not find matching texture to re-link - property may have broken reference
+                                        // This is okay - we preserve source material data as much as possible
+                                        Debug.Log($"No matching texture found for property '{propName}' in material '{matName}' (source had texture '{oldTex.name}'). Available textures: {string.Join(", ", loadedTextures.Keys)}");
                                     }
+                                }
+                            }
+
+                            // Preserve important material properties for correct rendering
+                            // This ensures alpha clipping, specular highlights, and environment reflections work correctly
+
+                            // Preserve alpha clipping settings
+                            if (loadedMat.HasProperty("_AlphaClip"))
+                            {
+                                float alphaClipValue = loadedMat.GetFloat("_AlphaClip");
+                                bool alphaClipping = true;
+
+                                // Set the _ALPHATEST_ON keyword for URP/Built-in shaders
+                                if (alphaClipping)
+                                {
+                                    loadedMat.EnableKeyword("_ALPHATEST_ON");
+                                    Debug.Log($"Enabled _ALPHATEST_ON keyword for material '{matName}' (AlphaClip: {alphaClipValue})");
+                                }
+                                else
+                                {
+                                    loadedMat.DisableKeyword("_ALPHATEST_ON");
+                                }
+
+                                // Ensure _Cutoff property is preserved and set correctly (alpha clipping threshold)
+                                if (loadedMat.HasProperty("_Cutoff"))
+                                {
+                                    float currentCutoff = loadedMat.GetFloat("_Cutoff");
+                                    // Re-set the value to ensure it's applied (sometimes values don't persist after import)
+                                    loadedMat.SetFloat("_Cutoff", currentCutoff);
+                                    Debug.Log($"Set _Cutoff value for material '{matName}': {currentCutoff}");
+                                }
+
+                                Debug.Log($"Configured alpha clipping for material '{matName}': {alphaClipping} (AlphaClip value: {alphaClipValue})");
+                            }
+
+                            // Preserve specular highlights setting
+                            if (loadedMat.HasProperty("_SpecularHighlights"))
+                            {
+                                float specularHighlights = loadedMat.GetFloat("_SpecularHighlights");
+                                loadedMat.SetFloat("_SpecularHighlights", specularHighlights);
+                                Debug.Log($"Preserved _SpecularHighlights for material '{matName}': {specularHighlights}");
+                            }
+
+                            // Preserve specular color (URP and Built-in)
+                            if (loadedMat.HasProperty("_SpecColor"))
+                            {
+                                Color specColor = loadedMat.GetColor("_SpecColor");
+                                loadedMat.SetColor("_SpecColor", specColor);
+                                Debug.Log($"Preserved _SpecColor for material '{matName}': {specColor}");
+                            }
+
+                            // Preserve smoothness (URP)
+                            if (loadedMat.HasProperty("_Smoothness"))
+                            {
+                                float smoothness = loadedMat.GetFloat("_Smoothness");
+                                loadedMat.SetFloat("_Smoothness", smoothness);
+                                Debug.Log($"Preserved _Smoothness for material '{matName}': {smoothness}");
+                            }
+
+                            // Preserve glossiness (Built-in Standard shader)
+                            if (loadedMat.HasProperty("_Glossiness"))
+                            {
+                                float glossiness = loadedMat.GetFloat("_Glossiness");
+                                loadedMat.SetFloat("_Glossiness", glossiness);
+                                Debug.Log($"Preserved _Glossiness for material '{matName}': {glossiness}");
+                            }
+
+                            // Preserve specular gloss map texture and switch to specular workflow if present
+                            bool hasSpecGlossMap = false;
+                            if (loadedMat.HasProperty("_SpecGlossMap"))
+                            {
+                                Texture specGlossMap = loadedMat.GetTexture("_SpecGlossMap");
+                                if (specGlossMap != null)
+                                {
+                                    loadedMat.SetTexture("_SpecGlossMap", specGlossMap);
+                                    hasSpecGlossMap = true;
+                                    Debug.Log($"Preserved _SpecGlossMap for material '{matName}': {specGlossMap.name}");
+                                }
+                            }
+
+                            // Switch to specular workflow if specular map is present
+                            // _WorkflowMode: 0 = Specular, 1 = Metallic
+                            if (hasSpecGlossMap && loadedMat.HasProperty("_WorkflowMode"))
+                            {
+                                loadedMat.SetFloat("_WorkflowMode", 0f); // Specular workflow
+                                Debug.Log($"Switched to specular workflow for material '{matName}' (specular map present)");
+                            }
+
+                            // Preserve metallic value (for metallic workflow)
+                            if (loadedMat.HasProperty("_Metallic"))
+                            {
+                                float metallic = loadedMat.GetFloat("_Metallic");
+                                loadedMat.SetFloat("_Metallic", metallic);
+                                Debug.Log($"Preserved _Metallic for material '{matName}': {metallic}");
+                            }
+
+                            // Preserve metallic gloss map texture
+                            if (loadedMat.HasProperty("_MetallicGlossMap"))
+                            {
+                                Texture metallicGlossMap = loadedMat.GetTexture("_MetallicGlossMap");
+                                if (metallicGlossMap != null)
+                                {
+                                    loadedMat.SetTexture("_MetallicGlossMap", metallicGlossMap);
+                                    Debug.Log($"Preserved _MetallicGlossMap for material '{matName}': {metallicGlossMap.name}");
+                                }
+                            }
+
+                            // Preserve environment reflections setting
+                            if (loadedMat.HasProperty("_EnvironmentReflections"))
+                            {
+                                float environmentReflections = loadedMat.GetFloat("_EnvironmentReflections");
+                                loadedMat.SetFloat("_EnvironmentReflections", environmentReflections);
+                                Debug.Log($"Preserved _EnvironmentReflections for material '{matName}': {environmentReflections}");
+                            }
+
+                            // Also preserve GlossyReflections if it exists (some shaders use this instead)
+                            if (loadedMat.HasProperty("_GlossyReflections"))
+                            {
+                                float glossyReflections = loadedMat.GetFloat("_GlossyReflections");
+                                loadedMat.SetFloat("_GlossyReflections", glossyReflections);
+                            }
+
+                            // If material doesn't have _AlphaClip property, try to enable keyword if shader supports it
+                            // This handles materials that might have the keyword set but not the property
+                            if (!loadedMat.HasProperty("_AlphaClip") && loadedMat.shader != null)
+                            {
+                                // Try to enable keyword if shader supports it
+                                try
+                                {
+                                    // Check if keyword exists in shader
+                                    Shader shader = loadedMat.shader;
+                                    if (shader != null)
+                                    {
+                                        // Enable keyword - if it doesn't exist, this will be a no-op
+                                        loadedMat.EnableKeyword("_ALPHATEST_ON");
+                                    }
+                                }
+                                catch
+                                {
+                                    // Keyword might not exist in this shader, ignore
                                 }
                             }
                         }
@@ -383,12 +608,10 @@ namespace ModelLibrary.Editor.Windows
                     if (asset is Material material)
                     {
                         materials.Add(material);
-                        Debug.Log($"Found material asset: {material.name}, shader: {material.shader?.name}");
                     }
                     else if (asset is Texture2D texture)
                     {
                         textures.Add(texture);
-                        Debug.Log($"Found texture asset: {texture.name} ({texture.width}x{texture.height})");
                     }
                 }
 
@@ -425,7 +648,6 @@ namespace ModelLibrary.Editor.Windows
                                 if (loadedMaterials.TryGetValue(materialNameToMatch, out Material loadedMat))
                                 {
                                     materialToUse = loadedMat;
-                                    Debug.Log($"Matched material '{materialNameToMatch}' to loaded .mat file");
                                 }
                                 else
                                 {
@@ -450,18 +672,152 @@ namespace ModelLibrary.Editor.Windows
                             if (materialToUse == null && loadedMaterials.Count > 0)
                             {
                                 materialToUse = loadedMaterials.Values.First();
-                                Debug.Log($"Using first loaded .mat file: {materialToUse.name}");
                             }
 
-                            // Use the material asset directly from the imported FBX
-                            // The material should reference textures that are now in the same directory
+                            // Create a material instance for preview to ensure keyword changes take effect
+                            // Using the asset directly can prevent keyword changes from being applied
                             Material materialToUseForPreview = null;
                             if (materialToUse != null)
                             {
-                                // Use the material asset directly - it should have texture references
-                                materialToUseForPreview = materialToUse;
+                                // Create an instance so we can safely modify keywords and properties
+                                materialToUseForPreview = new Material(materialToUse);
 
-                                Debug.Log($"Using material asset: '{materialToUseForPreview.name}' from '{tempAssetPath}', shader: {materialToUseForPreview.shader?.name}");
+                                // Preserve important material properties for correct rendering
+                                // This ensures alpha clipping, specular highlights, and environment reflections work correctly
+
+                                // Preserve alpha clipping settings - check multiple property names
+                                bool alphaClipping = false;
+                                float alphaClipValue = 0f;
+                                float cutoffValue = 0.5f;
+
+                                // Check for _AlphaClip property (URP)
+                                if (materialToUseForPreview.HasProperty("_AlphaClip"))
+                                {
+                                    alphaClipValue = materialToUseForPreview.GetFloat("_AlphaClip");
+                                    alphaClipping = true;//alphaClipValue >= 0.5f;
+                                }
+                                // Check for _AlphaTest property (some shaders)
+                                else if (materialToUseForPreview.HasProperty("_AlphaTest"))
+                                {
+                                    alphaClipValue = materialToUseForPreview.GetFloat("_AlphaTest");
+                                    alphaClipping = true;//alphaClipValue >= 0.5f;
+                                }
+
+                                // Get cutoff value if available
+                                if (materialToUseForPreview.HasProperty("_Cutoff"))
+                                {
+                                    cutoffValue = materialToUseForPreview.GetFloat("_Cutoff");
+                                }
+
+                                // Set the _ALPHATEST_ON keyword BEFORE setting properties
+                                // This ensures the shader variant is compiled with the keyword
+                                if (alphaClipping)
+                                {
+                                    materialToUseForPreview.EnableKeyword("_ALPHATEST_ON");
+
+                                    // Re-apply cutoff value after enabling keyword
+
+                                    if (materialToUseForPreview.HasProperty("_Cutoff"))
+                                    {
+                                        materialToUseForPreview.SetFloat("_Cutoff", cutoffValue);
+                                    }
+                                }
+                                else
+                                {
+                                    materialToUseForPreview.DisableKeyword("_ALPHATEST_ON");
+                                }
+
+
+                                // Preserve specular highlights setting
+                                if (materialToUseForPreview.HasProperty("_SpecularHighlights"))
+                                {
+                                    float specularHighlights = materialToUseForPreview.GetFloat("_SpecularHighlights");
+                                    materialToUseForPreview.SetFloat("_SpecularHighlights", specularHighlights);
+                                }
+
+                                // Preserve specular color (URP and Built-in)
+                                if (materialToUseForPreview.HasProperty("_SpecColor"))
+                                {
+                                    Color specColor = materialToUseForPreview.GetColor("_SpecColor");
+                                    materialToUseForPreview.SetColor("_SpecColor", specColor);
+                                }
+
+                                // Preserve smoothness (URP)
+                                if (materialToUseForPreview.HasProperty("_Smoothness"))
+                                {
+                                    float smoothness = materialToUseForPreview.GetFloat("_Smoothness");
+                                    materialToUseForPreview.SetFloat("_Smoothness", smoothness);
+                                }
+
+                                // Preserve glossiness (Built-in Standard shader)
+                                if (materialToUseForPreview.HasProperty("_Glossiness"))
+                                {
+                                    float glossiness = materialToUseForPreview.GetFloat("_Glossiness");
+                                    materialToUseForPreview.SetFloat("_Glossiness", glossiness);
+                                }
+
+                                // Preserve specular gloss map texture and switch to specular workflow if present
+                                bool hasSpecGlossMapForPreview = false;
+                                if (materialToUseForPreview.HasProperty("_SpecGlossMap"))
+                                {
+                                    Texture specGlossMap = materialToUseForPreview.GetTexture("_SpecGlossMap");
+                                    if (specGlossMap != null)
+                                    {
+                                        materialToUseForPreview.SetTexture("_SpecGlossMap", specGlossMap);
+                                        hasSpecGlossMapForPreview = true;
+                                    }
+                                }
+
+                                // Switch to specular workflow if specular map is present
+                                // _WorkflowMode: 0 = Specular, 1 = Metallic
+                                if (hasSpecGlossMapForPreview && materialToUseForPreview.HasProperty("_WorkflowMode"))
+                                {
+                                    materialToUseForPreview.SetFloat("_WorkflowMode", 0f); // Specular workflow
+                                }
+
+                                // Preserve metallic value (for metallic workflow)
+                                if (materialToUseForPreview.HasProperty("_Metallic"))
+                                {
+                                    float metallic = materialToUseForPreview.GetFloat("_Metallic");
+                                    materialToUseForPreview.SetFloat("_Metallic", metallic);
+                                }
+
+                                // Preserve metallic gloss map texture
+                                if (materialToUseForPreview.HasProperty("_MetallicGlossMap"))
+                                {
+                                    Texture metallicGlossMap = materialToUseForPreview.GetTexture("_MetallicGlossMap");
+                                    if (metallicGlossMap != null)
+                                    {
+                                        materialToUseForPreview.SetTexture("_MetallicGlossMap", metallicGlossMap);
+                                    }
+                                }
+
+                                // Preserve environment reflections setting
+                                if (materialToUseForPreview.HasProperty("_EnvironmentReflections"))
+                                {
+                                    float environmentReflections = materialToUseForPreview.GetFloat("_EnvironmentReflections");
+                                    materialToUseForPreview.SetFloat("_EnvironmentReflections", environmentReflections);
+                                }
+
+                                // Also preserve GlossyReflections if it exists (some shaders use this instead)
+                                if (materialToUseForPreview.HasProperty("_GlossyReflections"))
+                                {
+                                    float glossyReflections = materialToUseForPreview.GetFloat("_GlossyReflections");
+                                    materialToUseForPreview.SetFloat("_GlossyReflections", glossyReflections);
+                                }
+
+                                // If material doesn't have _AlphaClip property, try to enable keyword if shader supports it
+                                if (!materialToUseForPreview.HasProperty("_AlphaClip") && !materialToUseForPreview.HasProperty("_AlphaTest") && materialToUseForPreview.shader != null)
+                                {
+                                    try
+                                    {
+                                        materialToUseForPreview.EnableKeyword("_ALPHATEST_ON");
+                                    }
+                                    catch
+                                    {
+                                        // Keyword might not exist in this shader, ignore
+                                    }
+                                }
 
                                 // Log texture information to verify textures are loaded
                                 if (materialToUseForPreview.shader != null)
@@ -473,11 +829,7 @@ namespace ModelLibrary.Editor.Windows
                                         {
                                             string propName = materialToUseForPreview.shader.GetPropertyName(j);
                                             Texture tex = materialToUseForPreview.GetTexture(propName);
-                                            if (tex != null)
-                                            {
-                                                Debug.Log($"Material '{materialToUseForPreview.name}' has texture property '{propName}': {tex.name} ({tex.width}x{tex.height}), type: {tex.GetType().Name}");
-                                            }
-                                            else
+                                            if (tex == null)
                                             {
                                                 Debug.LogWarning($"Material '{materialToUseForPreview.name}' texture property '{propName}' is null. Material asset path: {AssetDatabase.GetAssetPath(materialToUseForPreview)}");
                                             }
@@ -633,13 +985,6 @@ namespace ModelLibrary.Editor.Windows
                 );
 
                 Vector3 cameraPos = bounds.center + direction * (size * _cameraDistance);
-
-                // Debug logging
-                if (Event.current.type == EventType.Repaint)
-                {
-                    Debug.Log($"Rendering preview: Mesh={meshInfo.mesh.name}, Bounds={bounds}, CameraPos={cameraPos}, Rect={_previewRect}");
-                }
-
                 // Render the preview with custom camera position
                 Texture preview = _previewUtil.Render(meshInfo.mesh, meshInfo.material, _previewRect, cameraPos, bounds.center);
                 if (preview != null)
@@ -649,7 +994,6 @@ namespace ModelLibrary.Editor.Windows
                 else
                 {
                     // Debug: log when preview is null
-                    Debug.LogWarning($"Preview texture is null. Mesh: {meshInfo.mesh?.name}, Material: {meshInfo.material?.name}, Rect: {_previewRect}");
                     EditorGUI.DrawRect(_previewRect, new Color(0.2f, 0.2f, 0.2f, 1f));
                 }
             }

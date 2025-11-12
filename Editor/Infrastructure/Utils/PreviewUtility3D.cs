@@ -30,24 +30,31 @@ namespace ModelLibrary.Editor.Utils
         {
             _preview = new PreviewRenderUtility(true) { cameraFieldOfView = 30f };
             _cam = _preview.camera;
-            _cam.backgroundColor = new Color(0.2f, 0.2f, 0.2f, 1f);
-            _cam.clearFlags = CameraClearFlags.SolidColor;
+            _cam.clearFlags = CameraClearFlags.Skybox;
+            _cam.backgroundColor = new Color(0.1921569f, 0.3019608f, 0.4745098f, 0f);
             _cam.nearClipPlane = 0.1f;
             _cam.farClipPlane = 100f;
 
-            // Create light - PreviewRenderUtility handles lighting automatically
-            // but we can add a light for better control
-            _root = new GameObject("PreviewRoot");
-            _light = new GameObject("Light").AddComponent<Light>();
-            _light.transform.SetParent(_root.transform);
+            // PreviewRenderUtility with 'true' creates its own scene with built-in lighting
+            // We'll add additional lights directly to the preview scene using AddSingleGO
+            // Create light as root GameObject (AddSingleGO requires root GameObjects)
+            GameObject lightObj = new GameObject("PreviewLight");
+            _light = lightObj.AddComponent<Light>();
             _light.type = LightType.Directional;
-            _light.intensity = 1.0f;
+            _light.intensity = 2; // Increased intensity for better specular visibility
+            _light.colorTemperature = 5000;
             _light.color = Color.white;
-            _light.shadows = LightShadows.None;
+            _light.shadows = LightShadows.Soft;
+            _light.enabled = true;
+            _light.bounceIntensity = 1;
+            _light.renderMode = LightRenderMode.Auto;
+
+            // Add light to preview scene - AddSingleGO handles adding it to the preview's isolated scene
+            // This doesn't modify the current scene, only the preview's internal scene
+            _preview.AddSingleGO(lightObj);
 
             // Add reflection probe for reflections
-            GameObject probeObj = new GameObject("ReflectionProbe");
-            probeObj.transform.SetParent(_root.transform);
+            GameObject probeObj = new GameObject("PreviewReflectionProbe");
             probeObj.transform.position = Vector3.zero;
             _reflectionProbe = probeObj.AddComponent<ReflectionProbe>();
             _reflectionProbe.mode = UnityEngine.Rendering.ReflectionProbeMode.Realtime;
@@ -56,44 +63,57 @@ namespace ModelLibrary.Editor.Utils
             _reflectionProbe.intensity = 1.0f;
             _reflectionProbe.size = new Vector3(100f, 100f, 100f); // Large enough to cover the preview area
 
-            // Set up a simple skybox for reflections
-            // Use Unity's default skybox or create a simple gradient skybox
-            Material skyboxMaterial = RenderSettings.skybox;
-            if (skyboxMaterial == null)
+            // Add probe to preview scene
+            _preview.AddSingleGO(probeObj);
+
+            // Create root for cleanup (but don't add it to preview scene)
+            _root = new GameObject("PreviewRoot");
+
+            // Set up skybox for reflections - use the currently active scene's skybox
+            // RenderSettings.skybox reflects the skybox of the currently active scene
+            Material sceneSkybox = RenderSettings.skybox;
+
+            if (sceneSkybox != null)
             {
-                // Try to find a default skybox material
+                // Use the scene's skybox - explicitly set it to ensure PreviewRenderUtility picks it up
+                // This ensures the preview uses the same skybox as the currently opened scene
+                RenderSettings.skybox = sceneSkybox;
+            }
+            else
+            {
+                // If no skybox is set in the scene, create a simple procedural skybox as fallback
                 Shader skyboxShader = Shader.Find("Skybox/Procedural");
                 if (skyboxShader != null)
                 {
-                    skyboxMaterial = new Material(skyboxShader);
-                    skyboxMaterial.SetColor("_SkyTint", new Color(0.5f, 0.5f, 0.5f, 1f));
-                    skyboxMaterial.SetColor("_GroundColor", new Color(0.2f, 0.2f, 0.2f, 1f));
-                    skyboxMaterial.SetFloat("_SunSize", 0.04f);
-                    skyboxMaterial.SetFloat("_SunSizeConvergence", 5f);
-                    skyboxMaterial.SetFloat("_AtmosphereThickness", 1f);
-                    skyboxMaterial.SetColor("_SunColor", Color.white);
+                    Material fallbackSkybox = new Material(skyboxShader);
+                    fallbackSkybox.SetColor("_SkyTint", new Color(0.5f, 0.5f, 0.5f, 1f));
+                    fallbackSkybox.SetColor("_GroundColor", new Color(0.2f, 0.2f, 0.2f, 1f));
+                    fallbackSkybox.SetFloat("_SunSize", 0.04f);
+                    fallbackSkybox.SetFloat("_SunSizeConvergence", 5f);
+                    fallbackSkybox.SetFloat("_AtmosphereThickness", 1f);
+                    fallbackSkybox.SetColor("_SunColor", Color.white);
+
+                    // Set the fallback skybox for the preview
+                    RenderSettings.skybox = fallbackSkybox;
                 }
             }
 
-            // Set skybox for reflections
-            if (skyboxMaterial != null)
-            {
-                RenderSettings.skybox = skyboxMaterial;
-            }
-
-            // Add ambient light settings
+            // Add ambient light settings - increased for better specular/metallic visibility
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.5f, 0.5f, 0.5f, 1f);
-            RenderSettings.ambientEquatorColor = new Color(0.3f, 0.3f, 0.3f, 1f);
-            RenderSettings.ambientGroundColor = new Color(0.2f, 0.2f, 0.2f, 1f);
+            RenderSettings.ambientSkyColor = new Color(0.7f, 0.7f, 0.7f, 1f); // Brighter for specular highlights
+            RenderSettings.ambientEquatorColor = new Color(0.5f, 0.5f, 0.5f, 1f);
+            RenderSettings.ambientGroundColor = new Color(0.3f, 0.3f, 0.3f, 1f);
+            RenderSettings.ambientIntensity = 1.0f; // Increase overall ambient intensity
         }
 
         /// <summary>
         /// Disposes of the preview utility and cleans up all resources.
-        /// Destroys the root GameObject and cleans up the preview render utility.
+        /// Cleans up the preview render utility which will destroy all GameObjects in the preview scene.
         /// </summary>
         public void Dispose()
         {
+            // Cleanup will destroy all GameObjects in the preview scene, including the light and probe
+            // We don't need to manually destroy them
             if (_root)
             {
                 UnityEngine.Object.DestroyImmediate(_root);
@@ -144,8 +164,7 @@ namespace ModelLibrary.Editor.Utils
 
             _cam.transform.position = pos;
             _cam.transform.LookAt(bounds.center);
-            _light.transform.rotation = Quaternion.Euler(30, 30, 0);
-            _light.transform.position = pos + Vector3.up * 2f;
+            _light.transform.SetPositionAndRotation(pos + Vector3.up * 2f, Quaternion.Euler(30, 30, 0));
 
             // Position reflection probe at mesh center
             if (_reflectionProbe != null)
@@ -156,8 +175,8 @@ namespace ModelLibrary.Editor.Utils
 
             // Ensure camera is properly set up
             _cam.orthographic = false;
-            _cam.clearFlags = CameraClearFlags.SolidColor;
-            _cam.backgroundColor = new Color(0.2f, 0.2f, 0.2f, 1f);
+            _cam.clearFlags = CameraClearFlags.Skybox;
+            _cam.backgroundColor = new Color(0.1921569f, 0.3019608f, 0.4745098f, 0f);
 
             // PreviewRenderUtility works with SRP enabled - no need to disable it
             // This allows URP materials to render correctly with their textures
@@ -187,8 +206,6 @@ namespace ModelLibrary.Editor.Utils
         /// <returns>The rendered preview texture.</returns>
         public Texture Render(Mesh mesh, Material mat, Rect rect, Vector3 cameraPosition, Vector3 lookAt)
         {
-            Debug.Log($"PreviewUtility3D.Render called: mesh={(mesh != null ? mesh.name : "null")}, mat={(mat != null ? mat.name : "null")}, rect={rect}, cameraPos={cameraPosition}, lookAt={lookAt}");
-
             if (mesh == null)
             {
                 Debug.LogWarning("PreviewUtility3D.Render: mesh is null");
@@ -216,8 +233,7 @@ namespace ModelLibrary.Editor.Utils
 
             _cam.transform.position = cameraPosition;
             _cam.transform.LookAt(lookAt);
-            _light.transform.rotation = Quaternion.Euler(30, 30, 0);
-            _light.transform.position = cameraPosition + Vector3.up * 2f;
+            _light.transform.SetPositionAndRotation(cameraPosition + Vector3.up * 2f, Quaternion.Euler(30, 30, 0));
 
             // Position reflection probe at lookAt point (mesh center)
             if (_reflectionProbe != null)
@@ -228,19 +244,17 @@ namespace ModelLibrary.Editor.Utils
 
             // Ensure camera is properly set up
             _cam.orthographic = false;
-            _cam.clearFlags = CameraClearFlags.SolidColor;
-            _cam.backgroundColor = new Color(0.2f, 0.2f, 0.2f, 1f);
+            _cam.clearFlags = CameraClearFlags.Skybox;
+            _cam.backgroundColor = new Color(0.1921569f, 0.3019608f, 0.4745098f, 0f);
 
             // PreviewRenderUtility works with SRP enabled - no need to disable it
             // This allows URP materials to render correctly with their textures
             try
             {
-                Debug.Log($"PreviewUtility3D.Render: Starting preview render. Using mat: {(mat.shader != null ? mat.shader.name : "null")}, SRP enabled: {Unsupported.useScriptableRenderPipeline}");
                 _preview.BeginPreview(rect, GUIStyle.none);
                 _preview.DrawMesh(mesh, Matrix4x4.identity, mat, 0);
                 _preview.camera.Render();
                 Texture previewTexture = _preview.EndPreview();
-                Debug.Log($"PreviewUtility3D.Render: Preview texture created: {previewTexture != null}, Size: {(previewTexture != null ? $"{previewTexture.width}x{previewTexture.height}" : "null")}");
                 return previewTexture;
             }
             catch (Exception ex)
