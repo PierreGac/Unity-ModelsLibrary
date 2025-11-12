@@ -170,6 +170,8 @@ namespace ModelLibrary.Editor.Windows
                 if (GUILayout.Button("Submit Note") && !string.IsNullOrWhiteSpace(_newNoteMessage))
                 {
                     _ = SubmitNote();
+                    _newNoteMessage = string.Empty;
+                    GUI.FocusControl(null);
                 }
                 EditorGUILayout.Space();
 

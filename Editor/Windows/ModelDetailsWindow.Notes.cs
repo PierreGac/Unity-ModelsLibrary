@@ -4,6 +4,7 @@ using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Utils;
 using UnityEditor;
+using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
 {
@@ -26,7 +27,18 @@ namespace ModelLibrary.Editor.Windows
 
                 _meta.notes.Add(note);
                 await SaveMeta();
+
+                // Clear the note field and reset focus
                 _newNoteMessage = string.Empty;
+                GUI.FocusControl(null);
+
+                // Invalidate meta cache in all open ModelLibraryWindow instances to refresh note indicators
+                ModelLibraryWindow[] windows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
+                for (int i = 0; i < windows.Length; i++)
+                {
+                    windows[i].InvalidateMetaCache(_modelId, _version);
+                }
+
                 Repaint();
             }
             catch (Exception ex)

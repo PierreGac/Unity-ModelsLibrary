@@ -997,21 +997,21 @@ namespace ModelLibrary.Editor.Windows
                         normal = { textColor = new Color(0.1f, 0.7f, 0.2f) }, // Green text
                         fontStyle = FontStyle.Bold
                     };
-                    
+
                     Color originalBgColor = GUI.backgroundColor;
                     // Green background with transparency for better visibility
                     GUI.backgroundColor = new Color(0.2f, 0.8f, 0.3f, 0.3f);
-                    
+
                     string statusText = hasUpdate ? "Update Available" : "Installed";
                     using (new EditorGUILayout.HorizontalScope("box"))
                     {
                         GUILayout.FlexibleSpace();
                         GUILayout.Label(statusText, installedLabelStyle);
-    GUILayout.FlexibleSpace();
+                        GUILayout.FlexibleSpace();
                     }
-                    
-                    GUI.backgroundColor = originalBgColor;
 
+                    GUI.backgroundColor = originalBgColor;
+                }
                 else if (installed && (string.IsNullOrEmpty(localVersion) || localVersion == "(unknown)"))
                 {
                     // Draw colored label for installed but unknown version
@@ -1019,12 +1019,12 @@ namespace ModelLibrary.Editor.Windows
                     {
                         alignment = TextAnchor.MiddleCenter,
                         padding = new RectOffset(6, 6, 2, 2),
-    normal = { textColor = new Color(0.5f, 0.5f, 0.5f) } // Grey text
+                        normal = { textColor = new Color(0.5f, 0.5f, 0.5f) } // Grey text
                     };
-                    
+
                     Color originalBgColor = GUI.backgroundColor;
                     GUI.backgroundColor = new Color(0.6f, 0.6f, 0.6f, 0.2f);
-                    
+
                     using (new EditorGUILayout.HorizontalScope("box"))
                     {
                         GUILayout.FlexibleSpace();
@@ -1035,13 +1035,13 @@ namespace ModelLibrary.Editor.Windows
                     GUI.backgroundColor = originalBgColor;
                 }
 
-
-            GUI.backgroundColor = originalBackground;
+                GUI.backgroundColor = originalBackground;
+            }
         }
 
         private void DrawImageOnlyCard(ModelIndex.Entry entry, float thumbnailSize, bool highlight = false)
         {
-ey = entry.id + "@" + entry.latestVersion;
+            string key = entry.id + "@" + entry.latestVersion;
             if (!_metaCache.ContainsKey(key) && !_loadingMeta.Contains(key))
             {
                 _ = LoadMetaAsync(entry.id, entry.latestVersion);

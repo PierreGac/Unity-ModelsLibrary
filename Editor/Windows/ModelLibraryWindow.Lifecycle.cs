@@ -104,6 +104,7 @@ namespace ModelLibrary.Editor.Windows
         {
             _indexCache = null;
             _loadingIndex = false;
+            ClearMetaCache();
             InitializeServices();
         }
 

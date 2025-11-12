@@ -28,6 +28,48 @@ namespace ModelLibrary.Editor.Windows
             _thumbnailCacheNodes.Clear();
         }
 
+        /// <summary>
+        /// Clears the entire meta cache.
+        /// </summary>
+        private void ClearMetaCache()
+        {
+            _metaCache.Clear();
+            _metaCacheOrder.Clear();
+            _metaCacheNodes.Clear();
+            _loadingMeta.Clear();
+        }
+
+        /// <summary>
+        /// Invalidates the meta cache for a specific model version.
+        /// This forces the metadata to be reloaded from the repository immediately.
+        /// </summary>
+        /// <param name="modelId">The model ID.</param>
+        /// <param name="version">The version string.</param>
+        public void InvalidateMetaCache(string modelId, string version)
+        {
+            string key = modelId + "@" + version;
+            if (_metaCache.ContainsKey(key))
+            {
+                _metaCache.Remove(key);
+                if (_metaCacheNodes.TryGetValue(key, out LinkedListNode<string> node))
+                {
+                    _metaCacheOrder.Remove(node);
+                    _metaCacheNodes.Remove(key);
+                }
+            }
+            
+            // Trigger immediate reload of metadata to get updated notes
+            if (_service != null && !_loadingMeta.Contains(key))
+            {
+                _ = LoadMetaAsync(modelId, version);
+            }
+            
+            // Update notes count after reload (will be called again when metadata loads)
+            UpdateNotesCount();
+            UpdateWindowTitle();
+            Repaint();
+        }
+
         private async Task LoadMetaAsync(string id, string version)
         {
             string key = id + "@" + version;
@@ -45,6 +87,10 @@ namespace ModelLibrary.Editor.Windows
                         _ = LoadThumbnailAsync(thumbKey, id, version, previewPath);
                     }
                 }
+                
+                // Update notes count and window title after metadata is loaded
+                UpdateNotesCount();
+                UpdateWindowTitle();
                 Repaint();
             }
             catch
