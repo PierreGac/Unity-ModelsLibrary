@@ -25,6 +25,10 @@ namespace ModelLibrary.Editor.Windows
         private const string __FavoritesPrefKey = "ModelLibrary.Favorites";
         private const string __RecentlyUsedPrefKey = "ModelLibrary.RecentlyUsed";
         private const int __MaxRecentlyUsed = 20;
+        private const string __ThumbnailSizePrefKey = "ModelLibrary.ThumbnailSize";
+        private const float __MIN_THUMBNAIL_SIZE = 64f;
+        private const float __MAX_THUMBNAIL_SIZE = 256f;
+        private const float __DEFAULT_THUMBNAIL_SIZE = 128f;
 
         private static readonly TimeSpan NOTIFICATION_DURATION = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan MIN_UPDATE_CHECK_INTERVAL = TimeSpan.FromSeconds(5);
@@ -87,6 +91,7 @@ namespace ModelLibrary.Editor.Windows
         private RecentlyUsedManager _recentlyUsedManager;
         private ModelLibraryUIDrawer.FilterMode _filterMode = ModelLibraryUIDrawer.FilterMode.All;
         private InstallPathHelper _installPathHelper = new InstallPathHelper();
+        private float _thumbnailSize = __DEFAULT_THUMBNAIL_SIZE;
 
         [Serializable]
         private sealed class ImportHistoryEntry

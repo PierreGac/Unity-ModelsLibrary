@@ -164,6 +164,12 @@ namespace ModelLibrary.Editor.Windows
                 DrawListView(filteredEntries);
             }
             EditorGUILayout.EndScrollView();
+
+            // Draw thumbnail size slider in lower right corner (only for grid/image views)
+            if (_viewMode == ViewMode.Grid || _viewMode == ViewMode.ImageOnly)
+            {
+                DrawThumbnailSizeSlider();
+            }
         }
 
         private void DrawToolbar()
@@ -649,11 +655,11 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawGridView(List<ModelIndex.Entry> entries)
         {
-            const float thumbnailSize = 128f;
+            float thumbnailSize = _thumbnailSize;
             const float spacing = 8f;
             const float cardPadding = 4f;
-            const float minCardWidth = thumbnailSize + (cardPadding * 2f);
-            const float minCardHeight = thumbnailSize + 80f;
+            float minCardWidth = thumbnailSize + (cardPadding * 2f);
+            float minCardHeight = thumbnailSize + 80f;
 
             float availableWidth = EditorGUIUtility.currentViewWidth - 20f;
             int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / (minCardWidth + spacing)));
@@ -673,20 +679,30 @@ namespace ModelLibrary.Editor.Windows
 
             for (int row = firstVisibleRow; row <= lastVisibleRow; row++)
             {
-                EditorGUILayout.BeginHorizontal();
-                for (int col = 0; col < columns; col++)
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    int index = (row * columns) + col;
-                    if (index >= entries.Count)
+                    for (int col = 0; col < columns; col++)
                     {
-                        break;
+                        int index = (row * columns) + col;
+                        if (index >= entries.Count)
+                        {
+                            break;
+                        }
+
+                        ModelIndex.Entry entry = entries[index];
+                        bool isHighlighted = index == _keyboardSelectionIndex;
+                        DrawGridCard(entry, thumbnailSize, cardPadding, minCardHeight, isHighlighted);
+
+                        // Add spacing between cards (except for the last card in row)
+                        if (col < columns - 1)
+                        {
+                            GUILayout.Space(spacing);
+                        }
                     }
 
-                    ModelIndex.Entry entry = entries[index];
-                    bool isHighlighted = index == _keyboardSelectionIndex;
-                    DrawGridCard(entry, thumbnailSize, cardPadding, minCardHeight, isHighlighted);
+                    // Add flexible space at the end to prevent the last card from stretching
+                    GUILayout.FlexibleSpace();
                 }
-                EditorGUILayout.EndHorizontal();
             }
 
             int remainingRows = totalRows - lastVisibleRow - 1;
@@ -698,9 +714,9 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawImageOnlyView(List<ModelIndex.Entry> entries)
         {
-            const float thumbnailSize = 200f;
+            float thumbnailSize = _thumbnailSize;
             const float spacing = 10f;
-            const float minCardWidth = thumbnailSize + spacing;
+            float minCardWidth = thumbnailSize + spacing;
 
             float availableWidth = EditorGUIUtility.currentViewWidth - 20f;
             int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / minCardWidth));
@@ -719,20 +735,30 @@ namespace ModelLibrary.Editor.Windows
 
             for (int row = firstVisibleRow; row <= lastVisibleRow; row++)
             {
-                EditorGUILayout.BeginHorizontal();
-                for (int col = 0; col < columns; col++)
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    int index = (row * columns) + col;
-                    if (index >= entries.Count)
+                    for (int col = 0; col < columns; col++)
                     {
-                        break;
+                        int index = (row * columns) + col;
+                        if (index >= entries.Count)
+                        {
+                            break;
+                        }
+
+                        ModelIndex.Entry entry = entries[index];
+                        bool isHighlighted = index == _keyboardSelectionIndex;
+                        DrawImageOnlyCard(entry, thumbnailSize, isHighlighted);
+
+                        // Add spacing between cards (except for the last card in row)
+                        if (col < columns - 1)
+                        {
+                            GUILayout.Space(spacing);
+                        }
                     }
 
-                    ModelIndex.Entry entry = entries[index];
-                    bool isHighlighted = index == _keyboardSelectionIndex;
-                    DrawImageOnlyCard(entry, thumbnailSize, isHighlighted);
+                    // Add flexible space at the end to prevent the last card from stretching
+                    GUILayout.FlexibleSpace();
                 }
-                EditorGUILayout.EndHorizontal();
             }
 
             int remainingRows = totalRows - lastVisibleRow - 1;
@@ -840,8 +866,7 @@ namespace ModelLibrary.Editor.Windows
                 if (TryGetMetaFromCache(key, out ModelMeta meta))
                 {
                     string thumbKey = key + "#thumb";
-                    Texture2D thumbnail;
-                    bool hasThumbnail = TryGetThumbnailFromCache(thumbKey, out thumbnail);
+                    bool hasThumbnail = TryGetThumbnailFromCache(thumbKey, out Texture2D thumbnail);
                     bool isLoadingThumbnail = _loadingThumbnails.Contains(thumbKey);
                     bool isLoadingMetaInner = _loadingMeta.Contains(key);
 
@@ -850,7 +875,7 @@ namespace ModelLibrary.Editor.Windows
                         Rect thumbRect = GUILayoutUtility.GetRect(64f, 64f, GUILayout.Width(64f), GUILayout.Height(64f));
                         if (hasThumbnail && thumbnail != null)
                         {
-                            EditorGUI.DrawPreviewTexture(thumbRect, thumbnail, null, ScaleMode.ScaleToFit);
+                            EditorGUI.DrawPreviewTexture(thumbRect, thumbnail, null, ScaleMode.ScaleAndCrop);
                             GUILayout.Space(6f);
                         }
                         else if (isLoadingThumbnail || isLoadingMetaInner)
@@ -893,7 +918,7 @@ namespace ModelLibrary.Editor.Windows
                 GUI.backgroundColor = new Color(0.2f, 0.4f, 0.6f, 0.35f);
             }
 
-            using (new EditorGUILayout.VerticalScope("box", GUILayout.Width(thumbnailSize + (padding * 2f)), GUILayout.MinHeight(minHeight)))
+            using (new EditorGUILayout.VerticalScope("box", GUILayout.Width(thumbnailSize + (padding * 2f)), GUILayout.MinHeight(minHeight), GUILayout.ExpandWidth(false)))
             {
                 if (_bulkSelectionMode)
                 {
@@ -923,41 +948,53 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 string thumbKey = key + "#thumb";
-                Texture2D thumbnail;
-                bool hasThumbnail = TryGetThumbnailFromCache(thumbKey, out thumbnail);
+                bool hasThumbnail = TryGetThumbnailFromCache(thumbKey, out Texture2D thumbnail);
                 bool isLoadingThumbnail = _loadingThumbnails.Contains(thumbKey);
                 bool isLoadingMeta = _loadingMeta.Contains(key);
 
-                Rect thumbRect = GUILayoutUtility.GetRect(thumbnailSize, thumbnailSize, GUILayout.Width(thumbnailSize), GUILayout.Height(thumbnailSize));
-                string tooltip = BuildModelTooltip(entry, key);
-
-                if (hasThumbnail && thumbnail != null)
+                // Use horizontal scope to center the thumbnail and ensure it fills available width
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    GUIContent thumbContent = new GUIContent(thumbnail, tooltip);
-                    if (GUI.Button(thumbRect, thumbContent, GUIStyle.none))
+                    GUILayout.FlexibleSpace();
+                    Rect thumbRect = GUILayoutUtility.GetRect(thumbnailSize, thumbnailSize, GUILayout.Width(thumbnailSize), GUILayout.Height(thumbnailSize), GUILayout.ExpandWidth(false));
+                    GUILayout.FlexibleSpace();
+
+                    string tooltip = BuildModelTooltip(entry, key);
+
+                    if (hasThumbnail && thumbnail != null)
                     {
-                        ModelDetailsWindow.Open(entry.id, entry.latestVersion);
+                        // Draw thumbnail with proper scaling to fill the rect completely
+                        // ScaleAndCrop ensures the image fills the entire button while maintaining aspect ratio
+                        EditorGUI.DrawPreviewTexture(thumbRect, thumbnail, null, ScaleMode.ScaleAndCrop);
+
+                        // Draw clickable button on top (transparent) with tooltip
+                        GUIContent buttonContent = new GUIContent(string.Empty, tooltip);
+                        if (GUI.Button(thumbRect, buttonContent, GUIStyle.none))
+                        {
+                            ModelDetailsWindow.Open(entry.id, entry.latestVersion);
+                        }
                     }
-                }
-                else
-                {
-                    DrawThumbnailPlaceholder(thumbRect, entry.name, isLoadingThumbnail || isLoadingMeta, () =>
+                    else
                     {
-                        ModelDetailsWindow.Open(entry.id, entry.latestVersion);
-                    });
+                        DrawThumbnailPlaceholder(thumbRect, entry.name, isLoadingThumbnail || isLoadingMeta, () =>
+                        {
+                            ModelDetailsWindow.Open(entry.id, entry.latestVersion);
+                        });
 
-                    if (thumbRect.Contains(Event.current.mousePosition))
-                    {
-                        GUI.tooltip = tooltip;
+                        // Set tooltip for placeholder
+                        if (thumbRect.Contains(Event.current.mousePosition))
+                        {
+                            GUI.tooltip = tooltip;
+                        }
                     }
-                }
 
-                // Draw note badge overlaid on thumbnail in upper right corner
-                bool hasNotes = HasNotes(entry.id, entry.latestVersion);
-                if (hasNotes)
-                {
-                    (bool hasNotesInfo, string notesTooltip) = GetNotesInfo(entry.id, entry.latestVersion);
-                    DrawNoteBadgeOverlay(thumbRect, notesTooltip);
+                    // Draw note badge overlaid on thumbnail in upper right corner
+                    bool hasNotes = HasNotes(entry.id, entry.latestVersion);
+                    if (hasNotes)
+                    {
+                        (bool hasNotesInfo, string notesTooltip) = GetNotesInfo(entry.id, entry.latestVersion);
+                        DrawNoteBadgeOverlay(thumbRect, notesTooltip);
+                    }
                 }
 
                 GUILayout.Space(2f);
@@ -995,12 +1032,14 @@ namespace ModelLibrary.Editor.Windows
                         GUI.color = originalUpdateColor;
                     }
 
-                    string displayName = entry.name;
-                    if (displayName.Length > 15)
-                    {
-                        displayName = string.Concat(displayName.Substring(0, 12), "...");
-                    }
-                    GUILayout.Label(displayName, EditorStyles.miniLabel, GUILayout.ExpandWidth(true));
+                    // Calculate available width for the label (accounting for star button and update badge)
+                    float labelWidth = thumbnailSize + (padding * 2f) - 16f - (hasUpdateBadge ? 16f : 0f) - 8f; // Subtract space for buttons and margin
+
+                    // Get truncated text with ellipsis if needed
+                    string displayName = TruncateTextWithEllipsis(entry.name, EditorStyles.miniLabel, labelWidth);
+
+                    // Use the label with fixed width
+                    GUILayout.Label(displayName, EditorStyles.miniLabel, GUILayout.Width(labelWidth), GUILayout.ExpandWidth(false));
                 }
 
                 GUILayout.Label($"v{entry.latestVersion}", EditorStyles.centeredGreyMiniLabel);
@@ -1026,7 +1065,7 @@ namespace ModelLibrary.Editor.Windows
                     GUI.backgroundColor = new Color(0.2f, 0.8f, 0.3f, 0.3f);
 
                     string statusText = hasUpdate ? "Update Available" : "Installed";
-                    using (new EditorGUILayout.HorizontalScope("box"))
+                    using (new EditorGUILayout.HorizontalScope("box", GUILayout.ExpandWidth(false)))
                     {
                         GUILayout.FlexibleSpace();
                         GUILayout.Label(statusText, installedLabelStyle);
@@ -1071,12 +1110,11 @@ namespace ModelLibrary.Editor.Windows
             }
 
             string thumbKey = key + "#thumb";
-            Texture2D thumbnail;
-            bool hasThumbnail = TryGetThumbnailFromCache(thumbKey, out thumbnail);
+            bool hasThumbnail = TryGetThumbnailFromCache(thumbKey, out Texture2D thumbnail);
             bool isLoadingThumbnail = _loadingThumbnails.Contains(thumbKey);
             bool isLoadingMeta = _loadingMeta.Contains(key);
 
-            Rect thumbRect = GUILayoutUtility.GetRect(thumbnailSize, thumbnailSize, GUILayout.Width(thumbnailSize), GUILayout.Height(thumbnailSize));
+            Rect thumbRect = GUILayoutUtility.GetRect(thumbnailSize, thumbnailSize, GUILayout.Width(thumbnailSize), GUILayout.Height(thumbnailSize), GUILayout.ExpandWidth(false));
 
             if (highlight)
             {
@@ -1088,8 +1126,13 @@ namespace ModelLibrary.Editor.Windows
 
             if (hasThumbnail && thumbnail != null)
             {
-                GUIContent thumbContent = new GUIContent(thumbnail, tooltip);
-                if (GUI.Button(thumbRect, thumbContent, GUIStyle.none))
+                // Draw thumbnail with proper scaling to fill the rect completely
+                // ScaleAndCrop ensures the image fills the entire button while maintaining aspect ratio
+                EditorGUI.DrawPreviewTexture(thumbRect, thumbnail, null, ScaleMode.ScaleAndCrop);
+
+                // Draw clickable button on top (transparent) with tooltip
+                GUIContent buttonContent = new GUIContent(string.Empty, tooltip);
+                if (GUI.Button(thumbRect, buttonContent, GUIStyle.none))
                 {
                     ModelDetailsWindow.Open(entry.id, entry.latestVersion);
                 }
@@ -1101,6 +1144,7 @@ namespace ModelLibrary.Editor.Windows
                     ModelDetailsWindow.Open(entry.id, entry.latestVersion);
                 });
 
+                // Set tooltip for placeholder
                 if (thumbRect.Contains(Event.current.mousePosition))
                 {
                     GUI.tooltip = tooltip;
@@ -1565,6 +1609,93 @@ namespace ModelLibrary.Editor.Windows
             }
 
             Repaint();
+        }
+
+        /// <summary>
+        /// Truncates text to fit within the specified width, adding ellipsis if needed.
+        /// </summary>
+        /// <param name="text">The text to truncate.</param>
+        /// <param name="style">The GUIStyle to use for measuring text width.</param>
+        /// <param name="maxWidth">The maximum width the text should fit within.</param>
+        /// <returns>The truncated text with ellipsis if needed, or the original text if it fits.</returns>
+        private static string TruncateTextWithEllipsis(string text, GUIStyle style, float maxWidth)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            // Check if text fits without truncation
+            Vector2 textSize = style.CalcSize(new GUIContent(text));
+            if (textSize.x <= maxWidth)
+            {
+                return text;
+            }
+
+            // Calculate ellipsis width
+            Vector2 ellipsisSize = style.CalcSize(new GUIContent("..."));
+            float availableWidth = maxWidth - ellipsisSize.x;
+
+            // Binary search for the maximum length that fits
+            int minLength = 0;
+            int maxLength = text.Length;
+            string bestFit = "...";
+
+            while (minLength <= maxLength)
+            {
+                int midLength = (minLength + maxLength) / 2;
+                string testText = text[..midLength];
+                Vector2 testSize = style.CalcSize(new GUIContent(testText));
+
+                if (testSize.x <= availableWidth)
+                {
+                    bestFit = testText + "...";
+                    minLength = midLength + 1;
+                }
+                else
+                {
+                    maxLength = midLength - 1;
+                }
+            }
+
+            return bestFit;
+        }
+
+        /// <summary>
+        /// Draws a thumbnail size slider in the lower right corner of the window.
+        /// Similar to Unity's Project view slider for controlling icon sizes.
+        /// </summary>
+        private void DrawThumbnailSizeSlider()
+        {
+            const float sliderWidth = 100f;
+            const float sliderHeight = 18f;
+            const float margin = 8f;
+
+            // Get window position and size
+            Rect windowRect = position;
+            float sliderX = windowRect.width - sliderWidth - margin;
+            float sliderY = windowRect.height - sliderHeight - margin;
+
+            // Create slider rect in lower right corner
+            Rect sliderRect = new Rect(sliderX, sliderY, sliderWidth, sliderHeight);
+
+            // Draw slider
+            float newSize = GUI.HorizontalSlider(sliderRect, _thumbnailSize, __MIN_THUMBNAIL_SIZE, __MAX_THUMBNAIL_SIZE);
+            if (Mathf.Abs(newSize - _thumbnailSize) > 0.1f)
+            {
+                _thumbnailSize = newSize;
+                EditorPrefs.SetFloat(__ThumbnailSizePrefKey, _thumbnailSize);
+                Repaint();
+            }
+
+            // Draw size label next to slider (optional, for user feedback)
+            Rect labelRect = new Rect(sliderX - 50f, sliderY, 45f, sliderHeight);
+            GUIStyle labelStyle = new GUIStyle(EditorStyles.miniLabel)
+            {
+                alignment = TextAnchor.MiddleRight,
+                normal = { textColor = EditorStyles.miniLabel.normal.textColor }
+            };
+            GUI.Label(labelRect, $"{(int)_thumbnailSize}px", labelStyle);
         }
     }
 }

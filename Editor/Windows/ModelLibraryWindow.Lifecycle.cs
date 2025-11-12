@@ -21,6 +21,8 @@ namespace ModelLibrary.Editor.Windows
         private void OnEnable()
         {
             _sortMode = (ModelSortMode)EditorPrefs.GetInt(__SortModePrefKey, (int)ModelSortMode.Name);
+            _thumbnailSize = EditorPrefs.GetFloat(__ThumbnailSizePrefKey, __DEFAULT_THUMBNAIL_SIZE);
+            _thumbnailSize = Mathf.Clamp(_thumbnailSize, __MIN_THUMBNAIL_SIZE, __MAX_THUMBNAIL_SIZE);
 
             _searchHistoryManager = new SearchHistoryManager(__SearchHistoryPrefKey, __MaxSearchHistory);
             _filterPresetManager = new FilterPresetManager(__FilterPresetsPrefKey);
