@@ -53,14 +53,52 @@ namespace ModelLibrary.Editor.Services
             string[] selected = Selection.assetGUIDs;
             List<string> relPayload = new List<string>();
             List<string> guids = new List<string>();
+            HashSet<string> processedGuids = new HashSet<string>(); // Track processed GUIDs to avoid duplicates
             int totalVertices = 0;
             int totalTriangles = 0;
             HashSet<int> processedMeshIds = new HashSet<int>();
 
+            // First, expand folders to get all files recursively
+            List<string> allAssetGuids = new List<string>();
             foreach (string guid in selected)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 if (string.IsNullOrEmpty(path))
+                {
+                    continue;
+                }
+
+                // If it's a folder, recursively collect all files within it
+                if (AssetDatabase.IsValidFolder(path))
+                {
+                    string[] folderGuids = AssetDatabase.FindAssets(string.Empty, new[] { path });
+                    allAssetGuids.AddRange(folderGuids);
+                }
+                else
+                {
+                    // It's a file, add it directly
+                    allAssetGuids.Add(guid);
+                }
+            }
+
+            // Process all collected assets
+            foreach (string guid in allAssetGuids)
+            {
+                // Skip if already processed (can happen when folders overlap)
+                if (processedGuids.Contains(guid))
+                {
+                    continue;
+                }
+                processedGuids.Add(guid);
+
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (string.IsNullOrEmpty(path))
+                {
+                    continue;
+                }
+
+                // Skip folders (they were already expanded above)
+                if (AssetDatabase.IsValidFolder(path))
                 {
                     continue;
                 }
