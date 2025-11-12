@@ -952,6 +952,14 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
+                // Draw note badge overlaid on thumbnail in upper right corner
+                bool hasNotes = HasNotes(entry.id, entry.latestVersion);
+                if (hasNotes)
+                {
+                    (bool hasNotesInfo, string notesTooltip) = GetNotesInfo(entry.id, entry.latestVersion);
+                    DrawNoteBadgeOverlay(thumbRect, notesTooltip);
+                }
+
                 GUILayout.Space(2f);
 
                 using (new EditorGUILayout.HorizontalScope())
@@ -970,7 +978,22 @@ namespace ModelLibrary.Editor.Windows
                     }
                     GUI.color = originalColor;
 
-                    DrawCompactNotificationBadges(entry);
+                    // Only draw update badge in horizontal layout (note badge is now overlaid on thumbnail)
+                    bool hasUpdateBadge = _modelUpdateStatus.TryGetValue(entry.id, out bool updateStatusBadge) && updateStatusBadge;
+                    bool installedForBadge = TryGetLocalInstall(entry, out ModelMeta localMetaForBadge);
+                    if (installedForBadge && localMetaForBadge != null && !string.IsNullOrEmpty(localMetaForBadge.version) && localMetaForBadge.version != "(unknown)")
+                    {
+                        hasUpdateBadge = hasUpdateBadge || ModelVersionUtils.NeedsUpgrade(localMetaForBadge.version, entry.latestVersion);
+                    }
+                    if (hasUpdateBadge)
+                    {
+                        GUIStyle updateStyle = new GUIStyle(GUI.skin.label);
+                        updateStyle.normal.textColor = Color.yellow;
+                        Color originalUpdateColor = GUI.color;
+                        GUI.color = Color.yellow;
+                        GUILayout.Label("🔄", updateStyle, GUILayout.Width(16), GUILayout.Height(16));
+                        GUI.color = originalUpdateColor;
+                    }
 
                     string displayName = entry.name;
                     if (displayName.Length > 15)
@@ -1136,6 +1159,37 @@ namespace ModelLibrary.Editor.Windows
 
             tooltip.AppendLine("\nClick to view details");
             return tooltip.ToString();
+        }
+
+        /// <summary>
+        /// Draws a note badge overlaid on the thumbnail in the upper right corner.
+        /// </summary>
+        /// <param name="thumbRect">The rectangle of the thumbnail.</param>
+        /// <param name="tooltip">Tooltip text to display when hovering over the badge.</param>
+        private void DrawNoteBadgeOverlay(Rect thumbRect, string tooltip)
+        {
+            const float badgeSize = 22f;
+            const float offset = 3f;
+
+            // Position badge in upper right corner
+            Rect badgeRect = new Rect(
+                thumbRect.x + thumbRect.width - badgeSize - offset,
+                thumbRect.y + offset,
+                badgeSize,
+                badgeSize
+            );
+
+            // Draw note emoji/icon with light blue color (no background for transparency)
+            GUIStyle badgeStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = 14,
+                normal = { textColor = new Color(0.4f, 0.75f, 1f) } // Light blue
+            };
+
+            string tooltipText = !string.IsNullOrEmpty(tooltip) ? tooltip : "This model has feedback notes";
+            GUIContent badgeContent = new GUIContent("💬", tooltipText);
+            GUI.Label(badgeRect, badgeContent, badgeStyle);
         }
 
         private void DrawThumbnailPlaceholder(Rect rect, string modelName, bool isLoading, Action onClick)

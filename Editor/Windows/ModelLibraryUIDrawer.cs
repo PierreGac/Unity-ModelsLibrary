@@ -230,8 +230,8 @@ namespace ModelLibrary.Editor.Windows
                     Color originalColor = GUI.color;
                     GUI.color = new Color(0.3f, 0.7f, 1f); // Light blue
                     string tooltip = !string.IsNullOrEmpty(notesTooltip) ? notesTooltip : "This model has feedback notes - Click to view";
-                    GUIContent notesContent = new GUIContent("📝", tooltip);
-                    GUILayout.Label(notesContent, notesBadgeStyle, GUILayout.Width(20), GUILayout.Height(20));
+                    GUIContent notesContent = new GUIContent("💬", tooltip);
+                    GUILayout.Label(notesContent, notesBadgeStyle, GUILayout.Width(25), GUILayout.Height(20));
                     GUI.color = originalColor;
                 }
             }
@@ -287,7 +287,7 @@ namespace ModelLibrary.Editor.Windows
         {
             if (hasNotes)
             {
-                GUILayout.Label("📝", GUILayout.Width(14), GUILayout.Height(14));
+                GUILayout.Label("💬", GUILayout.Width(19), GUILayout.Height(14));
             }
             if (hasUpdate)
             {
