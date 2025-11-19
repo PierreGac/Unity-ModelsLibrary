@@ -12,6 +12,12 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public partial class ModelSubmitWindow
     {
+        /// <summary>
+        /// Checks if a model with the given name already exists in the repository.
+        /// Performs case-insensitive comparison and trims whitespace.
+        /// </summary>
+        /// <param name="name">The model name to check (will be trimmed before comparison).</param>
+        /// <returns>True if a model with this name exists, false otherwise.</returns>
         private bool ModelNameExists(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -19,12 +25,25 @@ namespace ModelLibrary.Editor.Windows
                 return false;
             }
 
-            return _existingModels.Any(entry => entry != null && string.Equals(entry.name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+            string trimmedName = name.Trim();
+            if (string.IsNullOrEmpty(trimmedName))
+            {
+                return false;
+            }
+
+            return _existingModels.Any(entry => 
+                entry != null && 
+                !string.IsNullOrEmpty(entry.name) &&
+                string.Equals(entry.name.Trim(), trimmedName, StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>
-        /// Check if a model with the same name and version already exists.
+        /// Checks if a model with the same name and version already exists.
+        /// Performs case-insensitive comparison and trims whitespace for both name and version.
         /// </summary>
+        /// <param name="name">The model name to check (will be trimmed before comparison).</param>
+        /// <param name="version">The version string to check (will be trimmed before comparison).</param>
+        /// <returns>True if a model with this name and version exists, false otherwise.</returns>
         private bool ModelVersionExists(string name, string version)
         {
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(version))
@@ -32,10 +51,20 @@ namespace ModelLibrary.Editor.Windows
                 return false;
             }
 
+            string trimmedName = name.Trim();
+            string trimmedVersion = version.Trim();
+
+            if (string.IsNullOrEmpty(trimmedName) || string.IsNullOrEmpty(trimmedVersion))
+            {
+                return false;
+            }
+
             return _existingModels.Any(entry =>
                 entry != null &&
-                string.Equals(entry.name, name.Trim(), StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(entry.latestVersion, version.Trim(), StringComparison.OrdinalIgnoreCase));
+                !string.IsNullOrEmpty(entry.name) &&
+                !string.IsNullOrEmpty(entry.latestVersion) &&
+                string.Equals(entry.name.Trim(), trimmedName, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(entry.latestVersion.Trim(), trimmedVersion, StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>
@@ -60,11 +89,10 @@ namespace ModelLibrary.Editor.Windows
             List<string> pathErrors = PathUtils.ValidateRelativePath(_relativePath);
             errors.AddRange(pathErrors);
 
-            // Validate changelog - simple check
-            if (string.IsNullOrEmpty(_changeSummary))
-            {
-                errors.Add("Changelog is required");
-            }
+            // Validate changelog using comprehensive validator
+            bool isUpdateMode = _mode == SubmitMode.Update;
+            List<string> changelogErrors = ChangelogValidator.ValidateChangelog(_changeSummary, isUpdateMode);
+            errors.AddRange(changelogErrors);
 
             if (_mode == SubmitMode.New)
             {

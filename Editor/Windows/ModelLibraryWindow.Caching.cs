@@ -57,14 +57,14 @@ namespace ModelLibrary.Editor.Windows
                     _metaCacheOrder.Remove(node);
                     _metaCacheNodes.Remove(key);
                 }
-}
-            
+            }
+
             // Trigger immediate reload of metadata to get updated notes
             if (_service != null && !_loadingMeta.Contains(key))
             {
                 _ = LoadMetaAsync(modelId, version);
-}
-            
+            }
+
             // Update notes count after reload (will be called again when metadata loads)
             UpdateNotesCount();
             UpdateWindowTitle();
@@ -87,8 +87,8 @@ namespace ModelLibrary.Editor.Windows
                     {
                         _ = LoadThumbnailAsync(thumbKey, id, version, previewPath);
                     }
-}
-                
+                }
+
                 // Update notes count and window title after metadata is loaded
                 UpdateNotesCount();
                 UpdateWindowTitle();
@@ -96,8 +96,8 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Load Meta Failed", 
-                    $"Failed to load metadata for {id} version {version}: {ex.Message}", 
+                ErrorLogger.LogError("Load Meta Failed",
+                    $"Failed to load metadata for {id} version {version}: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"Key: {key}, ModelId: {id}, Version: {version}");
             }
             finally
@@ -124,8 +124,8 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Load Thumbnail Failed", 
-                    $"Failed to load thumbnail: {ex.Message}", 
+                ErrorLogger.LogError("Load Thumbnail Failed",
+                    $"Failed to load thumbnail: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"CacheKey: {cacheKey}, ModelId: {id}, Version: {version}, RelativePath: {relativePath}");
                 RemoveThumbnailCacheEntry(cacheKey);
             }
@@ -514,7 +514,13 @@ namespace ModelLibrary.Editor.Windows
             string key = modelId + "@" + version;
             if (TryGetMetaFromCache(key, out ModelMeta meta))
             {
-                return meta.notes != null && meta.notes.Count > 0;
+                bool hasNotes = meta.notes != null && meta.notes.Count > 0;
+
+                // Only show notification if notes exist AND haven't been read
+                if (hasNotes)
+                {
+                    return !NotificationStateManager.AreNotesRead(modelId, version);
+                }
             }
 
             return false;
@@ -528,11 +534,11 @@ namespace ModelLibrary.Editor.Windows
                 // Performance: Use StringBuilder for building tooltip in loop
                 StringBuilder tooltipBuilder = new StringBuilder();
                 tooltipBuilder.Append($"This model has {meta.notes.Count} note{(meta.notes.Count == 1 ? string.Empty : "s")}:\n");
-                
+
                 foreach (ModelNote note in meta.notes.OrderByDescending(entry => entry.createdTimeTicks).Take(3))
                 {
-                    string preview = note.message.Length > StringConstants.MAX_TOOLTIP_PREVIEW_LENGTH 
-                        ? $"{note.message.Substring(0, StringConstants.MAX_TOOLTIP_PREVIEW_LENGTH)}..." 
+                    string preview = note.message.Length > StringConstants.MAX_TOOLTIP_PREVIEW_LENGTH
+                        ? $"{note.message.Substring(0, StringConstants.MAX_TOOLTIP_PREVIEW_LENGTH)}..."
                         : note.message;
                     tooltipBuilder.Append($"• [{note.tag}] {preview}\n");
                 }

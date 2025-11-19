@@ -17,6 +17,13 @@ namespace ModelLibrary.Editor.Windows
             HandleKeyboardShortcuts();
             DrawNotification();
 
+            // Draw loading overlay if refresh or loading is in progress
+            if (_refreshingManifest || _loadingIndex)
+            {
+                DrawLoadingOverlay();
+                return; // Block all UI interaction during loading
+            }
+
             if (!FirstRunWizard.IsConfigured())
             {
                 DrawConfigurationRequired();
@@ -434,6 +441,70 @@ namespace ModelLibrary.Editor.Windows
                     _viewMode = (ViewMode)newViewMode;
                     Repaint();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Draws a full-screen loading overlay that blocks all UI interaction during refresh operations.
+        /// </summary>
+        private void DrawLoadingOverlay()
+        {
+            Rect overlayRect = new Rect(0, 0, position.width, position.height);
+            
+            // Draw semi-transparent background
+            Color originalColor = GUI.color;
+            GUI.color = new Color(0, 0, 0, 0.5f);
+            GUI.DrawTexture(overlayRect, Texture2D.whiteTexture);
+            GUI.color = originalColor;
+
+            // Draw loading message box in center
+            float boxWidth = 300f;
+            float boxHeight = 100f;
+            Rect boxRect = new Rect(
+                (position.width - boxWidth) * 0.5f,
+                (position.height - boxHeight) * 0.5f,
+                boxWidth,
+                boxHeight
+            );
+
+            GUI.Box(boxRect, "", EditorStyles.helpBox);
+
+            // Draw loading text
+            GUIStyle labelStyle = new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = 14
+            };
+
+            string loadingText = _refreshingManifest 
+                ? "Refreshing model library..." 
+                : "Loading model index...";
+
+            Rect labelRect = new Rect(boxRect.x, boxRect.y + 20f, boxWidth, 30f);
+            GUI.Label(labelRect, loadingText, labelStyle);
+
+            // Draw progress indicator (animated dots)
+            string progressDots = "";
+            int dotCount = (int)(EditorApplication.timeSinceStartup * 2) % 4;
+            for (int i = 0; i < dotCount; i++)
+            {
+                progressDots += ".";
+            }
+
+            Rect progressRect = new Rect(boxRect.x, boxRect.y + 50f, boxWidth, 20f);
+            GUIStyle progressStyle = new GUIStyle(EditorStyles.label)
+            {
+                alignment = TextAnchor.MiddleCenter
+            };
+            GUI.Label(progressRect, progressDots, progressStyle);
+
+            // Consume all events to block interaction
+            if (Event.current.type == EventType.MouseDown || 
+                Event.current.type == EventType.MouseUp ||
+                Event.current.type == EventType.KeyDown ||
+                Event.current.type == EventType.ScrollWheel)
+            {
+                Event.current.Use();
             }
         }
 
@@ -1016,12 +1087,14 @@ namespace ModelLibrary.Editor.Windows
                     GUI.color = originalColor;
 
                     // Only draw update badge in horizontal layout (note badge is now overlaid on thumbnail)
-                    bool hasUpdateBadge = _modelUpdateStatus.TryGetValue(entry.id, out bool updateStatusBadge) && updateStatusBadge;
+                    bool hasUpdateFromCache = _modelUpdateStatus.TryGetValue(entry.id, out bool updateStatusBadge) && updateStatusBadge;
+                    bool hasUpdateLocally = false;
                     bool installedForBadge = TryGetLocalInstall(entry, out ModelMeta localMetaForBadge);
                     if (installedForBadge && localMetaForBadge != null && !string.IsNullOrEmpty(localMetaForBadge.version) && localMetaForBadge.version != "(unknown)")
                     {
-                        hasUpdateBadge = hasUpdateBadge || ModelVersionUtils.NeedsUpgrade(localMetaForBadge.version, entry.latestVersion);
+                        hasUpdateLocally = ModelVersionUtils.NeedsUpgrade(localMetaForBadge.version, entry.latestVersion);
                     }
+                    bool hasUpdateBadge = (hasUpdateFromCache || hasUpdateLocally) && !NotificationStateManager.IsUpdateRead(entry.id);
                     if (hasUpdateBadge)
                     {
                         GUIStyle updateStyle = new GUIStyle(GUI.skin.label);
@@ -1130,6 +1203,35 @@ namespace ModelLibrary.Editor.Windows
                 // ScaleAndCrop ensures the image fills the entire button while maintaining aspect ratio
                 EditorGUI.DrawPreviewTexture(thumbRect, thumbnail, null, ScaleMode.ScaleAndCrop);
 
+                // Draw notification badges overlay on thumbnail
+                bool hasNotes = HasNotes(entry.id, entry.latestVersion);
+                bool hasUpdateFromCache = _modelUpdateStatus.TryGetValue(entry.id, out bool updateStatus) && updateStatus;
+                bool hasUpdateLocally = false;
+                bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
+                if (installed && localMeta != null && !string.IsNullOrEmpty(localMeta.version) && localMeta.version != "(unknown)")
+                {
+                    hasUpdateLocally = ModelVersionUtils.NeedsUpgrade(localMeta.version, entry.latestVersion);
+                }
+                bool hasUpdate = (hasUpdateFromCache || hasUpdateLocally) && !NotificationStateManager.IsUpdateRead(entry.id);
+
+                // Draw badges in top-right corner of thumbnail
+                if (hasNotes || hasUpdate)
+                {
+                    Rect badgeRect = new Rect(thumbRect.xMax - 20f, thumbRect.y + 2f, 18f, 18f);
+                    if (hasNotes)
+                    {
+                        GUI.Label(badgeRect, "📝", EditorStyles.boldLabel);
+                        badgeRect.x -= 20f; // Offset for update badge if both present
+                    }
+                    if (hasUpdate)
+                    {
+                        Color originalColor = GUI.color;
+                        GUI.color = Color.yellow;
+                        GUI.Label(badgeRect, "🔄", EditorStyles.boldLabel);
+                        GUI.color = originalColor;
+                    }
+                }
+
                 // Draw clickable button on top (transparent) with tooltip
                 GUIContent buttonContent = new GUIContent(string.Empty, tooltip);
                 if (GUI.Button(thumbRect, buttonContent, GUIStyle.none))
@@ -1173,7 +1275,14 @@ namespace ModelLibrary.Editor.Windows
                 }
             }
 
-            bool hasUpdate = _modelUpdateStatus.TryGetValue(entry.id, out bool updateStatus) && updateStatus;
+            bool hasUpdateFromCache = _modelUpdateStatus.TryGetValue(entry.id, out bool updateStatus) && updateStatus;
+            bool hasUpdateLocally = false;
+            bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
+            if (installed && localMeta != null && !string.IsNullOrEmpty(localMeta.version) && localMeta.version != "(unknown)")
+            {
+                hasUpdateLocally = ModelVersionUtils.NeedsUpgrade(localMeta.version, entry.latestVersion);
+            }
+            bool hasUpdate = (hasUpdateFromCache || hasUpdateLocally) && !NotificationStateManager.IsUpdateRead(entry.id);
             bool hasNotes = HasNotes(entry.id, entry.latestVersion);
             bool isFavorite = _favoritesManager.IsFavorite(entry.id);
             bool isInstalled = TryGetLocalInstall(entry, out _);
@@ -1294,7 +1403,7 @@ namespace ModelLibrary.Editor.Windows
                 hasUpdateLocally = ModelVersionUtils.NeedsUpgrade(localMeta.version, entry.latestVersion);
             }
 
-            bool hasUpdate = hasUpdateFromCache || hasUpdateLocally;
+            bool hasUpdate = (hasUpdateFromCache || hasUpdateLocally) && !NotificationStateManager.IsUpdateRead(entry.id);
 
             ModelLibraryUIDrawer.DrawNotificationBadges(hasNotes, hasUpdate, notesTooltip);
         }
@@ -1302,13 +1411,16 @@ namespace ModelLibrary.Editor.Windows
         private void DrawCompactNotificationBadges(ModelIndex.Entry entry)
         {
             bool hasNotes = HasNotes(entry.id, entry.latestVersion);
-            bool hasUpdate = _modelUpdateStatus.TryGetValue(entry.id, out bool updateStatus) && updateStatus;
+            bool hasUpdateFromCache = _modelUpdateStatus.TryGetValue(entry.id, out bool updateStatus) && updateStatus;
 
+            bool hasUpdateLocally = false;
             bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
             if (installed && localMeta != null && !string.IsNullOrEmpty(localMeta.version) && localMeta.version != "(unknown)")
             {
-                hasUpdate = hasUpdate || ModelVersionUtils.NeedsUpgrade(localMeta.version, entry.latestVersion);
+                hasUpdateLocally = ModelVersionUtils.NeedsUpgrade(localMeta.version, entry.latestVersion);
             }
+
+            bool hasUpdate = (hasUpdateFromCache || hasUpdateLocally) && !NotificationStateManager.IsUpdateRead(entry.id);
 
             ModelLibraryUIDrawer.DrawCompactNotificationBadges(hasNotes, hasUpdate);
         }

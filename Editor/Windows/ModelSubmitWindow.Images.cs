@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -86,18 +87,50 @@ namespace ModelLibrary.Editor.Windows
                     currentEvent.Use();
 
                     // Process dragged files
+                    int addedCount = 0;
+                    int skippedCount = 0;
+                    
                     if (DragAndDrop.paths != null && DragAndDrop.paths.Length > 0)
                     {
                         foreach (string path in DragAndDrop.paths)
                         {
                             if (IsValidImageFile(path))
                             {
+                                int countBefore = _imageAbsPaths.Count;
                                 AddImageFile(path);
+                                if (_imageAbsPaths.Count > countBefore)
+                                {
+                                    addedCount++;
+                                }
+                                else
+                                {
+                                    skippedCount++;
+                                }
+                            }
+                            else
+                            {
+                                skippedCount++;
                             }
                         }
                     }
+                    
+                    // Provide user feedback
+                    if (addedCount > 0)
+                    {
+                        Debug.Log($"[ModelSubmitWindow] Added {addedCount} image{(addedCount == 1 ? string.Empty : "s")} via drag-and-drop");
+                    }
+                    if (skippedCount > 0 && addedCount == 0)
+                    {
+                        EditorUtility.DisplayDialog("No Images Added",
+                            $"None of the {skippedCount} dropped file{(skippedCount == 1 ? string.Empty : "s")} could be added.\n\n" +
+                            "Please ensure files are valid image formats (PNG, JPG, JPEG, TGA, PSD) and exist.",
+                            "OK");
+                    }
                     else if (DragAndDrop.objectReferences != null && DragAndDrop.objectReferences.Length > 0)
                     {
+                        int textureAddedCount = 0;
+                        int textureSkippedCount = 0;
+                        
                         foreach (UnityEngine.Object obj in DragAndDrop.objectReferences)
                         {
                             if (obj is Texture2D texture)
@@ -105,10 +138,62 @@ namespace ModelLibrary.Editor.Windows
                                 string assetPath = AssetDatabase.GetAssetPath(texture);
                                 if (!string.IsNullOrEmpty(assetPath))
                                 {
-                                    string fullPath = Path.GetFullPath(assetPath);
-                                    AddImageFile(fullPath);
+                                    try
+                                    {
+                                        // Convert Unity asset path to full file system path
+                                        string fullDataPath = Path.GetFullPath(Application.dataPath);
+                                        string fullPath;
+                                        
+                                        if (assetPath.StartsWith("Assets/"))
+                                        {
+                                            // Remove "Assets/" prefix and combine with project root
+                                            string relativePath = assetPath.Substring(7);
+                                            fullPath = Path.GetFullPath(Path.Combine(fullDataPath, "..", relativePath));
+                                        }
+                                        else
+                                        {
+                                            // Fallback: try direct conversion
+                                            fullPath = Path.GetFullPath(assetPath);
+                                        }
+                                        
+                                        int countBefore = _imageAbsPaths.Count;
+                                        AddImageFile(fullPath);
+                                        if (_imageAbsPaths.Count > countBefore)
+                                        {
+                                            textureAddedCount++;
+                                        }
+                                        else
+                                        {
+                                            textureSkippedCount++;
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        ErrorLogger.LogError("Convert Asset Path Failed",
+                                            $"Failed to convert asset path '{assetPath}' to full path: {ex.Message}",
+                                            ErrorHandler.CategorizeException(ex), ex, $"AssetPath: {assetPath}");
+                                        textureSkippedCount++;
+                                    }
+                                }
+                                else
+                                {
+                                    Debug.LogWarning($"[ModelSubmitWindow] Texture2D '{texture.name}' has no asset path");
+                                    textureSkippedCount++;
                                 }
                             }
+                        }
+                        
+                        // Provide user feedback for texture drag-and-drop
+                        if (textureAddedCount > 0)
+                        {
+                            Debug.Log($"[ModelSubmitWindow] Added {textureAddedCount} texture{(textureAddedCount == 1 ? string.Empty : "s")} via drag-and-drop");
+                        }
+                        if (textureSkippedCount > 0 && textureAddedCount == 0)
+                        {
+                            EditorUtility.DisplayDialog("No Images Added",
+                                $"None of the {textureSkippedCount} dropped texture{(textureSkippedCount == 1 ? string.Empty : "s")} could be added.\n\n" +
+                                "Please ensure textures are valid image formats.",
+                                "OK");
                         }
                     }
                 }
@@ -117,26 +202,92 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Adds an image file to the list if valid and not already present.
+        /// Normalizes the path to ensure consistent comparison and handles both relative and absolute paths.
         /// </summary>
-        /// <param name="filePath">Path to the image file</param>
+        /// <param name="filePath">Path to the image file (can be relative or absolute)</param>
         private void AddImageFile(string filePath)
         {
-            if (IsValidImageFile(filePath))
+            if (string.IsNullOrEmpty(filePath))
             {
-                if (!_imageAbsPaths.Contains(filePath))
+                Debug.LogWarning("[ModelSubmitWindow] Cannot add image: file path is empty");
+                return;
+            }
+
+            // Normalize path - convert to absolute path for consistent comparison
+            string normalizedPath = filePath;
+            try
+            {
+                // If path is relative, make it absolute
+                if (!Path.IsPathRooted(filePath))
                 {
-                    _imageAbsPaths.Add(filePath);
-                    SaveDraft(); // Auto-save draft when images are added
+                    // Try to resolve relative to project root
+                    string projectRoot = Path.GetFullPath(Application.dataPath + "/..");
+                    normalizedPath = Path.GetFullPath(Path.Combine(projectRoot, filePath));
                 }
                 else
                 {
-                    Debug.LogWarning($"Image '{Path.GetFileName(filePath)}' is already selected.");
+                    normalizedPath = Path.GetFullPath(filePath);
                 }
+
+                // Normalize path separators
+                normalizedPath = normalizedPath.Replace('\\', '/');
             }
-            else
+            catch (Exception ex)
             {
-                Debug.LogError($"Invalid image file: {Path.GetFileName(filePath)}");
+                ErrorLogger.LogError("Normalize Image Path Failed",
+                    $"Failed to normalize image path '{filePath}': {ex.Message}",
+                    ErrorHandler.CategorizeException(ex), ex, $"FilePath: {filePath}");
+                return;
             }
+
+            // Validate the normalized path
+            if (!IsValidImageFile(normalizedPath))
+            {
+                string fileName = Path.GetFileName(filePath);
+                ErrorLogger.LogError("Invalid Image File",
+                    $"Cannot add image '{fileName}': File does not exist or is not a valid image format.",
+                    ErrorHandler.ErrorCategory.Validation, null, $"FilePath: {normalizedPath}");
+                
+                // Show user-friendly error message
+                EditorUtility.DisplayDialog("Invalid Image",
+                    $"Cannot add '{fileName}':\n\n" +
+                    "• File does not exist\n" +
+                    "• Or file is not a supported image format (PNG, JPG, JPEG, TGA, PSD)\n" +
+                    "• Or file exceeds maximum size (50MB)",
+                    "OK");
+                return;
+            }
+
+            // Check if already added (case-insensitive, normalized comparison)
+            bool alreadyAdded = _imageAbsPaths.Any(existingPath =>
+            {
+                try
+                {
+                    string normalizedExisting = Path.GetFullPath(existingPath).Replace('\\', '/');
+                    return string.Equals(normalizedExisting, normalizedPath, StringComparison.OrdinalIgnoreCase);
+                }
+                catch
+                {
+                    return false;
+                }
+            });
+
+            if (alreadyAdded)
+            {
+                string fileName = Path.GetFileName(normalizedPath);
+                Debug.LogWarning($"[ModelSubmitWindow] Image '{fileName}' is already selected.");
+                EditorUtility.DisplayDialog("Image Already Added",
+                    $"The image '{fileName}' is already in the list.",
+                    "OK");
+                return;
+            }
+
+            // Add the normalized path
+            _imageAbsPaths.Add(normalizedPath);
+            SaveDraft(); // Auto-save draft when images are added
+            
+            Debug.Log($"[ModelSubmitWindow] Added image: {Path.GetFileName(normalizedPath)}");
+            Repaint(); // Refresh UI to show new image
         }
 
         /// <summary>

@@ -231,8 +231,9 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Updates the window title to reflect pending updates and notes.
+        /// Can be called externally to refresh the title after notification state changes.
         /// </summary>
-        private void UpdateWindowTitle()
+        public void UpdateWindowTitle()
         {
             List<string> indicators = new List<string>();
             if (_updateCount > 0)
@@ -284,9 +285,10 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Recomputes the number of models that contain notes.
+        /// Recomputes the number of models that contain unread notes.
+        /// Can be called externally to refresh the count after notification state changes.
         /// </summary>
-        private void UpdateNotesCount()
+        public void UpdateNotesCount()
         {
             _notesCount = 0;
             if (_indexCache?.entries == null)
@@ -296,9 +298,41 @@ namespace ModelLibrary.Editor.Windows
 
             foreach (ModelIndex.Entry entry in _indexCache.entries)
             {
+                // HasNotes() now checks read state, so this count reflects unread notes only
                 if (HasNotes(entry.id, entry.latestVersion))
                 {
                     _notesCount++;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Recomputes the number of models that have unread updates.
+        /// Can be called externally to refresh the count after notification state changes.
+        /// </summary>
+        public void UpdateUpdateCount()
+        {
+            _updateCount = 0;
+            if (_indexCache?.entries == null)
+            {
+                return;
+            }
+
+            foreach (ModelIndex.Entry entry in _indexCache.entries)
+            {
+                // Check if model has update AND hasn't been marked as read
+                bool hasUpdateFromCache = _modelUpdateStatus.TryGetValue(entry.id, out bool updateStatus) && updateStatus;
+                bool hasUpdateLocally = false;
+                bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
+                if (installed && localMeta != null && !string.IsNullOrEmpty(localMeta.version) && localMeta.version != "(unknown)")
+                {
+                    hasUpdateLocally = ModelVersionUtils.NeedsUpgrade(localMeta.version, entry.latestVersion);
+                }
+                
+                bool hasUnreadUpdate = (hasUpdateFromCache || hasUpdateLocally) && !NotificationStateManager.IsUpdateRead(entry.id);
+                if (hasUnreadUpdate)
+                {
+                    _updateCount++;
                 }
             }
         }

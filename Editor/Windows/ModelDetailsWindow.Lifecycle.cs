@@ -19,14 +19,34 @@ namespace ModelLibrary.Editor.Windows
     {
         /// <summary>
         /// Opens the model details window for a specific model version.
+        /// Marks notifications as read when details are viewed.
         /// </summary>
         /// <param name="id">The unique identifier of the model.</param>
         /// <param name="version">The version of the model to display.</param>
         public static void Open(string id, string version)
         {
+            // Mark notifications as read when details are opened
+            NotificationStateManager.MarkNotesAsRead(id, version);
+            NotificationStateManager.MarkUpdateAsRead(id);
+
             ModelDetailsWindow w = GetWindow<ModelDetailsWindow>("Model Details");
             w._modelId = id; w._version = version; w.Init();
             w.Show();
+
+            // Refresh Model Library windows to update notification badges immediately
+            ModelLibraryWindow[] windows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
+            for (int i = 0; i < windows.Length; i++)
+            {
+                ModelLibraryWindow window = windows[i];
+                if (window != null)
+                {
+                    // Update counts and window title to reflect read state changes
+                    window.UpdateNotesCount();
+                    window.UpdateUpdateCount();
+                    window.UpdateWindowTitle();
+                    window.Repaint(); // Force UI refresh to show updated badges
+                }
+            }
         }
 
         /// <summary>

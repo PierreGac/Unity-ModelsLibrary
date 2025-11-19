@@ -252,10 +252,10 @@ namespace ModelLibrary.Editor.Windows
 
 
                 bool deleted = await _service.DeleteVersionAsync(_modelId, _version);
-                EditorUtility.ClearProgressBar();
-
+                
                 if (!deleted)
                 {
+                    EditorUtility.ClearProgressBar();
                     // Schedule error dialog on main thread to avoid blocking
                     EditorApplication.delayCall += () =>
                     {
@@ -264,35 +264,81 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
+                // Refresh version list after deletion to get updated list
+                EditorUtility.DisplayProgressBar("Deleting Version", "Refreshing version list...", ProgressBarConstants.MID_OPERATION);
+                await LoadVersionListAsync();
+                EditorUtility.ClearProgressBar();
+
                 // Store values for use in delayCall (capture before closing window)
                 string deletedVersion = _version;
-                string modelName = _meta.identity.name;
-                string nextVersion = _availableVersions.FirstOrDefault(v => !string.Equals(v, _version, StringComparison.OrdinalIgnoreCase));
+                string modelName = _meta?.identity?.name ?? _modelId;
                 string modelIdToOpen = _modelId;
+                
+                // Get next available version from refreshed list
+                string nextVersion = _availableVersions != null && _availableVersions.Count > 0
+                    ? _availableVersions.FirstOrDefault(v => !string.Equals(v, _version, StringComparison.OrdinalIgnoreCase))
+                    : null;
+                
+                bool hasOtherVersions = !string.IsNullOrEmpty(nextVersion) && _availableVersions != null && _availableVersions.Count > 0;
 
                 // Schedule all UI operations on the main thread to avoid blocking
                 EditorApplication.delayCall += () =>
                 {
-                    // Show success dialog on main thread
-                    EditorUtility.DisplayDialog("Version Deleted", $"Removed version {deletedVersion} of '{modelName}'.", "OK");
-
-                    // Refresh Model Library windows
-                    ModelLibraryWindow[] windows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
-                    for (int i = 0; i < windows.Length; i++)
+                    try
                     {
-                        windows[i].ReinitializeAfterConfiguration();
+                        // Show success dialog on main thread
+                        string message = hasOtherVersions
+                            ? $"Removed version {deletedVersion} of '{modelName}'."
+                            : $"Removed version {deletedVersion} of '{modelName}'. This was the last version.";
+                        EditorUtility.DisplayDialog("Version Deleted", message, "OK");
+
+                        // Refresh Model Library windows
+                        ModelLibraryWindow[] windows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
+                        for (int i = 0; i < windows.Length; i++)
+                        {
+                            windows[i].ReinitializeAfterConfiguration();
+                        }
+
+                        // Close current window
+                        ModelDetailsWindow currentWindow = GetWindow<ModelDetailsWindow>();
+                        if (currentWindow != null)
+                        {
+                            currentWindow.Close();
+                        }
+
+                        // Only open next version if it exists and is valid
+                        if (hasOtherVersions && !string.IsNullOrEmpty(nextVersion))
+                        {
+                            // Verify version still exists before opening
+                            try
+                            {
+                                Open(modelIdToOpen, nextVersion);
+                            }
+                            catch (Exception openEx)
+                            {
+                                ErrorLogger.LogError("Open Next Version Failed",
+                                    $"Failed to open next version '{nextVersion}' after deletion: {openEx.Message}",
+                                    ErrorHandler.CategorizeException(openEx), openEx,
+                                    $"ModelId: {modelIdToOpen}, NextVersion: {nextVersion}");
+                                
+                                // Show error but don't block - deletion succeeded
+                                EditorUtility.DisplayDialog("Warning",
+                                    $"Version deleted successfully, but failed to open next version '{nextVersion}': {openEx.Message}",
+                                    "OK");
+                            }
+                        }
+                        else
+                        {
+                            // No other versions available - window already closed, show info
+                            Debug.Log($"[ModelDetailsWindow] Deleted last version of model '{modelName}'. No other versions available.");
+                        }
                     }
-
-                    // Close current window and open next version if available
-                    ModelDetailsWindow currentWindow = GetWindow<ModelDetailsWindow>();
-                    if (currentWindow != null)
+                    catch (Exception uiEx)
                     {
-                        currentWindow.Close();
-                    }
-
-                    if (!string.IsNullOrEmpty(nextVersion))
-                    {
-                        Open(modelIdToOpen, nextVersion);
+                        ErrorLogger.LogError("UI Update After Deletion Failed",
+                            $"Error updating UI after version deletion: {uiEx.Message}",
+                            ErrorHandler.CategorizeException(uiEx), uiEx,
+                            $"ModelId: {modelIdToOpen}, DeletedVersion: {deletedVersion}");
                     }
                 };
             }

@@ -2,6 +2,7 @@
 using System.IO;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Settings;
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -65,35 +66,52 @@ namespace ModelLibrary.Editor.Windows
         {
             try
             {
+                // Check if username key exists and is not default
                 if (!EditorPrefs.HasKey("ModelLibrary.UserName"))
                 {
+                    Debug.Log("[FirstRunWizard] Configuration incomplete: UserName key not found");
                     return false;
                 }
 
                 SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
                 string userName = identityProvider.GetUserName();
-                if (string.IsNullOrWhiteSpace(userName))
+                
+                // Check if username is set and not default/anonymous
+                if (string.IsNullOrWhiteSpace(userName) || userName == "anonymous")
                 {
+                    Debug.Log($"[FirstRunWizard] Configuration incomplete: UserName is '{userName}' (default or empty)");
                     return false;
                 }
 
                 ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
+                if (settings == null)
+                {
+                    Debug.LogWarning("[FirstRunWizard] Configuration incomplete: Could not load ModelLibrarySettings");
+                    return false;
+                }
+
                 if (string.IsNullOrWhiteSpace(settings.repositoryRoot))
                 {
+                    Debug.Log("[FirstRunWizard] Configuration incomplete: Repository root is empty");
                     return false;
                 }
 
+                // Check if repository root is still the default example value
                 if (settings.repositoryRoot == "\\\\SERVER\\ModelLibrary")
                 {
+                    Debug.Log("[FirstRunWizard] Configuration incomplete: Repository root is still default value");
                     return false;
                 }
 
+                Debug.Log($"[FirstRunWizard] Configuration complete: User='{userName}', Repo='{settings.repositoryRoot}'");
                 return true;
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"FirstRunWizard.IsConfigured() failed: {ex.Message}");
-                return false;
+                ErrorLogger.LogError("Configuration Check Failed",
+                    $"Failed to check configuration state: {ex.Message}",
+                    ErrorHandler.CategorizeException(ex), ex);
+                return false; // Assume not configured on error
             }
         }
 
@@ -105,11 +123,36 @@ namespace ModelLibrary.Editor.Windows
         {
             if (!IsConfigured())
             {
-                FirstRunWizard window = GetWindow<FirstRunWizard>(true, "Model Library Setup", true);
-                window.minSize = new Vector2(480f, 360f);
-                window.maxSize = new Vector2(640f, 520f);
-                window.Init();
-                window.ShowUtility();
+                try
+                {
+                    FirstRunWizard window = GetWindow<FirstRunWizard>(true, "Model Library Setup", true);
+                    if (window == null)
+                    {
+                        Debug.LogError("[FirstRunWizard] Failed to create wizard window");
+                        return;
+                    }
+
+                    window.minSize = new Vector2(480f, 360f);
+                    window.maxSize = new Vector2(640f, 520f);
+                    window.Init();
+                    window.ShowUtility();
+                    window.Focus(); // Ensure window is focused
+                    
+                    Debug.Log("[FirstRunWizard] Wizard window opened");
+                }
+                catch (Exception ex)
+                {
+                    ErrorLogger.LogError("Show Wizard Failed",
+                        $"Failed to show first-run wizard: {ex.Message}",
+                        ErrorHandler.CategorizeException(ex), ex);
+                    
+                    // Fallback: show error dialog
+                    EditorUtility.DisplayDialog("Configuration Required",
+                        "The Model Library needs to be configured, but the wizard could not be opened.\n\n" +
+                        $"Error: {ex.Message}\n\n" +
+                        "Please try opening the Model Library window again, or configure manually via Settings.",
+                        "OK");
+                }
             }
         }
 
@@ -129,17 +172,68 @@ namespace ModelLibrary.Editor.Windows
 
         private void SaveConfiguration()
         {
-            SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            identityProvider.SetUserName(_userName);
-            identityProvider.SetUserRole(_userRole);
+            try
+            {
+                // Validate before saving
+                if (string.IsNullOrWhiteSpace(_userName) || _userName == "anonymous")
+                {
+                    EditorUtility.DisplayDialog("Invalid Configuration",
+                        "User name cannot be empty or 'anonymous'. Please enter a valid name.",
+                        "OK");
+                    return;
+                }
 
-            ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
-            settings.repositoryKind = _kind;
-            settings.repositoryRoot = _repoRoot;
-            EditorUtility.SetDirty(settings);
-            AssetDatabase.SaveAssets();
+                if (string.IsNullOrWhiteSpace(_repoRoot))
+                {
+                    EditorUtility.DisplayDialog("Invalid Configuration",
+                        "Repository root cannot be empty. Please specify a repository location.",
+                        "OK");
+                    return;
+                }
 
-            NotifyConfigurationChanged();
+                // Save user identity
+                SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
+                identityProvider.SetUserName(_userName);
+                identityProvider.SetUserRole(_userRole);
+
+                // Save repository settings
+                ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
+                if (settings == null)
+                {
+                    EditorUtility.DisplayDialog("Save Failed",
+                        "Could not load ModelLibrarySettings. Please try again.",
+                        "OK");
+                    return;
+                }
+
+                settings.repositoryKind = _kind;
+                settings.repositoryRoot = _repoRoot;
+                EditorUtility.SetDirty(settings);
+                AssetDatabase.SaveAssets();
+
+                // Verify configuration was saved
+                if (!IsConfigured())
+                {
+                    EditorUtility.DisplayDialog("Save Warning",
+                        "Configuration was saved but verification failed. The wizard will remain open.\n\n" +
+                        "Please check your settings and try again.",
+                        "OK");
+                    return;
+                }
+
+                Debug.Log($"[FirstRunWizard] Configuration saved successfully: User='{_userName}', Repo='{_repoRoot}'");
+                NotifyConfigurationChanged();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Save Configuration Failed",
+                    $"Failed to save configuration: {ex.Message}",
+                    ErrorHandler.CategorizeException(ex), ex);
+                
+                EditorUtility.DisplayDialog("Save Failed",
+                    $"Failed to save configuration: {ex.Message}\n\nPlease try again.",
+                    "OK");
+            }
         }
 
         private void NotifyConfigurationChanged()

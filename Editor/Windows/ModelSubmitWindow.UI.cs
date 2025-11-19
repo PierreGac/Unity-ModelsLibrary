@@ -506,7 +506,7 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Draws the changelog field with simple validation.
+        /// Draws the changelog field with comprehensive validation feedback.
         /// </summary>
         private void DrawChangelogField()
         {
@@ -515,9 +515,13 @@ namespace ModelLibrary.Editor.Windows
             // Set a stable control name BEFORE drawing - Unity uses this to track focus
             GUI.SetNextControlName(__CHANGELOG_CONTROL_NAME);
 
-            bool hasError = string.IsNullOrEmpty(_changeSummary);
+            // Perform comprehensive validation
+            bool isUpdateMode = _mode == SubmitMode.Update;
+            List<string> validationErrors = ChangelogValidator.ValidateChangelog(_changeSummary, isUpdateMode);
+            bool hasErrors = validationErrors != null && validationErrors.Count > 0;
+
             Color originalColor = GUI.color;
-            if (hasError)
+            if (hasErrors)
             {
                 GUI.color = Color.red;
             }
@@ -532,13 +536,32 @@ namespace ModelLibrary.Editor.Windows
             if (newChangeSummary != _changeSummary)
             {
                 _changeSummary = newChangeSummary;
+                Repaint(); // Trigger repaint to update validation feedback
             }
 
-            // Simple validation feedback
-            if (hasError)
+            // Show validation errors
+            if (hasErrors)
             {
                 EditorGUILayout.Space(2);
-                EditorGUILayout.HelpBox("Changelog is required", MessageType.Error);
+                string errorMessage = string.Join("\n• ", validationErrors);
+                EditorGUILayout.HelpBox($"Validation errors:\n• {errorMessage}", MessageType.Error);
+            }
+            else if (!string.IsNullOrWhiteSpace(_changeSummary))
+            {
+                // Show validation suggestions if changelog exists but could be improved
+                List<string> suggestions = ChangelogValidator.GetValidationSuggestions(_changeSummary);
+                if (suggestions != null && suggestions.Count > 0)
+                {
+                    EditorGUILayout.Space(2);
+                    string suggestionText = string.Join("\n", suggestions);
+                    EditorGUILayout.HelpBox($"Suggestions:\n{suggestionText}", MessageType.Info);
+                }
+            }
+            else if (isUpdateMode)
+            {
+                // For updates, changelog is required
+                EditorGUILayout.Space(2);
+                EditorGUILayout.HelpBox("Changelog is required for updates. Please describe what changed in this version.", MessageType.Warning);
             }
         }
     }

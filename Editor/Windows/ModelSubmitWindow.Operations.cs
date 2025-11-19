@@ -541,22 +541,122 @@ namespace ModelLibrary.Editor.Windows
 
         private string DefaultInstallPath() => "Assets/Models/NewModel";
 
+        /// <summary>
+        /// Gets the default relative path for model submission based on selected assets.
+        /// Prioritizes finding the model root folder (containing FBX/OBJ files) rather than
+        /// using subfolders like Materials. Walks up directory tree if needed to find model root.
+        /// </summary>
         private string GetDefaultRelativePath()
         {
-            // Get the first selected asset's path as the default relative path
             string[] selected = Selection.assetGUIDs;
-            if (selected != null && selected.Length > 0)
+            if (selected == null || selected.Length == 0)
             {
-                string firstAssetPath = AssetDatabase.GUIDToAssetPath(selected[0]);
-                if (!string.IsNullOrEmpty(firstAssetPath))
+                return "Models/NewModel";
+            }
+
+            // Step 1: Look for FBX/OBJ files in selection first - these indicate model root
+            string meshFilePath = null;
+            foreach (string guid in selected)
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (string.IsNullOrEmpty(assetPath) || AssetDatabase.IsValidFolder(assetPath))
                 {
-                    // Convert to relative path from Assets folder
-                    if (firstAssetPath.StartsWith("Assets/"))
+                    continue;
+                }
+
+                string extension = Path.GetExtension(assetPath).ToLowerInvariant();
+                if (extension == FileExtensions.FBX || extension == FileExtensions.OBJ)
+                {
+                    meshFilePath = assetPath;
+                    break; // Found a mesh file, use its directory
+                }
+            }
+
+            // Step 2: If mesh file found, use its directory as model root
+            if (!string.IsNullOrEmpty(meshFilePath))
+            {
+                string directory = Path.GetDirectoryName(meshFilePath);
+                if (!string.IsNullOrEmpty(directory) && directory.StartsWith("Assets/"))
+                {
+                    string relativePath = directory[7..]; // Remove "Assets/" prefix
+                    Debug.Log($"[ModelSubmitWindow] Found mesh file, using directory as relative path: {relativePath}");
+                    return relativePath;
+                }
+            }
+
+            // Step 3: No mesh file in selection - walk up directory tree to find model root
+            // Start from first selected asset
+            string firstAssetPath = AssetDatabase.GUIDToAssetPath(selected[0]);
+            if (!string.IsNullOrEmpty(firstAssetPath) && firstAssetPath.StartsWith("Assets/"))
+            {
+                string currentDir = AssetDatabase.IsValidFolder(firstAssetPath) 
+                    ? firstAssetPath 
+                    : Path.GetDirectoryName(firstAssetPath);
+
+                if (!string.IsNullOrEmpty(currentDir))
+                {
+                    // Walk up directory tree looking for folder containing FBX/OBJ files
+                    string searchDir = currentDir;
+                    int maxDepth = 5; // Prevent infinite loops
+                    int depth = 0;
+
+                    while (!string.IsNullOrEmpty(searchDir) && searchDir.StartsWith("Assets/") && depth < maxDepth)
                     {
-                        return firstAssetPath[7..]; // Remove "Assets/" prefix
+                        // Check if this directory contains FBX/OBJ files
+                        string[] filesInDir = Directory.GetFiles(searchDir, "*.*", SearchOption.TopDirectoryOnly);
+                        bool hasMeshFiles = filesInDir.Any(file =>
+                        {
+                            string ext = Path.GetExtension(file).ToLowerInvariant();
+                            return ext == FileExtensions.FBX || ext == FileExtensions.OBJ;
+                        });
+
+                        if (hasMeshFiles)
+                        {
+                            // Found model root directory
+                            string relativePath = searchDir[7..]; // Remove "Assets/" prefix
+                            Debug.Log($"[ModelSubmitWindow] Found model root directory (contains mesh files): {relativePath}");
+                            return relativePath;
+                        }
+
+                        // Move up one level
+                        string parentDir = Path.GetDirectoryName(searchDir);
+                        if (string.IsNullOrEmpty(parentDir) || parentDir == searchDir)
+                        {
+                            break; // Reached root or no parent
+                        }
+                        searchDir = parentDir;
+                        depth++;
+                    }
+
+                    // Step 4: Fallback - use directory of first selected asset (current behavior)
+                    // But exclude common subfolders like Materials, Textures, etc.
+                    string fallbackDir = currentDir;
+                    if (fallbackDir.StartsWith("Assets/"))
+                    {
+                        string relativePath = fallbackDir[7..];
+                        
+                        // Exclude common subfolders - walk up one level if in Materials/Textures/etc
+                        string[] subfoldersToExclude = { "Materials", "Textures", "Prefabs", "Scripts", "Animations" };
+                        string[] pathParts = relativePath.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+                        
+                        if (pathParts.Length > 1 && subfoldersToExclude.Contains(pathParts[pathParts.Length - 1], StringComparer.OrdinalIgnoreCase))
+                        {
+                            // In a subfolder - use parent directory
+                            relativePath = string.Join("/", pathParts.Take(pathParts.Length - 1));
+                            Debug.Log($"[ModelSubmitWindow] Excluded subfolder, using parent directory: {relativePath}");
+                        }
+                        else
+                        {
+                            Debug.Log($"[ModelSubmitWindow] Using directory of selected asset as relative path: {relativePath}");
+                        }
+                        
+                        return relativePath;
                     }
                 }
             }
+
+            // Step 5: Final fallback
+            Debug.Log("[ModelSubmitWindow] Could not determine relative path from selection, using default");
             return "Models/NewModel";
         }
     }
