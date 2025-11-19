@@ -17,9 +17,20 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Opens the model submission window.
         /// Checks user role and only allows Artists to access the submission interface.
+        /// Prevents opening during play mode.
         /// </summary>
         public static void Open()
         {
+            // Don't open during play mode
+            if (EditorApplication.isPlaying)
+            {
+                EditorUtility.DisplayDialog("Cannot Open During Play Mode",
+                    "The Model Submission window cannot be opened while the application is playing.\n\n" +
+                    "Please stop play mode first.",
+                    "OK");
+                return;
+            }
+
             // Only allow Artists to submit models
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
             if (identityProvider.GetUserRole() != UserRole.Artist)

@@ -369,6 +369,12 @@ namespace ModelLibrary.Editor.Windows
 
         private async Task RefreshManifestCacheAsync()
         {
+            // Don't refresh during play mode
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
+
             if (_refreshingManifest)
             {
                 return;
@@ -391,9 +397,25 @@ namespace ModelLibrary.Editor.Windows
                 // Load index once to match old manifests by name
                 ModelIndex index = await _service.GetIndexAsync();
 
+                // Check again after async operation
+                if (EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    EditorUtility.ClearProgressBar();
+                    _refreshingManifest = false;
+                    return;
+                }
+
                 // Process files on main thread with progress updates
                 for (int i = 0; i < manifestPaths.Count; i++)
                 {
+                    // Check play mode in loop
+                    if (EditorApplication.isPlayingOrWillChangePlaymode)
+                    {
+                        EditorUtility.ClearProgressBar();
+                        _refreshingManifest = false;
+                        return;
+                    }
+
                     string manifestPath = manifestPaths[i];
                     processed++;
 

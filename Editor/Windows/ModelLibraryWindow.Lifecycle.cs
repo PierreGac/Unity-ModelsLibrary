@@ -20,6 +20,12 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void OnEnable()
         {
+            // Don't initialize during play mode
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
+
             _sortMode = (ModelSortMode)EditorPrefs.GetInt(__SortModePrefKey, (int)ModelSortMode.Name);
             _thumbnailSize = EditorPrefs.GetFloat(__ThumbnailSizePrefKey, __DEFAULT_THUMBNAIL_SIZE);
             _thumbnailSize = Mathf.Clamp(_thumbnailSize, __MIN_THUMBNAIL_SIZE, __MAX_THUMBNAIL_SIZE);
@@ -45,6 +51,9 @@ namespace ModelLibrary.Editor.Windows
             }
 
             EnableBackgroundUpdateChecking();
+
+            // Subscribe to play mode state changes
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
         }
 
         /// <summary>
@@ -76,6 +85,12 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void OnEditorUpdate()
         {
+            // Don't run background checks during play mode
+            if (EditorApplication.isPlaying)
+            {
+                return;
+            }
+
             if (_service != null && _indexCache != null && (DateTime.Now - _lastUpdateCheck) > BACKGROUND_UPDATE_CHECK_INTERVAL)
             {
                 _ = CheckForUpdatesAsync();
@@ -100,6 +115,13 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         public void FullRefresh()
         {
+            // Don't refresh during play mode
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                Debug.LogWarning("[ModelLibraryWindow] Cannot refresh during play mode.");
+                return;
+            }
+
             _indexCache = null;
             _loadingIndex = false;
             ClearMetaCache();
@@ -123,6 +145,13 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         public void RefreshIndex()
         {
+            // Don't refresh during play mode
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                Debug.LogWarning("[ModelLibraryWindow] Cannot refresh index during play mode.");
+                return;
+            }
+
             _indexCache = null;
             _ = LoadIndexAsync();
             _ = RefreshManifestCacheAsync();
@@ -158,6 +187,12 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private async Task LoadIndexAsync()
         {
+            // Don't load during play mode or when about to enter play mode
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
+
             if (_loadingIndex)
             {
                 return;
@@ -172,6 +207,14 @@ namespace ModelLibrary.Editor.Windows
 
                 _indexCache = await _service.GetIndexAsync();
 
+                // Check again after async operation - play mode might have started
+                if (EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    EditorUtility.ClearProgressBar();
+                    _loadingIndex = false;
+                    return;
+                }
+
                 TriggerCacheWarming();
 
                 EditorUtility.DisplayProgressBar("Loading Model Library", "Processing models...", 0.5f);
@@ -182,9 +225,13 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                ErrorHandler.ShowError("Load Failed",
-                    "Unable to load the model library from the repository. Please check your connection and settings.", ex);
-                titleContent.text = "Model Library - Error";
+                // Only show errors if not entering play mode
+                if (!EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    ErrorHandler.ShowError("Load Failed",
+                        "Unable to load the model library from the repository. Please check your connection and settings.", ex);
+                    titleContent.text = "Model Library - Error";
+                }
             }
             finally
             {
@@ -199,20 +246,38 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private async Task CheckForUpdatesAsync()
         {
+            // Don't check during play mode
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
+
             try
             {
                 _lastUpdateCheck = DateTime.Now;
-                
+
                 // GetUpdateCountAsync() already refreshes the update cache, so we can read from it directly
                 _updateCount = await _service.GetUpdateCountAsync();
+
+                // Check again after async operation
+                if (EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    return;
+                }
 
                 if (_indexCache?.entries != null)
                 {
                     _modelUpdateStatus.Clear();
-                    
+
                     // Read directly from cached update info instead of calling HasUpdateAsync for each model
                     for (int i = 0; i < _indexCache.entries.Count; i++)
                     {
+                        // Check play mode in loop as well
+                        if (EditorApplication.isPlayingOrWillChangePlaymode)
+                        {
+                            return;
+                        }
+
                         ModelIndex.Entry entry = _indexCache.entries[i];
                         ModelUpdateDetector.ModelUpdateInfo updateInfo = await _service.GetUpdateInfoAsync(entry.id);
                         _modelUpdateStatus[entry.id] = updateInfo?.hasUpdate ?? false;
@@ -225,7 +290,11 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Failed to check for updates: {ex.Message}");
+                // Only log if not entering play mode
+                if (!EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    Debug.LogError($"Failed to check for updates: {ex.Message}");
+                }
             }
         }
 
@@ -328,12 +397,231 @@ namespace ModelLibrary.Editor.Windows
                 {
                     hasUpdateLocally = ModelVersionUtils.NeedsUpgrade(localMeta.version, entry.latestVersion);
                 }
-                
+
                 bool hasUnreadUpdate = (hasUpdateFromCache || hasUpdateLocally) && !NotificationStateManager.IsUpdateRead(entry.id);
                 if (hasUnreadUpdate)
                 {
                     _updateCount++;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Handles Unity play mode state changes to cancel ongoing operations and close windows.
+        /// </summary>
+        private void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            try
+            {
+                if (state == PlayModeStateChange.ExitingEditMode || state == PlayModeStateChange.EnteredPlayMode)
+                {
+                    // Cancel ongoing operations
+                    _loadingIndex = false;
+                    _refreshingManifest = false;
+
+                    // Clear progress bar safely
+                    try
+                    {
+                        EditorUtility.ClearProgressBar();
+                    }
+                    catch
+                    {
+                        // Ignore errors clearing progress bar during play mode transition
+                    }
+
+                    // Disable background update checking during play mode
+                    DisableBackgroundUpdateChecking();
+
+                    // Close all Model Library windows when entering play mode
+                    CloseAllModelLibraryWindows();
+                }
+                else if (state == PlayModeStateChange.EnteredEditMode)
+                {
+                    // Re-enable background checking when returning to edit mode
+                    if (!_backgroundUpdateCheckEnabled && !EditorApplication.isPlaying)
+                    {
+                        EnableBackgroundUpdateChecking();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log but don't throw - play mode transition should continue
+                Debug.LogWarning($"[ModelLibraryWindow] Error in play mode state change handler: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Closes all Model Library plugin windows when entering play mode.
+        /// </summary>
+        private static void CloseAllModelLibraryWindows()
+        {
+            try
+            {
+                // Close Model Library Browser
+                ModelLibraryWindow[] browserWindows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
+                if (browserWindows != null)
+                {
+                    for (int i = 0; i < browserWindows.Length; i++)
+                    {
+                        try
+                        {
+                            browserWindows[i].CloseWindow();
+                        }
+                        catch
+                        {
+                            // Silently ignore errors closing individual windows
+                        }
+                    }
+                }
+
+                // Close Model Details windows
+                ModelDetailsWindow[] detailsWindows = Resources.FindObjectsOfTypeAll<ModelDetailsWindow>();
+                if (detailsWindows != null)
+                {
+                    for (int i = 0; i < detailsWindows.Length; i++)
+                    {
+                        try
+                        {
+                            EditorWindow window = detailsWindows[i];
+                            if (window != null)
+                            {
+                                window.Close();
+                            }
+                        }
+                        catch
+                        {
+                            // Silently ignore errors
+                        }
+                    }
+                }
+
+                // Close Model Submit windows
+                ModelSubmitWindow[] submitWindows = Resources.FindObjectsOfTypeAll<ModelSubmitWindow>();
+                if (submitWindows != null)
+                {
+                    for (int i = 0; i < submitWindows.Length; i++)
+                    {
+                        try
+                        {
+                            EditorWindow window = submitWindows[i];
+                            if (window != null)
+                            {
+                                window.Close();
+                            }
+                        }
+                        catch
+                        {
+                            // Silently ignore errors
+                        }
+                    }
+                }
+
+                // Close Model Preview 3D windows
+                ModelPreview3DWindow[] previewWindows = Resources.FindObjectsOfTypeAll<ModelPreview3DWindow>();
+                if (previewWindows != null)
+                {
+                    for (int i = 0; i < previewWindows.Length; i++)
+                    {
+                        try
+                        {
+                            EditorWindow window = previewWindows[i];
+                            if (window != null)
+                            {
+                                window.Close();
+                            }
+                        }
+                        catch
+                        {
+                            // Silently ignore errors
+                        }
+                    }
+                }
+
+                // Close other Model Library windows
+                BatchUploadWindow[] batchWindows = Resources.FindObjectsOfTypeAll<BatchUploadWindow>();
+                if (batchWindows != null)
+                {
+                    for (int i = 0; i < batchWindows.Length; i++)
+                    {
+                        try
+                        {
+                            EditorWindow window = batchWindows[i];
+                            if (window != null)
+                            {
+                                window.Close();
+                            }
+                        }
+                        catch
+                        {
+                            // Silently ignore errors
+                        }
+                    }
+                }
+
+                AnalyticsWindow[] analyticsWindows = Resources.FindObjectsOfTypeAll<AnalyticsWindow>();
+                if (analyticsWindows != null)
+                {
+                    for (int i = 0; i < analyticsWindows.Length; i++)
+                    {
+                        try
+                        {
+                            EditorWindow window = analyticsWindows[i];
+                            if (window != null)
+                            {
+                                window.Close();
+                            }
+                        }
+                        catch
+                        {
+                            // Silently ignore errors
+                        }
+                    }
+                }
+
+                ModelVersionComparisonWindow[] comparisonWindows = Resources.FindObjectsOfTypeAll<ModelVersionComparisonWindow>();
+                if (comparisonWindows != null)
+                {
+                    for (int i = 0; i < comparisonWindows.Length; i++)
+                    {
+                        try
+                        {
+                            EditorWindow window = comparisonWindows[i];
+                            if (window != null)
+                            {
+                                window.Close();
+                            }
+                        }
+                        catch
+                        {
+                            // Silently ignore errors
+                        }
+                    }
+                }
+
+                ModelBulkTagWindow[] bulkTagWindows = Resources.FindObjectsOfTypeAll<ModelBulkTagWindow>();
+                if (bulkTagWindows != null)
+                {
+                    for (int i = 0; i < bulkTagWindows.Length; i++)
+                    {
+                        try
+                        {
+                            EditorWindow window = bulkTagWindows[i];
+                            if (window != null)
+                            {
+                                window.Close();
+                            }
+                        }
+                        catch
+                        {
+                            // Silently ignore errors
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Silently ignore all errors - play mode transition should continue
             }
         }
 
@@ -344,6 +632,7 @@ namespace ModelLibrary.Editor.Windows
         private void OnDisable()
         {
             DisableBackgroundUpdateChecking();
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
             ClearThumbnailCache();
             _loadingThumbnails.Clear();
         }

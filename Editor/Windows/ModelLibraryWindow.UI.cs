@@ -12,8 +12,14 @@ namespace ModelLibrary.Editor.Windows
 {
     public partial class ModelLibraryWindow
     {
+        private bool _isExiting = false;
+
         private void OnGUI()
         {
+            if(_isExiting)
+            {
+                return;
+            }
             HandleKeyboardShortcuts();
             DrawNotification();
 
@@ -177,6 +183,12 @@ namespace ModelLibrary.Editor.Windows
             {
                 DrawThumbnailSizeSlider();
             }
+        }
+
+        public void CloseWindow()
+        {
+            _isExiting = true;
+            Close();
         }
 
         private void DrawToolbar()

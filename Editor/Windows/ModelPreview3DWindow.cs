@@ -83,11 +83,19 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Opens the 3D preview window for a specific model version.
+        /// Prevents opening during play mode.
         /// </summary>
         /// <param name="modelId">The unique identifier of the model.</param>
         /// <param name="version">The version of the model to preview.</param>
         public static void Open(string modelId, string version)
         {
+            // Don't open during play mode
+            if (EditorApplication.isPlaying)
+            {
+                Debug.LogWarning("[ModelPreview3DWindow] Cannot open 3D preview during play mode.");
+                return;
+            }
+
             ModelPreview3DWindow window = GetWindow<ModelPreview3DWindow>("3D Preview");
             window._modelId = modelId;
             window._version = version;

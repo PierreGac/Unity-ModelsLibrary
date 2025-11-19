@@ -20,11 +20,19 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Opens the model details window for a specific model version.
         /// Marks notifications as read when details are viewed.
+        /// Prevents opening during play mode.
         /// </summary>
         /// <param name="id">The unique identifier of the model.</param>
         /// <param name="version">The version of the model to display.</param>
         public static void Open(string id, string version)
         {
+            // Don't open during play mode
+            if (EditorApplication.isPlaying)
+            {
+                Debug.LogWarning("[ModelDetailsWindow] Cannot open model details during play mode.");
+                return;
+            }
+
             // Mark notifications as read when details are opened
             NotificationStateManager.MarkNotesAsRead(id, version);
             NotificationStateManager.MarkUpdateAsRead(id);

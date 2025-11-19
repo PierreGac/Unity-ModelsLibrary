@@ -24,10 +24,21 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Opens the Model Library browser window from the Unity menu.
+        /// Prevents opening during play mode.
         /// </summary>
         [MenuItem("Tools/Model Library")]
         public static void Open()
         {
+            // Don't open during play mode
+            if (EditorApplication.isPlaying)
+            {
+                EditorUtility.DisplayDialog("Cannot Open During Play Mode",
+                    "The Model Library browser cannot be opened while the application is playing.\n\n" +
+                    "Please stop play mode first.",
+                    "OK");
+                return;
+            }
+
             ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
             window.Show();
         }
