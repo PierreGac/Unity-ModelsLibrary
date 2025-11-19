@@ -71,10 +71,7 @@ namespace ModelLibrary.Editor.Windows
 
         private void OnEnable()
         {
-            ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
-            IModelRepository repo = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.FileSystem
-                ? new FileSystemRepository(settings.repositoryRoot)
-                : new HttpRepository(settings.repositoryRoot);
+            IModelRepository repo = RepositoryFactory.CreateRepository();
             _service = new ModelLibraryService(repo);
             _batchService = new BatchUploadService(_service, new SimpleUserIdentityProvider());
         }

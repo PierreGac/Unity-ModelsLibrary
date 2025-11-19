@@ -93,22 +93,8 @@ namespace ModelLibrary.Editor.Windows
                     if (!string.IsNullOrEmpty(modelId))
                     {
                         // Asset belongs to an existing model - try to get the model name from the index
-                        try
-                        {
-                            ModelIndex index = _service?.GetIndexAsync().Result;
-                            if (index?.entries != null)
-                            {
-                                ModelIndex.Entry entry = index.entries.FirstOrDefault(e => string.Equals(e.id, modelId, StringComparison.OrdinalIgnoreCase));
-                                if (entry != null && !string.IsNullOrWhiteSpace(entry.name))
-                                {
-                                    suggestedName = entry.name;
-                                }
-                            }
-                        }
-                        catch
-                        {
-                            // Ignore errors - index might not be loaded yet
-                        }
+                        // Note: This is a synchronous context, so we can't await. Skip index lookup to avoid blocking.
+                        // The name will be suggested from file/folder structure instead.
                     }
                 }
 
@@ -351,8 +337,11 @@ namespace ModelLibrary.Editor.Windows
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"Failed to copy image '{Path.GetFileName(abs)}': {ex.Message}");
-                        throw new Exception($"Failed to copy image '{Path.GetFileName(abs)}': {ex.Message}");
+                        string fileName = Path.GetFileName(abs);
+                        ErrorLogger.LogError("Copy Image Failed", 
+                            $"Failed to copy image '{fileName}': {ex.Message}", 
+                            ErrorHandler.CategorizeException(ex), ex, $"ImagePath: {abs}, ImageIndex: {imageIndex}/{_imageAbsPaths.Count}");
+                        throw new Exception($"Failed to copy image '{fileName}': {ex.Message}");
                     }
                 }
 
@@ -429,7 +418,17 @@ namespace ModelLibrary.Editor.Windows
                 _cancelSubmission = false;
                 if (!string.IsNullOrEmpty(temp))
                 {
-                    try { Directory.Delete(temp, true); } catch { }
+                    try 
+                    { 
+                        Directory.Delete(temp, true); 
+                    } 
+                    catch (Exception cleanupEx)
+                    {
+                        // Log cleanup failure but don't throw - submission may have succeeded
+                        ErrorLogger.LogError("Cleanup Temp Directory Failed", 
+                            $"Failed to clean up temporary directory: {cleanupEx.Message}", 
+                            ErrorHandler.CategorizeException(cleanupEx), cleanupEx, $"TempPath: {temp}");
+                    }
                 }
             }
         }
@@ -511,18 +510,7 @@ namespace ModelLibrary.Editor.Windows
 
             // Search for manifest files in the project
             // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
-            List<string> manifestPaths = new List<string>();
-            
-            // Search for new naming convention (.modelLibrary.meta.json) first, then old naming for backward compatibility
-            foreach (string manifestPath in Directory.EnumerateFiles("Assets", ".modelLibrary.meta.json", SearchOption.AllDirectories))
-            {
-                manifestPaths.Add(manifestPath);
-            }
-            // Fallback for old files created before the naming change
-            foreach (string manifestPath in Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", SearchOption.AllDirectories))
-            {
-                manifestPaths.Add(manifestPath);
-            }
+            List<string> manifestPaths = ManifestDiscoveryUtility.DiscoverAllManifestFiles("Assets");
 
             for (int i = 0; i < manifestPaths.Count; i++)
             {

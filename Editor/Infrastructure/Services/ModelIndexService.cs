@@ -92,7 +92,9 @@ namespace ModelLibrary.Editor.Services
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[ModelIndexService] Failed to enumerate versions for {modelId}: {ex.Message}");
+                ErrorLogger.LogError("Enumerate Versions Failed", 
+                    $"Failed to enumerate versions for {modelId}: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}");
             }
 
             List<string> sorted = versions.ToList();

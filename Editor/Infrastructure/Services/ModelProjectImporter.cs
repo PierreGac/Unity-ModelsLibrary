@@ -37,7 +37,9 @@ namespace ModelLibrary.Editor.Services
             // Ensure destination is a directory, not a file
             if (File.Exists(destAbs))
             {
-                Debug.LogWarning($"[ModelProjectImporter] Destination path points to an existing file: {destAbs}. Converting to directory path.");
+                ErrorLogger.LogError("Invalid Destination Path", 
+                    $"Destination path points to an existing file: {destAbs}. Converting to directory path.", 
+                    ErrorHandler.ErrorCategory.FileSystem, null, $"Destination: {destAbs}");
                 destAbs = Path.Combine(Path.GetDirectoryName(destAbs), Path.GetFileNameWithoutExtension(destAbs));
                 destRel = PathUtils.SanitizePathSeparator(destAbs.Replace(Path.GetFullPath("Assets"), "Assets"));
             }
@@ -88,7 +90,9 @@ namespace ModelLibrary.Editor.Services
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"[ModelProjectImporter] Failed to copy payload file {file} to {target}: {ex.Message}");
+                        ErrorLogger.LogError("Copy Payload File Failed", 
+                            $"Failed to copy payload file {file} to {target}: {ex.Message}", 
+                            ErrorHandler.CategorizeException(ex), ex, $"Source: {file}, Target: {target}");
                         throw;
                     }
                 }
@@ -129,7 +133,9 @@ namespace ModelLibrary.Editor.Services
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"[ModelProjectImporter] Failed to copy dependency file {file} to {target}: {ex.Message}");
+                        ErrorLogger.LogError("Copy Dependency File Failed", 
+                            $"Failed to copy dependency file {file} to {target}: {ex.Message}", 
+                            ErrorHandler.CategorizeException(ex), ex, $"Source: {file}, Target: {target}");
                         throw;
                     }
                 }
@@ -243,10 +249,12 @@ namespace ModelLibrary.Editor.Services
                         Directory.Delete(path, true);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Best effort cleanup - will overwrite existing files during copy
-                    Debug.LogWarning($"[ModelProjectImporter] Failed to clean destination: {path}");
+                    ErrorLogger.LogError("Clean Destination Failed", 
+                        $"Failed to clean destination: {path}", 
+                        ErrorHandler.CategorizeException(ex), ex, $"Path: {path}");
                 }
             }
         }

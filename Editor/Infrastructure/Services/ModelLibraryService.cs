@@ -126,7 +126,9 @@ namespace ModelLibrary.Editor.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[ModelLibraryService] Error deleting version {version} of model {modelId}: {ex.Message}");
+                ErrorLogger.LogError("Delete Version Failed", 
+                    $"Error deleting version {version} of model {modelId}: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}, Version: {version}");
                 return false;
             }
         }
@@ -168,7 +170,9 @@ namespace ModelLibrary.Editor.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[ModelLibraryService] Error deleting model {modelId}: {ex.Message}");
+                ErrorLogger.LogError("Delete Model Failed", 
+                    $"Error deleting model {modelId}: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}");
                 return false;
             }
         }

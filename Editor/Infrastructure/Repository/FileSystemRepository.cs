@@ -463,7 +463,9 @@ namespace ModelLibrary.Editor.Repository
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogError($"[FileSystemRepository] Failed to delete version {modelId}/{version}: {ex.Message}");
+                ErrorLogger.LogError("Delete Version Failed", 
+                    $"Failed to delete version {modelId}/{version}: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}, Version: {version}");
                 return false;
             }
         }
@@ -519,7 +521,9 @@ namespace ModelLibrary.Editor.Repository
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogError($"[FileSystemRepository] Failed to delete model {modelId}: {ex.Message}");
+                ErrorLogger.LogError("Delete Model Failed", 
+                    $"Failed to delete model {modelId}: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}");
                 return false;
             }
         }

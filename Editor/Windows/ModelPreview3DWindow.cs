@@ -18,6 +18,33 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public class ModelPreview3DWindow : EditorWindow
     {
+        // Constants for magic numbers
+        private const float __DEFAULT_CAMERA_ROTATION_X = 30f;
+        private const float __DEFAULT_CAMERA_ROTATION_Y = 30f;
+        private const float __DEFAULT_CAMERA_DISTANCE = 5f;
+        private const float __MIN_CAMERA_DISTANCE = 1f;
+        private const float __MAX_CAMERA_DISTANCE = 20f;
+        private const float __MOUSE_ROTATION_SENSITIVITY = 0.5f;
+        private const float __MOUSE_ZOOM_SENSITIVITY = 0.1f;
+        private const float __MIN_CAMERA_ROTATION_X = -90f;
+        private const float __MAX_CAMERA_ROTATION_X = 90f;
+        private const float __PREVIEW_MIN_SIZE = 400f;
+        private const float __UI_SPACING = 10f;
+        private const float __ROTATION_LABEL_WIDTH = 60f;
+        private const float __RESET_BUTTON_WIDTH = 60f;
+        private const float __DEFAULT_BOUNDS_SIZE = 1f;
+        private const float __ERROR_BACKGROUND_RED = 0.5f;
+        private const float __PREVIEW_BACKGROUND_GRAY = 0.2f;
+        private const int __DEFAULT_SELECTED_MESH_INDEX = 0;
+
+        // Performance: Cache texture extensions array to avoid allocation on every call
+        private static readonly string[] __TEXTURE_EXTENSIONS = { "*.png", "*.jpg", "*.jpeg", "*.tga", "*.psd" };
+
+        // Performance: Cache mesh names array to avoid allocation every frame
+
+        private string[] _cachedMeshNames;
+        private int _lastMeshCount = -1;
+
         /// <summary>The unique identifier of the model being previewed.</summary>
         private string _modelId;
         /// <summary>The version of the model being previewed.</summary>
@@ -31,11 +58,11 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>List of meshes found in the model.</summary>
         private List<MeshInfo> _meshes = new List<MeshInfo>();
         /// <summary>Currently selected mesh index.</summary>
-        private int _selectedMeshIndex = 0;
+        private int _selectedMeshIndex = __DEFAULT_SELECTED_MESH_INDEX;
         /// <summary>Camera rotation angle around the model.</summary>
-        private Vector2 _cameraRotation = new Vector2(30f, 30f);
+        private Vector2 _cameraRotation = new Vector2(__DEFAULT_CAMERA_ROTATION_X, __DEFAULT_CAMERA_ROTATION_Y);
         /// <summary>Camera distance from the model.</summary>
-        private float _cameraDistance = 5f;
+        private float _cameraDistance = __DEFAULT_CAMERA_DISTANCE;
         /// <summary>Preview area rectangle.</summary>
         private Rect _previewRect;
         /// <summary>Whether the preview is currently loading.</summary>
@@ -67,7 +94,7 @@ namespace ModelLibrary.Editor.Windows
             window._service = null;
             window._meta = null;
             window._meshes.Clear();
-            window._selectedMeshIndex = 0;
+            window._selectedMeshIndex = __DEFAULT_SELECTED_MESH_INDEX;
             window._isLoading = true;
             window.Show();
             window.Repaint();
@@ -147,10 +174,7 @@ namespace ModelLibrary.Editor.Windows
                 // Initialize service if needed
                 if (_service == null)
                 {
-                    ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
-                    Repository.IModelRepository repo = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.FileSystem
-                        ? new Repository.FileSystemRepository(settings.repositoryRoot)
-                        : new Repository.HttpRepository(settings.repositoryRoot);
+                    Repository.IModelRepository repo = RepositoryFactory.CreateRepository();
                     _service = new ModelLibraryService(repo);
                 }
 
@@ -172,7 +196,7 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Failed to load model for 3D preview: {ex.Message}");
+                ErrorLogger.LogError("Load Model Failed", $"Failed to load model for 3D preview: {ex.Message}", ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}, Version: {_version}");
                 _isLoading = false;
                 Repaint();
             }
@@ -220,10 +244,9 @@ namespace ModelLibrary.Editor.Windows
                 // IMPORTANT: Import textures FIRST, then materials, so we can re-link textures
                 // Find and copy texture files from cache to temp directory
                 // Exclude preview images (in "images" folder or named "auto_preview")
-                string[] textureExtensions = new[] { "*.png", "*.jpg", "*.jpeg", "*.tga", "*.psd" };
                 List<string> textureFiles = new List<string>();
 
-                foreach (string ext in textureExtensions)
+                foreach (string ext in __TEXTURE_EXTENSIONS)
                 {
                     string[] allTextures = Directory.GetFiles(cacheRoot, ext, SearchOption.AllDirectories);
                     foreach (string textureFile in allTextures)
@@ -449,143 +472,7 @@ namespace ModelLibrary.Editor.Windows
 
                             // Preserve important material properties for correct rendering
                             // This ensures alpha clipping, specular highlights, and environment reflections work correctly
-
-                            // Preserve alpha clipping settings
-                            if (loadedMat.HasProperty("_AlphaClip"))
-                            {
-                                float alphaClipValue = loadedMat.GetFloat("_AlphaClip");
-                                bool alphaClipping = true;
-
-                                // Set the _ALPHATEST_ON keyword for URP/Built-in shaders
-                                if (alphaClipping)
-                                {
-                                    loadedMat.EnableKeyword("_ALPHATEST_ON");
-                                    Debug.Log($"Enabled _ALPHATEST_ON keyword for material '{matName}' (AlphaClip: {alphaClipValue})");
-                                }
-                                else
-                                {
-                                    loadedMat.DisableKeyword("_ALPHATEST_ON");
-                                }
-
-                                // Ensure _Cutoff property is preserved and set correctly (alpha clipping threshold)
-                                if (loadedMat.HasProperty("_Cutoff"))
-                                {
-                                    float currentCutoff = loadedMat.GetFloat("_Cutoff");
-                                    // Re-set the value to ensure it's applied (sometimes values don't persist after import)
-                                    loadedMat.SetFloat("_Cutoff", currentCutoff);
-                                    Debug.Log($"Set _Cutoff value for material '{matName}': {currentCutoff}");
-                                }
-
-                                Debug.Log($"Configured alpha clipping for material '{matName}': {alphaClipping} (AlphaClip value: {alphaClipValue})");
-                            }
-
-                            // Preserve specular highlights setting
-                            if (loadedMat.HasProperty("_SpecularHighlights"))
-                            {
-                                float specularHighlights = loadedMat.GetFloat("_SpecularHighlights");
-                                loadedMat.SetFloat("_SpecularHighlights", specularHighlights);
-                                Debug.Log($"Preserved _SpecularHighlights for material '{matName}': {specularHighlights}");
-                            }
-
-                            // Preserve specular color (URP and Built-in)
-                            if (loadedMat.HasProperty("_SpecColor"))
-                            {
-                                Color specColor = loadedMat.GetColor("_SpecColor");
-                                loadedMat.SetColor("_SpecColor", specColor);
-                                Debug.Log($"Preserved _SpecColor for material '{matName}': {specColor}");
-                            }
-
-                            // Preserve smoothness (URP)
-                            if (loadedMat.HasProperty("_Smoothness"))
-                            {
-                                float smoothness = loadedMat.GetFloat("_Smoothness");
-                                loadedMat.SetFloat("_Smoothness", smoothness);
-                                Debug.Log($"Preserved _Smoothness for material '{matName}': {smoothness}");
-                            }
-
-                            // Preserve glossiness (Built-in Standard shader)
-                            if (loadedMat.HasProperty("_Glossiness"))
-                            {
-                                float glossiness = loadedMat.GetFloat("_Glossiness");
-                                loadedMat.SetFloat("_Glossiness", glossiness);
-                                Debug.Log($"Preserved _Glossiness for material '{matName}': {glossiness}");
-                            }
-
-                            // Preserve specular gloss map texture and switch to specular workflow if present
-                            bool hasSpecGlossMap = false;
-                            if (loadedMat.HasProperty("_SpecGlossMap"))
-                            {
-                                Texture specGlossMap = loadedMat.GetTexture("_SpecGlossMap");
-                                if (specGlossMap != null)
-                                {
-                                    loadedMat.SetTexture("_SpecGlossMap", specGlossMap);
-                                    hasSpecGlossMap = true;
-                                    Debug.Log($"Preserved _SpecGlossMap for material '{matName}': {specGlossMap.name}");
-                                }
-                            }
-
-                            // Switch to specular workflow if specular map is present
-                            // _WorkflowMode: 0 = Specular, 1 = Metallic
-                            if (hasSpecGlossMap && loadedMat.HasProperty("_WorkflowMode"))
-                            {
-                                loadedMat.SetFloat("_WorkflowMode", 0f); // Specular workflow
-                                Debug.Log($"Switched to specular workflow for material '{matName}' (specular map present)");
-                            }
-
-                            // Preserve metallic value (for metallic workflow)
-                            if (loadedMat.HasProperty("_Metallic"))
-                            {
-                                float metallic = loadedMat.GetFloat("_Metallic");
-                                loadedMat.SetFloat("_Metallic", metallic);
-                                Debug.Log($"Preserved _Metallic for material '{matName}': {metallic}");
-                            }
-
-                            // Preserve metallic gloss map texture
-                            if (loadedMat.HasProperty("_MetallicGlossMap"))
-                            {
-                                Texture metallicGlossMap = loadedMat.GetTexture("_MetallicGlossMap");
-                                if (metallicGlossMap != null)
-                                {
-                                    loadedMat.SetTexture("_MetallicGlossMap", metallicGlossMap);
-                                    Debug.Log($"Preserved _MetallicGlossMap for material '{matName}': {metallicGlossMap.name}");
-                                }
-                            }
-
-                            // Preserve environment reflections setting
-                            if (loadedMat.HasProperty("_EnvironmentReflections"))
-                            {
-                                float environmentReflections = loadedMat.GetFloat("_EnvironmentReflections");
-                                loadedMat.SetFloat("_EnvironmentReflections", environmentReflections);
-                                Debug.Log($"Preserved _EnvironmentReflections for material '{matName}': {environmentReflections}");
-                            }
-
-                            // Also preserve GlossyReflections if it exists (some shaders use this instead)
-                            if (loadedMat.HasProperty("_GlossyReflections"))
-                            {
-                                float glossyReflections = loadedMat.GetFloat("_GlossyReflections");
-                                loadedMat.SetFloat("_GlossyReflections", glossyReflections);
-                            }
-
-                            // If material doesn't have _AlphaClip property, try to enable keyword if shader supports it
-                            // This handles materials that might have the keyword set but not the property
-                            if (!loadedMat.HasProperty("_AlphaClip") && loadedMat.shader != null)
-                            {
-                                // Try to enable keyword if shader supports it
-                                try
-                                {
-                                    // Check if keyword exists in shader
-                                    Shader shader = loadedMat.shader;
-                                    if (shader != null)
-                                    {
-                                        // Enable keyword - if it doesn't exist, this will be a no-op
-                                        loadedMat.EnableKeyword("_ALPHATEST_ON");
-                                    }
-                                }
-                                catch
-                                {
-                                    // Keyword might not exist in this shader, ignore
-                                }
-                            }
+                            MaterialPropertyPreserver.PreserveMaterialProperties(loadedMat, matName, enableLogging: true);
                         }
                     }
                 }
@@ -684,140 +571,7 @@ namespace ModelLibrary.Editor.Windows
 
                                 // Preserve important material properties for correct rendering
                                 // This ensures alpha clipping, specular highlights, and environment reflections work correctly
-
-                                // Preserve alpha clipping settings - check multiple property names
-                                bool alphaClipping = false;
-                                float alphaClipValue = 0f;
-                                float cutoffValue = 0.5f;
-
-                                // Check for _AlphaClip property (URP)
-                                if (materialToUseForPreview.HasProperty("_AlphaClip"))
-                                {
-                                    alphaClipValue = materialToUseForPreview.GetFloat("_AlphaClip");
-                                    alphaClipping = true;//alphaClipValue >= 0.5f;
-                                }
-                                // Check for _AlphaTest property (some shaders)
-                                else if (materialToUseForPreview.HasProperty("_AlphaTest"))
-                                {
-                                    alphaClipValue = materialToUseForPreview.GetFloat("_AlphaTest");
-                                    alphaClipping = true;//alphaClipValue >= 0.5f;
-                                }
-
-                                // Get cutoff value if available
-                                if (materialToUseForPreview.HasProperty("_Cutoff"))
-                                {
-                                    cutoffValue = materialToUseForPreview.GetFloat("_Cutoff");
-                                }
-
-                                // Set the _ALPHATEST_ON keyword BEFORE setting properties
-                                // This ensures the shader variant is compiled with the keyword
-                                if (alphaClipping)
-                                {
-                                    materialToUseForPreview.EnableKeyword("_ALPHATEST_ON");
-
-                                    // Re-apply cutoff value after enabling keyword
-
-                                    if (materialToUseForPreview.HasProperty("_Cutoff"))
-                                    {
-                                        materialToUseForPreview.SetFloat("_Cutoff", cutoffValue);
-                                    }
-                                }
-                                else
-                                {
-                                    materialToUseForPreview.DisableKeyword("_ALPHATEST_ON");
-                                }
-
-
-                                // Preserve specular highlights setting
-                                if (materialToUseForPreview.HasProperty("_SpecularHighlights"))
-                                {
-                                    float specularHighlights = materialToUseForPreview.GetFloat("_SpecularHighlights");
-                                    materialToUseForPreview.SetFloat("_SpecularHighlights", specularHighlights);
-                                }
-
-                                // Preserve specular color (URP and Built-in)
-                                if (materialToUseForPreview.HasProperty("_SpecColor"))
-                                {
-                                    Color specColor = materialToUseForPreview.GetColor("_SpecColor");
-                                    materialToUseForPreview.SetColor("_SpecColor", specColor);
-                                }
-
-                                // Preserve smoothness (URP)
-                                if (materialToUseForPreview.HasProperty("_Smoothness"))
-                                {
-                                    float smoothness = materialToUseForPreview.GetFloat("_Smoothness");
-                                    materialToUseForPreview.SetFloat("_Smoothness", smoothness);
-                                }
-
-                                // Preserve glossiness (Built-in Standard shader)
-                                if (materialToUseForPreview.HasProperty("_Glossiness"))
-                                {
-                                    float glossiness = materialToUseForPreview.GetFloat("_Glossiness");
-                                    materialToUseForPreview.SetFloat("_Glossiness", glossiness);
-                                }
-
-                                // Preserve specular gloss map texture and switch to specular workflow if present
-                                bool hasSpecGlossMapForPreview = false;
-                                if (materialToUseForPreview.HasProperty("_SpecGlossMap"))
-                                {
-                                    Texture specGlossMap = materialToUseForPreview.GetTexture("_SpecGlossMap");
-                                    if (specGlossMap != null)
-                                    {
-                                        materialToUseForPreview.SetTexture("_SpecGlossMap", specGlossMap);
-                                        hasSpecGlossMapForPreview = true;
-                                    }
-                                }
-
-                                // Switch to specular workflow if specular map is present
-                                // _WorkflowMode: 0 = Specular, 1 = Metallic
-                                if (hasSpecGlossMapForPreview && materialToUseForPreview.HasProperty("_WorkflowMode"))
-                                {
-                                    materialToUseForPreview.SetFloat("_WorkflowMode", 0f); // Specular workflow
-                                }
-
-                                // Preserve metallic value (for metallic workflow)
-                                if (materialToUseForPreview.HasProperty("_Metallic"))
-                                {
-                                    float metallic = materialToUseForPreview.GetFloat("_Metallic");
-                                    materialToUseForPreview.SetFloat("_Metallic", metallic);
-                                }
-
-                                // Preserve metallic gloss map texture
-                                if (materialToUseForPreview.HasProperty("_MetallicGlossMap"))
-                                {
-                                    Texture metallicGlossMap = materialToUseForPreview.GetTexture("_MetallicGlossMap");
-                                    if (metallicGlossMap != null)
-                                    {
-                                        materialToUseForPreview.SetTexture("_MetallicGlossMap", metallicGlossMap);
-                                    }
-                                }
-
-                                // Preserve environment reflections setting
-                                if (materialToUseForPreview.HasProperty("_EnvironmentReflections"))
-                                {
-                                    float environmentReflections = materialToUseForPreview.GetFloat("_EnvironmentReflections");
-                                    materialToUseForPreview.SetFloat("_EnvironmentReflections", environmentReflections);
-                                }
-
-                                // Also preserve GlossyReflections if it exists (some shaders use this instead)
-                                if (materialToUseForPreview.HasProperty("_GlossyReflections"))
-                                {
-                                    float glossyReflections = materialToUseForPreview.GetFloat("_GlossyReflections");
-                                    materialToUseForPreview.SetFloat("_GlossyReflections", glossyReflections);
-                                }
-
-                                // If material doesn't have _AlphaClip property, try to enable keyword if shader supports it
-                                if (!materialToUseForPreview.HasProperty("_AlphaClip") && !materialToUseForPreview.HasProperty("_AlphaTest") && materialToUseForPreview.shader != null)
-                                {
-                                    try
-                                    {
-                                        materialToUseForPreview.EnableKeyword("_ALPHATEST_ON");
-                                    }
-                                    catch
-                                    {
-                                        // Keyword might not exist in this shader, ignore
-                                    }
-                                }
+                                MaterialPropertyPreserver.PreserveMaterialProperties(materialToUseForPreview, materialToUseForPreview.name, enableLogging: false);
 
                                 // Log texture information to verify textures are loaded
                                 if (materialToUseForPreview.shader != null)
@@ -862,7 +616,7 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Failed to load meshes: {ex.Message}");
+                ErrorLogger.LogError("Load Meshes Failed", $"Failed to load meshes: {ex.Message}", ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}, Version: {_version}");
             }
         }
 
@@ -879,7 +633,11 @@ namespace ModelLibrary.Editor.Windows
 
             if (_meta == null)
             {
-                EditorGUILayout.HelpBox("Failed to load model metadata.", MessageType.Error);
+                EditorGUILayout.HelpBox("Failed to load model metadata. Please check your repository connection and try again.", MessageType.Error);
+                if (GUILayout.Button("Retry"))
+                {
+                    _ = LoadModelAsync();
+                }
                 return;
             }
 
@@ -893,46 +651,55 @@ namespace ModelLibrary.Editor.Windows
             EditorGUILayout.LabelField(_meta.identity.name, EditorStyles.boldLabel);
             EditorGUILayout.LabelField($"Version: {_meta.version}");
 
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(__UI_SPACING);
 
             // Mesh selection
             if (_meshes.Count > 1)
             {
-                string[] meshNames = _meshes.Select(m => m.name).ToArray();
-                _selectedMeshIndex = EditorGUILayout.Popup("Mesh", _selectedMeshIndex, meshNames);
+                // Performance: Cache mesh names array to avoid allocation every frame
+                if (_cachedMeshNames == null || _lastMeshCount != _meshes.Count)
+                {
+                    _cachedMeshNames = new string[_meshes.Count];
+                    for (int i = 0; i < _meshes.Count; i++)
+                    {
+                        _cachedMeshNames[i] = _meshes[i].name;
+                    }
+                    _lastMeshCount = _meshes.Count;
+                }
+                _selectedMeshIndex = EditorGUILayout.Popup("Mesh", _selectedMeshIndex, _cachedMeshNames);
             }
 
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(__UI_SPACING);
 
             // Preview controls
             using (new EditorGUILayout.HorizontalScope())
             {
-                EditorGUILayout.LabelField("Rotation:", GUILayout.Width(60));
+                EditorGUILayout.LabelField("Rotation:", GUILayout.Width(__ROTATION_LABEL_WIDTH));
                 _cameraRotation.x = EditorGUILayout.Slider(_cameraRotation.x, 0f, 360f);
                 _cameraRotation.y = EditorGUILayout.Slider(_cameraRotation.y, 0f, 360f);
 
-                if (GUILayout.Button("Reset", GUILayout.Width(60)))
+                if (GUILayout.Button("Reset", GUILayout.Width(__RESET_BUTTON_WIDTH)))
                 {
-                    _cameraRotation = new Vector2(30f, 30f);
-                    _cameraDistance = 5f;
+                    _cameraRotation = new Vector2(__DEFAULT_CAMERA_ROTATION_X, __DEFAULT_CAMERA_ROTATION_Y);
+                    _cameraDistance = __DEFAULT_CAMERA_DISTANCE;
                 }
             }
 
             EditorGUILayout.LabelField("Distance:", _cameraDistance.ToString("F2"));
-            _cameraDistance = EditorGUILayout.Slider(_cameraDistance, 1f, 20f);
+            _cameraDistance = EditorGUILayout.Slider(_cameraDistance, __MIN_CAMERA_DISTANCE, __MAX_CAMERA_DISTANCE);
 
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(__UI_SPACING);
 
             // 3D Preview area
-            _previewRect = GUILayoutUtility.GetRect(400, 400, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+            _previewRect = GUILayoutUtility.GetRect(__PREVIEW_MIN_SIZE, __PREVIEW_MIN_SIZE, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 
             // Always draw background first
             if (Event.current.type == EventType.Repaint)
             {
-                EditorGUI.DrawRect(_previewRect, new Color(0.2f, 0.2f, 0.2f, 1f));
+                EditorGUI.DrawRect(_previewRect, new Color(__PREVIEW_BACKGROUND_GRAY, __PREVIEW_BACKGROUND_GRAY, __PREVIEW_BACKGROUND_GRAY, 1f));
             }
 
-            if (_previewUtil != null && _selectedMeshIndex < _meshes.Count && _previewRect.width > 0 && _previewRect.height > 0)
+            if (_previewUtil != null && _selectedMeshIndex >= 0 && _selectedMeshIndex < _meshes.Count && _previewRect.width > 0 && _previewRect.height > 0)
             {
                 MeshInfo meshInfo = _meshes[_selectedMeshIndex];
 
@@ -972,7 +739,7 @@ namespace ModelLibrary.Editor.Windows
                 float size = Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z));
                 if (size <= 0f)
                 {
-                    size = 1f;
+                    size = __DEFAULT_BOUNDS_SIZE;
                 }
 
                 float angleX = _cameraRotation.x * Mathf.Deg2Rad;
@@ -994,13 +761,13 @@ namespace ModelLibrary.Editor.Windows
                 else
                 {
                     // Debug: log when preview is null
-                    EditorGUI.DrawRect(_previewRect, new Color(0.2f, 0.2f, 0.2f, 1f));
+                    EditorGUI.DrawRect(_previewRect, new Color(__PREVIEW_BACKGROUND_GRAY, __PREVIEW_BACKGROUND_GRAY, __PREVIEW_BACKGROUND_GRAY, 1f));
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Failed to render preview: {ex.Message}\n{ex.StackTrace}");
-                EditorGUI.DrawRect(_previewRect, new Color(0.5f, 0f, 0f, 1f)); // Red background on error
+                ErrorLogger.LogError("Render Preview Failed", $"Failed to render preview: {ex.Message}", ErrorHandler.ErrorCategory.Unknown, ex, $"Mesh: {meshInfo.name}, Material: {meshInfo.material?.name ?? "null"}");
+                EditorGUI.DrawRect(_previewRect, new Color(__ERROR_BACKGROUND_RED, 0f, 0f, 1f)); // Red background on error
             }
         }
 
@@ -1015,15 +782,15 @@ namespace ModelLibrary.Editor.Windows
             {
                 if (e.type == EventType.MouseDrag && e.button == 0)
                 {
-                    _cameraRotation.y += e.delta.x * 0.5f;
-                    _cameraRotation.x += e.delta.y * 0.5f;
-                    _cameraRotation.x = Mathf.Clamp(_cameraRotation.x, -90f, 90f);
+                    _cameraRotation.y += e.delta.x * __MOUSE_ROTATION_SENSITIVITY;
+                    _cameraRotation.x += e.delta.y * __MOUSE_ROTATION_SENSITIVITY;
+                    _cameraRotation.x = Mathf.Clamp(_cameraRotation.x, __MIN_CAMERA_ROTATION_X, __MAX_CAMERA_ROTATION_X);
                     Repaint();
                     e.Use();
                 }
                 else if (e.type == EventType.ScrollWheel)
                 {
-                    _cameraDistance = Mathf.Clamp(_cameraDistance + e.delta.y * 0.1f, 1f, 20f);
+                    _cameraDistance = Mathf.Clamp(_cameraDistance + e.delta.y * __MOUSE_ZOOM_SENSITIVITY, __MIN_CAMERA_DISTANCE, __MAX_CAMERA_DISTANCE);
                     Repaint();
                     e.Use();
                 }

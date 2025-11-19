@@ -169,7 +169,7 @@ namespace ModelLibrary.Editor.Windows
             _deletingModel = true;
             try
             {
-                EditorUtility.DisplayProgressBar("Deleting Model", $"Deleting {_meta.identity.name} and all versions...", 0.4f);
+                EditorUtility.DisplayProgressBar("Deleting Model", $"Deleting {_meta.identity.name} and all versions...", ProgressBarConstants.MID_OPERATION);
 
                 // Yield to allow UI to update before starting the deletion
 
@@ -244,7 +244,7 @@ namespace ModelLibrary.Editor.Windows
             _deletingVersion = true;
             try
             {
-                EditorUtility.DisplayProgressBar("Deleting Version", $"Deleting {_meta.identity.name} v{_version}...", 0.4f);
+                EditorUtility.DisplayProgressBar("Deleting Version", $"Deleting {_meta.identity.name} v{_version}...", ProgressBarConstants.MID_OPERATION);
 
                 // Yield to allow UI to update before starting the deletion
 
@@ -319,22 +319,19 @@ namespace ModelLibrary.Editor.Windows
             try
             {
                 titleContent.text = "Model Details - Importing...";
-                EditorUtility.DisplayProgressBar("Importing Model", "Connecting to repository...", 0.1f);
+                EditorUtility.DisplayProgressBar("Importing Model", "Connecting to repository...", ProgressBarConstants.INITIAL);
 
-                ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
-                IModelRepository repo = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.FileSystem
-                    ? new Repository.FileSystemRepository(settings.repositoryRoot)
-                    : new Repository.HttpRepository(settings.repositoryRoot);
+                IModelRepository repo = RepositoryFactory.CreateRepository();
                 ModelLibraryService service = new ModelLibraryService(repo);
 
-                EditorUtility.DisplayProgressBar("Importing Model", "Downloading model files...", 0.3f);
+                EditorUtility.DisplayProgressBar("Importing Model", "Downloading model files...", ProgressBarConstants.PREPARING);
                 (string cacheRoot, ModelMeta meta) = await service.DownloadModelVersionAsync(_modelId, _version);
 
-                EditorUtility.DisplayProgressBar("Importing Model", "Copying files to Assets folder...", 0.6f);
+                EditorUtility.DisplayProgressBar("Importing Model", "Copying files to Assets folder...", ProgressBarConstants.COPYING_IMAGES);
                 await ModelProjectImporter.ImportFromCacheAsync(cacheRoot, meta, cleanDestination: true);
 
-                EditorUtility.DisplayProgressBar("Importing Model", "Finalizing import...", 0.9f);
-                await Task.Delay(100); // Brief pause for UI update
+                EditorUtility.DisplayProgressBar("Importing Model", "Finalizing import...", ProgressBarConstants.FINALIZING);
+                await Task.Delay(DelayConstants.UI_UPDATE_DELAY_MS); // Brief pause for UI update
 
                 EditorUtility.ClearProgressBar();
 

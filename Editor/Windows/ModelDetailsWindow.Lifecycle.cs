@@ -34,10 +34,7 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void Init()
         {
-            ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
-            IModelRepository repo = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.FileSystem
-                ? new Repository.FileSystemRepository(settings.repositoryRoot)
-                : new Repository.HttpRepository(settings.repositoryRoot);
+            IModelRepository repo = RepositoryFactory.CreateRepository();
             _service = new ModelLibraryService(repo);
             _ = Load();
         }
@@ -47,21 +44,41 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private async Task Load()
         {
-            _meta = await _service.GetMetaAsync(_modelId, _version);
-            _baselineMetaJson = JsonUtil.ToJson(_meta);
-            _editedDescription = _meta.description;
-            _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
-            _editingTags = false;
+            try
+            {
+                _meta = await _service.GetMetaAsync(_modelId, _version);
+                if (_meta == null)
+                {
+                    ErrorLogger.LogError("Load Model Failed", 
+                        $"Failed to load model metadata for {_modelId} version {_version}", 
+                        ErrorHandler.ErrorCategory.Connection, null, $"ModelId: {_modelId}, Version: {_version}");
+                    Repaint();
+                    return;
+                }
 
-            // Track view analytics
+                _baselineMetaJson = JsonUtil.ToJson(_meta);
+                _editedDescription = _meta.description ?? string.Empty;
+                _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
+                _editingTags = false;
 
-            AnalyticsService.RecordEvent("view", _modelId, _version, _meta.identity.name);
+                // Track view analytics
+                if (_meta.identity != null && !string.IsNullOrEmpty(_meta.identity.name))
+                {
+                    AnalyticsService.RecordEvent("view", _modelId, _version, _meta.identity.name);
+                }
 
+                Repaint();
 
-            Repaint();
-
-            await LoadVersionListAsync();
-            _ = CheckInstallationStatusAsync();
+                await LoadVersionListAsync();
+                _ = CheckInstallationStatusAsync();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Load Model Failed", 
+                    $"Failed to load model: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}, Version: {_version}");
+                Repaint();
+            }
         }
 
         private async Task LoadVersionListAsync()
@@ -94,7 +111,9 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[ModelDetailsWindow] Failed to load version list for {_modelId}: {ex.Message}");
+                ErrorLogger.LogError("Load Version List Failed", 
+                    $"Failed to load version list for {_modelId}: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}");
                 _availableVersions.Clear();
                 _isLatestVersion = false;
                 _hasOlderVersions = false;
@@ -125,16 +144,7 @@ namespace ModelLibrary.Editor.Windows
                 List<string> manifestPaths = new List<string>();
 
                 // Search for new naming convention (.modelLibrary.meta.json) first, then old naming for backward compatibility
-
-                foreach (string manifestPath in System.IO.Directory.EnumerateFiles("Assets", ".modelLibrary.meta.json", System.IO.SearchOption.AllDirectories))
-                {
-                    manifestPaths.Add(manifestPath);
-                }
-                // Fallback for old files created before the naming change
-                foreach (string manifestPath in System.IO.Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", System.IO.SearchOption.AllDirectories))
-                {
-                    manifestPaths.Add(manifestPath);
-                }
+                manifestPaths.AddRange(ManifestDiscoveryUtility.DiscoverAllManifestFiles("Assets"));
 
                 string foundLocalVersion = null;
 
@@ -228,7 +238,9 @@ namespace ModelLibrary.Editor.Windows
                             }
                             catch (Exception ex)
                             {
-                                Debug.LogWarning($"[ModelDetailsWindow] Failed to match old manifest: {ex.Message}");
+                                ErrorLogger.LogError("Match Old Manifest Failed", 
+                                    $"Failed to match old manifest: {ex.Message}", 
+                                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}, ManifestPath: {manifestPath}");
                             }
                         }
 
@@ -242,7 +254,9 @@ namespace ModelLibrary.Editor.Windows
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogWarning($"[ModelDetailsWindow] Error reading manifest file {manifestPath}: {ex.Message}");
+                        ErrorLogger.LogError("Read Manifest File Failed", 
+                            $"Error reading manifest file {manifestPath}: {ex.Message}", 
+                            ErrorHandler.CategorizeException(ex), ex, $"ManifestPath: {manifestPath}, ModelId: {_modelId}");
                         // Continue to next manifest file
                     }
                 }
@@ -274,7 +288,9 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[ModelDetailsWindow] Failed to check installation status: {ex.Message}");
+                ErrorLogger.LogError("Check Installation Status Failed", 
+                    $"Failed to check installation status: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}");
                 _isInstalled = false;
                 _installedVersion = null;
                 _hasUpdate = false;

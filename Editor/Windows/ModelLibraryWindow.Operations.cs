@@ -18,15 +18,15 @@ namespace ModelLibrary.Editor.Windows
             try
             {
                 ModelDownloader downloader = new ModelDownloader(_service);
-                EditorUtility.DisplayProgressBar("Downloading Model", "Connecting to repository...", 0.1f);
+                EditorUtility.DisplayProgressBar("Downloading Model", "Connecting to repository...", ProgressBarConstants.INITIAL);
 
                 (string root, ModelMeta meta) = await downloader.DownloadAsync(id, version);
 
-                EditorUtility.DisplayProgressBar("Downloading Model", "Download complete", 1.0f);
-                await Task.Delay(100);
+                EditorUtility.DisplayProgressBar("Downloading Model", "Download complete", ProgressBarConstants.COMPLETE);
+                await Task.Delay(DelayConstants.UI_UPDATE_DELAY_MS);
 
-                ShowNotification("Downloaded", string.Concat("Cached at: ", root));
-                Debug.Log(string.Concat("Model cached at: ", root));
+                ShowNotification("Downloaded", $"Cached at: {root}");
+                Debug.Log($"Model cached at: {root}");
             }
             catch (Exception ex)
             {
@@ -53,10 +53,10 @@ namespace ModelLibrary.Editor.Windows
 
             try
             {
-                titleContent.text = string.Concat("Model Library - ", progressTitle, "...");
+                titleContent.text = $"Model Library - {progressTitle}...";
 
                 ModelDownloader downloader = new ModelDownloader(_service);
-                EditorUtility.DisplayProgressBar(progressTitle, "Downloading from repository...", 0.1f);
+                EditorUtility.DisplayProgressBar(progressTitle, "Downloading from repository...", ProgressBarConstants.INITIAL);
 
                 if (_importCancellation.TryGetValue(id, out bool cancelled) && cancelled)
                 {
@@ -70,14 +70,14 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
-                EditorUtility.DisplayProgressBar(progressTitle, "Preparing import...", 0.3f);
+                EditorUtility.DisplayProgressBar(progressTitle, "Preparing import...", ProgressBarConstants.PREPARING);
 
                 string defaultInstallPath = _installPathHelper.DetermineInstallPath(meta);
                 string chosenInstallPath = defaultInstallPath;
 
                 int choice = EditorUtility.DisplayDialogComplex(
                     isUpgrade ? "Update Model" : "Import Model",
-                    string.Concat("Select an install location for '", meta.identity.name, "'.\nStored path: ", defaultInstallPath),
+                    $"Select an install location for '{meta.identity.name}'.\nStored path: {defaultInstallPath}",
                     "Use Stored Path",
                     "Choose Folder...",
                     "Cancel");
@@ -111,7 +111,7 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
-                EditorUtility.DisplayProgressBar(progressTitle, "Copying files to Assets folder...", 0.5f);
+                EditorUtility.DisplayProgressBar(progressTitle, "Copying files to Assets folder...", ProgressBarConstants.COPYING);
                 await ModelProjectImporter.ImportFromCacheAsync(root, meta, true, chosenInstallPath, isUpgrade);
 
                 if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)
@@ -119,8 +119,8 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
-                EditorUtility.DisplayProgressBar(progressTitle, "Finalizing import...", 0.9f);
-                await Task.Delay(100);
+                EditorUtility.DisplayProgressBar(progressTitle, "Finalizing import...", ProgressBarConstants.FINALIZING);
+                await Task.Delay(DelayConstants.UI_UPDATE_DELAY_MS);
 
                 InvalidateLocalInstall(id);
                 
@@ -154,7 +154,9 @@ namespace ModelLibrary.Editor.Windows
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogWarning($"[ModelLibrary] Failed to read manifest file {manifestPath}: {ex.Message}. Using provided meta.");
+                        ErrorLogger.LogError("Read Manifest Failed", 
+                            $"Failed to read manifest file {manifestPath}: {ex.Message}. Using provided meta.", 
+                            ErrorHandler.CategorizeException(ex), ex, $"ManifestPath: {manifestPath}, ModelId: {id}");
                         // Fallback to the meta we have
                         _localInstallCache[id] = meta;
                         _manifestCache[id] = meta;
@@ -197,10 +199,10 @@ namespace ModelLibrary.Editor.Windows
                 AnalyticsService.RecordEvent(isUpgrade ? "update" : "import", id, version, meta.identity.name);
 
                 string message = isUpgrade && !string.IsNullOrEmpty(previousVersion)
-                    ? string.Concat("Updated '", meta.identity.name, "' from v", previousVersion, " to v", meta.version, " at ", chosenInstallPath, ".")
-                    : string.Concat("Imported '", meta.identity.name, "' v", meta.version, " to ", chosenInstallPath, ".");
+                    ? $"Updated '{meta.identity.name}' from v{previousVersion} to v{meta.version} at {chosenInstallPath}."
+                    : $"Imported '{meta.identity.name}' v{meta.version} to {chosenInstallPath}.";
                 ShowNotification(isUpgrade ? "Update Complete" : "Import Complete", message);
-                Debug.Log(string.Concat(isUpgrade ? "Update" : "Import", " Complete: ", message));
+                Debug.Log($"{(isUpgrade ? "Update" : "Import")} Complete: {message}");
                 Repaint();
             }
             catch (Exception ex)
@@ -209,14 +211,14 @@ namespace ModelLibrary.Editor.Windows
                 {
                     string operation = isUpgrade ? "Update" : "Import";
                     string operationLower = operation.ToLowerInvariant();
-                    ErrorHandler.ShowErrorWithRetry(string.Concat(operation, " Failed"),
-                        string.Concat("The model could not be ", operationLower, "ed into your project."),
+                    ErrorHandler.ShowErrorWithRetry($"{operation} Failed",
+                        $"The model could not be {operationLower}ed into your project.",
                         () => _ = Import(id, version, isUpgrade, previousVersion), ex);
                 }
                 else
                 {
-                    ShowNotification("Import Cancelled", string.Concat("The import of '", id, "' was cancelled."));
-                    Debug.Log(string.Concat("Import cancelled: ", id));
+                    ShowNotification("Import Cancelled", $"The import of '{id}' was cancelled.");
+                    Debug.Log($"Import cancelled: {id}");
                 }
             }
             finally
@@ -286,8 +288,8 @@ namespace ModelLibrary.Editor.Windows
 
                 AssetDatabase.Refresh();
 
-                ShowNotification("Import Undone", string.Concat("Removed ", removedCount, " assets from ", lastImport.installPath));
-                Debug.Log(string.Concat("Undo import: Removed ", removedCount, " assets"));
+                ShowNotification("Import Undone", $"Removed {removedCount} assets from {lastImport.installPath}");
+                Debug.Log($"Undo import: Removed {removedCount} assets");
                 Repaint();
             }
             catch (Exception ex)
@@ -322,7 +324,7 @@ namespace ModelLibrary.Editor.Windows
                         continue;
                     }
 
-                    EditorUtility.DisplayProgressBar("Bulk Import", string.Concat("Importing ", entry.name, " (", current, "/", total, ")..."), (float)current / total);
+                    EditorUtility.DisplayProgressBar("Bulk Import", $"Importing {entry.name} ({current}/{total})...", (float)current / total);
 
                     bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
                     bool needsUpgrade = installed && !string.IsNullOrEmpty(localMeta.version) && ModelVersionUtils.NeedsUpgrade(localMeta.version, entry.latestVersion);
@@ -332,16 +334,18 @@ namespace ModelLibrary.Editor.Windows
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError(string.Concat("Failed to import model ", modelId, ": ", ex.Message));
+                    ErrorLogger.LogError("Bulk Import Failed", 
+                        $"Failed to import model {modelId}: {ex.Message}", 
+                        ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}, Progress: {current}/{total}");
                     failCount++;
                 }
             }
 
             EditorUtility.ClearProgressBar();
 
-            string message = string.Concat("Bulk Import Complete! Successful: ", successCount, ", Failed: ", failCount);
+            string message = $"Bulk Import Complete! Successful: {successCount}, Failed: {failCount}";
             ShowNotification("Bulk Import Results", message);
-            Debug.Log(string.Concat("Bulk Import: ", message));
+            Debug.Log($"Bulk Import: {message}");
 
             _selectedModels.Clear();
             _bulkSelectionMode = false;
@@ -387,7 +391,7 @@ namespace ModelLibrary.Editor.Windows
                         continue;
                     }
 
-                    EditorUtility.DisplayProgressBar("Bulk Update", string.Concat("Updating ", entry.name, " (", current, "/", total, ")..."), (float)current / total);
+                    EditorUtility.DisplayProgressBar("Bulk Update", $"Updating {entry.name} ({current}/{total})...", (float)current / total);
 
                     bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
                     string previousVersion = installed ? localMeta.version : null;
@@ -397,16 +401,18 @@ namespace ModelLibrary.Editor.Windows
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError(string.Concat("Failed to update model ", modelId, ": ", ex.Message));
+                    ErrorLogger.LogError("Bulk Update Failed", 
+                        $"Failed to update model {modelId}: {ex.Message}", 
+                        ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}, Progress: {current}/{total}");
                     failCount++;
                 }
             }
 
             EditorUtility.ClearProgressBar();
 
-            string message = string.Concat("Bulk Update Complete! Successful: ", successCount, ", Failed: ", failCount);
+            string message = $"Bulk Update Complete! Successful: {successCount}, Failed: {failCount}";
             ShowNotification("Bulk Update Results", message);
-            Debug.Log(string.Concat("Bulk Update: ", message));
+            Debug.Log($"Bulk Update: {message}");
 
             _selectedModels.Clear();
             _bulkSelectionMode = false;
@@ -465,7 +471,9 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                Debug.LogWarning(string.Concat("Failed to save import history: ", ex.Message));
+                ErrorLogger.LogError("Save Import History Failed", 
+                    $"Failed to save import history: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex);
             }
         }
 
@@ -486,7 +494,9 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                Debug.LogWarning(string.Concat("Failed to load import history: ", ex.Message));
+                ErrorLogger.LogError("Load Import History Failed", 
+                    $"Failed to load import history: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex);
             }
         }
     }

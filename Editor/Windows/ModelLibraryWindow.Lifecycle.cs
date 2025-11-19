@@ -87,11 +87,7 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void InitializeServices()
         {
-            ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
-            IModelRepository repository = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.FileSystem
-                ? new Repository.FileSystemRepository(settings.repositoryRoot)
-                : new Repository.HttpRepository(settings.repositoryRoot);
-
+            IModelRepository repository = RepositoryFactory.CreateRepository();
             _service = new ModelLibraryService(repository);
             _ = LoadIndexAsync();
             _ = RefreshManifestCacheAsync();

@@ -7,6 +7,7 @@ using ModelLibrary.Editor;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Services;
 using ModelLibrary.Editor.Settings;
+using ModelLibrary.Editor.Utils;
 using ModelLibrary.Editor.Windows;
 using UnityEditor;
 using UnityEngine;
@@ -31,8 +32,8 @@ namespace ModelLibrary.Editor
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
             if (identityProvider.GetUserRole() != UserRole.Artist)
             {
-                EditorUtility.DisplayDialog("Access Denied", 
-                    "Model submission is only available for Artists. Please switch to Artist role in User Settings.", 
+                EditorUtility.DisplayDialog("Access Denied",
+                    "Model submission is only available for Artists. Please switch to Artist role in User Settings.",
                     "OK");
                 return;
             }
@@ -116,11 +117,11 @@ namespace ModelLibrary.Editor
             // Try to find which model this asset belongs to
             string selectedGuid = Selection.assetGUIDs[0];
             string modelId = FindModelIdFromGuid(selectedGuid);
-            
+
             if (string.IsNullOrEmpty(modelId))
             {
-                EditorUtility.DisplayDialog("Model Not Found", 
-                    "The selected asset does not belong to any model in the library.\n\nMake sure the model is installed and the asset is part of a registered model.", 
+                EditorUtility.DisplayDialog("Model Not Found",
+                    "The selected asset does not belong to any model in the library.\n\nMake sure the model is installed and the asset is part of a registered model.",
                     "OK");
                 return;
             }
@@ -160,11 +161,11 @@ namespace ModelLibrary.Editor
 
             string selectedGuid = Selection.assetGUIDs[0];
             string modelId = FindModelIdFromGuid(selectedGuid);
-            
+
             if (string.IsNullOrEmpty(modelId))
             {
-                EditorUtility.DisplayDialog("Model Not Found", 
-                    "The selected asset does not belong to any model in the library.", 
+                EditorUtility.DisplayDialog("Model Not Found",
+                    "The selected asset does not belong to any model in the library.",
                     "OK");
                 return;
             }
@@ -192,11 +193,11 @@ namespace ModelLibrary.Editor
             string selectedGuid = Selection.assetGUIDs[0];
             string modelId = FindModelIdFromGuid(selectedGuid);
             string version = FindModelVersionFromGuid(selectedGuid);
-            
+
             if (string.IsNullOrEmpty(modelId) || string.IsNullOrEmpty(version))
             {
-                EditorUtility.DisplayDialog("Model Not Found", 
-                    "The selected asset does not belong to any model in the library.", 
+                EditorUtility.DisplayDialog("Model Not Found",
+                    "The selected asset does not belong to any model in the library.",
                     "OK");
                 return;
             }
@@ -223,19 +224,8 @@ namespace ModelLibrary.Editor
             // Search for manifest files in the project
             // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
             // Unity doesn't import files starting with dot, so they're not in the AssetDatabase
-            List<string> manifestPaths = new List<string>();
-            
-            // Search for new naming convention (.modelLibrary.meta.json) first, then old naming for backward compatibility
-            foreach (string manifestPath in Directory.EnumerateFiles("Assets", ".modelLibrary.meta.json", SearchOption.AllDirectories))
-            {
-                manifestPaths.Add(manifestPath);
-            }
-            // Fallback for old files created before the naming change
-            foreach (string manifestPath in Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", SearchOption.AllDirectories))
-            {
-                manifestPaths.Add(manifestPath);
-            }
-            
+            List<string> manifestPaths = ManifestDiscoveryUtility.DiscoverAllManifestFiles("Assets");
+
             for (int i = 0; i < manifestPaths.Count; i++)
             {
                 string manifestPath = manifestPaths[i];
@@ -248,7 +238,7 @@ namespace ModelLibrary.Editor
                 {
                     string json = File.ReadAllText(manifestPath);
                     ModelMeta meta = JsonUtility.FromJson<ModelMeta>(json);
-                    
+
                     if (meta != null && meta.assetGuids != null && meta.assetGuids.Contains(guid))
                     {
                         return meta.identity?.id;
@@ -276,19 +266,8 @@ namespace ModelLibrary.Editor
             // Search for manifest files in the project
             // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
             // Unity doesn't import files starting with dot, so they're not in the AssetDatabase
-            List<string> manifestPaths = new List<string>();
-            
-            // Search for new naming convention (.modelLibrary.meta.json) first, then old naming for backward compatibility
-            foreach (string manifestPath in Directory.EnumerateFiles("Assets", ".modelLibrary.meta.json", SearchOption.AllDirectories))
-            {
-                manifestPaths.Add(manifestPath);
-            }
-            // Fallback for old files created before the naming change
-            foreach (string manifestPath in Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", SearchOption.AllDirectories))
-            {
-                manifestPaths.Add(manifestPath);
-            }
-            
+            List<string> manifestPaths = ManifestDiscoveryUtility.DiscoverAllManifestFiles("Assets");
+
             for (int i = 0; i < manifestPaths.Count; i++)
             {
                 string manifestPath = manifestPaths[i];
@@ -301,7 +280,7 @@ namespace ModelLibrary.Editor
                 {
                     string json = File.ReadAllText(manifestPath);
                     ModelMeta meta = JsonUtility.FromJson<ModelMeta>(json);
-                    
+
                     if (meta != null && meta.assetGuids != null && meta.assetGuids.Contains(guid))
                     {
                         return meta.version;
@@ -327,8 +306,8 @@ namespace ModelLibrary.Editor
             }
 
             // Wait a bit for the window to load
-            await Task.Delay(500);
-            
+            await Task.Delay(DelayConstants.LONG_DELAY_MS);
+
             // Set search to filter to this model
             // Note: This requires accessing private fields, so we'll need to add a public method
             // For now, we'll just open the window - the user can search manually
@@ -342,23 +321,20 @@ namespace ModelLibrary.Editor
         {
             try
             {
-                ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
-                Repository.IModelRepository repo = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.FileSystem
-                    ? new Repository.FileSystemRepository(settings.repositoryRoot)
-                    : new Repository.HttpRepository(settings.repositoryRoot);
+                Repository.IModelRepository repo = RepositoryFactory.CreateRepository();
                 ModelLibraryService service = new ModelLibraryService(repo);
 
                 bool hasUpdate = await service.HasUpdateAsync(modelId);
-                
+
                 if (hasUpdate)
                 {
                     ModelIndex.Entry entry = (await service.GetIndexAsync()).Get(modelId);
                     string latestVersion = entry?.latestVersion ?? "unknown";
-                    
-                    bool update = EditorUtility.DisplayDialog("Update Available", 
-                        $"Model '{entry?.name ?? modelId}' has an update available.\n\nLatest version: {latestVersion}\n\nWould you like to update now?", 
+
+                    bool update = EditorUtility.DisplayDialog("Update Available",
+                        $"Model '{entry?.name ?? modelId}' has an update available.\n\nLatest version: {latestVersion}\n\nWould you like to update now?",
                         "Update", "Cancel");
-                    
+
                     if (update)
                     {
                         // Open Model Library window to perform update
@@ -367,18 +343,20 @@ namespace ModelLibrary.Editor
                 }
                 else
                 {
-                    EditorUtility.DisplayDialog("No Updates", 
-                        $"Model '{modelId}' is up to date.", 
+                    EditorUtility.DisplayDialog("No Updates",
+                        $"Model '{modelId}' is up to date.",
                         "OK");
                 }
             }
             catch (System.Exception ex)
             {
-                EditorUtility.DisplayDialog("Error", 
-                    $"Failed to check for updates: {ex.Message}", 
+                ErrorLogger.LogError("Check Updates Failed",
+                    $"Failed to check for updates: {ex.Message}",
+                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}");
+                EditorUtility.DisplayDialog("Error",
+                    $"Failed to check for updates: {ex.Message}",
                     "OK");
             }
         }
     }
 }
-

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Settings;
@@ -56,13 +57,13 @@ namespace ModelLibrary.Editor.Windows
                     _metaCacheOrder.Remove(node);
                     _metaCacheNodes.Remove(key);
                 }
-            }
+}
             
             // Trigger immediate reload of metadata to get updated notes
             if (_service != null && !_loadingMeta.Contains(key))
             {
                 _ = LoadMetaAsync(modelId, version);
-            }
+}
             
             // Update notes count after reload (will be called again when metadata loads)
             UpdateNotesCount();
@@ -86,15 +87,18 @@ namespace ModelLibrary.Editor.Windows
                     {
                         _ = LoadThumbnailAsync(thumbKey, id, version, previewPath);
                     }
-                }
+}
                 
                 // Update notes count and window title after metadata is loaded
                 UpdateNotesCount();
                 UpdateWindowTitle();
                 Repaint();
             }
-            catch
+            catch (Exception ex)
             {
+                ErrorLogger.LogError("Load Meta Failed", 
+                    $"Failed to load metadata for {id} version {version}: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex, $"Key: {key}, ModelId: {id}, Version: {version}");
             }
             finally
             {
@@ -118,8 +122,11 @@ namespace ModelLibrary.Editor.Windows
                 }
                 Repaint();
             }
-            catch
+            catch (Exception ex)
             {
+                ErrorLogger.LogError("Load Thumbnail Failed", 
+                    $"Failed to load thumbnail: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), ex, $"CacheKey: {cacheKey}, ModelId: {id}, Version: {version}, RelativePath: {relativePath}");
                 RemoveThumbnailCacheEntry(cacheKey);
             }
             finally
@@ -376,21 +383,7 @@ namespace ModelLibrary.Editor.Windows
                 EditorUtility.DisplayProgressBar("Refreshing Manifest Cache", "Scanning for model manifests...", 0f);
 
                 // Move file enumeration to background thread to avoid blocking
-                List<string> manifestPaths = await Task.Run(() =>
-                {
-                    List<string> paths = new List<string>();
-                    // Search for new naming convention (.modelLibrary.meta.json) first, then old naming for backward compatibility
-                    foreach (string manifestPath in Directory.EnumerateFiles("Assets", ".modelLibrary.meta.json", SearchOption.AllDirectories))
-                    {
-                        paths.Add(manifestPath);
-                    }
-                    // Fallback for old files created before the naming change
-                    foreach (string manifestPath in Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", SearchOption.AllDirectories))
-                    {
-                        paths.Add(manifestPath);
-                    }
-                    return paths;
-                });
+                List<string> manifestPaths = await ManifestDiscoveryUtility.DiscoverAllManifestFilesAsync("Assets");
 
                 int total = manifestPaths.Count;
                 int processed = 0;
@@ -532,19 +525,24 @@ namespace ModelLibrary.Editor.Windows
             string key = modelId + "@" + version;
             if (TryGetMetaFromCache(key, out ModelMeta meta) && meta != null && meta.notes != null && meta.notes.Count > 0)
             {
-                string tooltip = $"This model has {meta.notes.Count} note{(meta.notes.Count == 1 ? string.Empty : "s")}:\n";
+                // Performance: Use StringBuilder for building tooltip in loop
+                StringBuilder tooltipBuilder = new StringBuilder();
+                tooltipBuilder.Append($"This model has {meta.notes.Count} note{(meta.notes.Count == 1 ? string.Empty : "s")}:\n");
+                
                 foreach (ModelNote note in meta.notes.OrderByDescending(entry => entry.createdTimeTicks).Take(3))
                 {
-                    string preview = note.message.Length > 50 ? string.Concat(note.message.Substring(0, 50), "...") : note.message;
-                    tooltip += $"• [{note.tag}] {preview}\n";
+                    string preview = note.message.Length > StringConstants.MAX_TOOLTIP_PREVIEW_LENGTH 
+                        ? $"{note.message.Substring(0, StringConstants.MAX_TOOLTIP_PREVIEW_LENGTH)}..." 
+                        : note.message;
+                    tooltipBuilder.Append($"• [{note.tag}] {preview}\n");
                 }
 
                 if (meta.notes.Count > 3)
                 {
-                    tooltip += $"... and {meta.notes.Count - 3} more";
+                    tooltipBuilder.Append($"... and {meta.notes.Count - 3} more");
                 }
 
-                return (true, tooltip);
+                return (true, tooltipBuilder.ToString());
             }
 
             return (false, null);
