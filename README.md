@@ -826,6 +826,36 @@ MIT License - see LICENSE file for details
 - **Keyboard Shortcuts**: `Tools > Model Library > Settings > Keyboard Shortcuts`
 - **Architecture Documentation**: See `architecture.md` for detailed design
 
+## 📋 Todo / Known Issues
+
+This section tracks known issues and planned improvements based on user feedback:
+
+### Network & Authentication Issues
+
+- **Silent failure on network authentication**: When working locally (without VPN), the refresh operation doesn't retrieve any models if the user is not logged into the server (Windows credentials), but doesn't provide any error information. The browser simply shows "0 models found" without indicating the authentication problem.
+
+### Cache & File System Issues
+
+- **Access denied on cached JSON files**: After discarding models from SmartGit (or other version control tools) and retrying an update on the same version, an "access denied" error occurs on JSON files in the cache. The workaround is to manually delete the model version folder in the cache.
+
+- **Cache cleanup after version deletion**: When deleting a version and restoring the previous one, the freshly deleted version remains displayed in the UI. Clicking on it opens a window that stays empty with "loading meta" message. Even after manually deleting the folder in the cache, the issue persists.
+
+### Import & GUID Management
+
+- **Frequent GUID conflicts**: GUID conflicts occur frequently during imports. The only solution to avoid losing references is to use the "Keep" button, which can be tedious.
+
+- **Incomplete import cancellation**: The "Cancel Import" button doesn't seem to cancel all operations completely, leaving some partial state or files behind.
+
+### Validation & Integrity
+
+- **Empty model submission**: It's possible to submit "empty" models (models without valid assets). Asset integrity verification should be added to prevent this.
+
+### User Interface & Clarity
+
+- **Asset path display**: The asset path should be displayed in the preview window to help users understand where assets are located.
+
+- **Absolute vs relative path confusion**: The distinction between absolute and relative paths is not clear to users. Better documentation or UI clarification is needed to explain when each path type is used and why.
+
 ---
 
 **Note**: This tool is Editor-only and does not include any runtime components. All functionality is available only within the Unity Editor.
