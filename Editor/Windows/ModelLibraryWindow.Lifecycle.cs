@@ -40,7 +40,8 @@ namespace ModelLibrary.Editor.Windows
 
             if (!FirstRunWizard.IsConfigured())
             {
-                FirstRunWizard.MaybeShow();
+                _currentView = ViewType.FirstRunWizard;
+                InitializeWizardState();
                 return;
             }
 
@@ -156,7 +157,24 @@ namespace ModelLibrary.Editor.Windows
 
             _indexCache = null;
             _authenticationError = null; // Clear any previous authentication errors
+            // Clear local install cache to force re-check of installation status
+            _localInstallCache.Clear();
+            _negativeCache.Clear();
             _ = LoadIndexAsync();
+            _ = RefreshManifestCacheAsync();
+        }
+
+        /// <summary>
+        /// Refreshes the manifest cache to update installation status.
+        /// This should be called after removing a model from the project.
+        /// </summary>
+        public void RefreshManifestCache()
+        {
+            // Clear caches to force re-scan
+            _localInstallCache.Clear();
+            _negativeCache.Clear();
+            _manifestCache.Clear();
+            _manifestCacheInitialized = false;
             _ = RefreshManifestCacheAsync();
         }
 
@@ -167,7 +185,8 @@ namespace ModelLibrary.Editor.Windows
 
             if (GUILayout.Button("Open Configuration Wizard", GUILayout.Height(30)))
             {
-                FirstRunWizard.MaybeShow();
+                NavigateToView(ViewType.FirstRunWizard);
+                InitializeWizardState();
             }
 
             EditorGUILayout.Space();

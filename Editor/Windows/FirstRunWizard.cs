@@ -14,7 +14,10 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public class FirstRunWizard : EditorWindow
     {
-        private enum WizardStep
+        /// <summary>
+        /// Wizard step enumeration for navigation.
+        /// </summary>
+        public enum WizardStep
         {
             Welcome = 0,
             Identity = 1,
@@ -118,6 +121,7 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Shows the first-run wizard if configuration is not complete.
         /// Called automatically when the Model Library browser opens and configuration is missing.
+        /// Now navigates to the wizard view instead of opening a separate window.
         /// </summary>
         public static void MaybeShow()
         {
@@ -125,20 +129,16 @@ namespace ModelLibrary.Editor.Windows
             {
                 try
                 {
-                    FirstRunWizard window = GetWindow<FirstRunWizard>(true, "Model Library Setup", true);
-                    if (window == null)
+                    ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+                    if (window != null)
                     {
-                        Debug.LogError("[FirstRunWizard] Failed to create wizard window");
-                        return;
+                        window.NavigateToView(ModelLibraryWindow.ViewType.FirstRunWizard);
+                        window.InitializeWizardState();
                     }
-
-                    window.minSize = new Vector2(480f, 360f);
-                    window.maxSize = new Vector2(640f, 520f);
-                    window.Init();
-                    window.ShowUtility();
-                    window.Focus(); // Ensure window is focused
-                    
-                    Debug.Log("[FirstRunWizard] Wizard window opened");
+                    else
+                    {
+                        Debug.LogError("[FirstRunWizard] Failed to get ModelLibraryWindow");
+                    }
                 }
                 catch (Exception ex)
                 {

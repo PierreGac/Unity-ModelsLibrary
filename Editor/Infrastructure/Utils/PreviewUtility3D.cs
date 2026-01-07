@@ -38,7 +38,9 @@ namespace ModelLibrary.Editor.Utils
             // PreviewRenderUtility with 'true' creates its own scene with built-in lighting
             // We'll add additional lights directly to the preview scene using AddSingleGO
             // Create light as root GameObject (AddSingleGO requires root GameObjects)
+            // CRITICAL: Use HideFlags to prevent this GameObject from appearing in the scene hierarchy
             GameObject lightObj = new GameObject("PreviewLight");
+            lightObj.hideFlags = HideFlags.HideAndDontSave; // Hide from hierarchy and don't save to scene
             _light = lightObj.AddComponent<Light>();
             _light.type = LightType.Directional;
             _light.intensity = 2; // Increased intensity for better specular visibility
@@ -54,7 +56,9 @@ namespace ModelLibrary.Editor.Utils
             _preview.AddSingleGO(lightObj);
 
             // Add reflection probe for reflections
+            // CRITICAL: Use HideFlags to prevent this GameObject from appearing in the scene hierarchy
             GameObject probeObj = new GameObject("PreviewReflectionProbe");
+            probeObj.hideFlags = HideFlags.HideAndDontSave; // Hide from hierarchy and don't save to scene
             probeObj.transform.position = Vector3.zero;
             _reflectionProbe = probeObj.AddComponent<ReflectionProbe>();
             _reflectionProbe.mode = UnityEngine.Rendering.ReflectionProbeMode.Realtime;
@@ -67,7 +71,9 @@ namespace ModelLibrary.Editor.Utils
             _preview.AddSingleGO(probeObj);
 
             // Create root for cleanup (but don't add it to preview scene)
+            // CRITICAL: Use HideFlags to prevent this GameObject from appearing in the scene hierarchy
             _root = new GameObject("PreviewRoot");
+            _root.hideFlags = HideFlags.HideAndDontSave; // Hide from hierarchy and don't save to scene
 
             // Set up skybox for reflections - use the currently active scene's skybox
             // RenderSettings.skybox reflects the skybox of the currently active scene

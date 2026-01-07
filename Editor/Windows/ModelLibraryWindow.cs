@@ -23,6 +23,41 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
+        /// Available view types for navigation within the Model Library window.
+        /// </summary>
+        public enum ViewType
+        {
+            /// <summary>Main browser view - the default landing page.</summary>
+            Browser,
+            /// <summary>First-run configuration wizard.</summary>
+            FirstRunWizard,
+            /// <summary>Model submission form.</summary>
+            Submit,
+            /// <summary>Model details view.</summary>
+            ModelDetails,
+            /// <summary>Help and documentation view.</summary>
+            Help,
+            /// <summary>Keyboard shortcuts view.</summary>
+            Shortcuts,
+            /// <summary>Settings view.</summary>
+            Settings,
+            /// <summary>Error log viewer.</summary>
+            ErrorLog,
+            /// <summary>Performance profiler view.</summary>
+            PerformanceProfiler,
+            /// <summary>Analytics view.</summary>
+            Analytics,
+            /// <summary>Bulk tag editor view.</summary>
+            BulkTag,
+            /// <summary>Batch upload view.</summary>
+            BatchUpload,
+            /// <summary>Version comparison view.</summary>
+            VersionComparison,
+            /// <summary>3D preview view (may open as separate window).</summary>
+            Preview3D
+        }
+
+        /// <summary>
         /// Opens the Model Library browser window from the Unity menu.
         /// Prevents opening during play mode.
         /// </summary>

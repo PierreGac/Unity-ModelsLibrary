@@ -40,6 +40,7 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Opens the analytics window.
+        /// Now navigates to the Analytics view in ModelLibraryWindow instead of opening a separate window.
         /// </summary>
         public static void Open()
         {
@@ -55,8 +56,12 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            AnalyticsWindow window = GetWindow<AnalyticsWindow>("Model Library Analytics");
-            window.Show();
+            // Navigate to Analytics view in ModelLibraryWindow
+            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+            if (window != null)
+            {
+                window.NavigateToView(ModelLibraryWindow.ViewType.Analytics);
+            }
         }
 
         /// <summary>

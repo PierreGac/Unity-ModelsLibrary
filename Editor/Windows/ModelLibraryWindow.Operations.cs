@@ -132,7 +132,7 @@ namespace ModelLibrary.Editor.Windows
                 EditorUtility.DisplayProgressBar(progressTitle, "Finalizing import...", ProgressBarConstants.FINALIZING);
                 await Task.Delay(DelayConstants.UI_UPDATE_DELAY_MS);
 
-                InvalidateLocalInstall(id);
+                InvalidateLocalInstallCache(id);
                 
                 // Read the manifest file we just created and add it to the cache
                 // This ensures the cache is immediately updated with the actual file content
@@ -188,6 +188,7 @@ namespace ModelLibrary.Editor.Windows
                 }
                 
                 // Force a repaint to update the UI immediately with the new cache state
+                // This ensures the browser view shows the model as installed right away
                 Repaint();
                 
                 // Trigger a background refresh of the manifest cache to ensure it's up to date
@@ -298,7 +299,7 @@ namespace ModelLibrary.Editor.Windows
                     AssetDatabase.DeleteAsset(manifestPath);
                 }
 
-                InvalidateLocalInstall(lastImport.modelId);
+                InvalidateLocalInstallCache(lastImport.modelId);
                 _localInstallCache.Remove(lastImport.modelId);
                 _manifestCache.Remove(lastImport.modelId);
 

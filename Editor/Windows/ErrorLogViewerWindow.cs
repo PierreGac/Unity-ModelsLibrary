@@ -22,11 +22,18 @@ namespace ModelLibrary.Editor.Windows
         private DateTime _lastRefresh = DateTime.MinValue;
         private const float REFRESH_INTERVAL_SECONDS = 2f;
 
+        /// <summary>
+        /// Opens the error log viewer window.
+        /// Now navigates to the ErrorLog view in ModelLibraryWindow instead of opening a separate window.
+        /// </summary>
         public static void Open()
         {
-            ErrorLogViewerWindow window = GetWindow<ErrorLogViewerWindow>("Model Library Error Log");
-            window.minSize = new Vector2(800, 400);
-            window.Show();
+            // Navigate to ErrorLog view in ModelLibraryWindow
+            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+            if (window != null)
+            {
+                window.NavigateToView(ModelLibraryWindow.ViewType.ErrorLog);
+            }
         }
 
         private void OnEnable() => RefreshLog();

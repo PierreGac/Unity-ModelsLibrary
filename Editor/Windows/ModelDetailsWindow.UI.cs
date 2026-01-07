@@ -211,7 +211,18 @@ namespace ModelLibrary.Editor.Windows
                 {
                     if (GUILayout.Button("Compare Versions", GUILayout.Width(150)))
                     {
-                        ModelVersionComparisonWindow.Open(_modelId, _version);
+                        // Navigate to VersionComparison view in ModelLibraryWindow
+                        ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+                        if (window != null)
+                        {
+                            Dictionary<string, object> parameters = new Dictionary<string, object>
+                            {
+                                { "modelId", _modelId },
+                                { "preferredRightVersion", _version }
+                            };
+                            window.NavigateToView(ModelLibraryWindow.ViewType.VersionComparison, parameters);
+                            window.InitializeVersionComparisonState();
+                        }
                     }
 
                     // Determine button state
@@ -231,7 +242,17 @@ namespace ModelLibrary.Editor.Windows
 
                     if (GUILayout.Button("3D Preview", GUILayout.Width(120)))
                     {
-                        ModelPreview3DWindow.Open(_modelId, _version);
+                        // Navigate to Preview3D view in ModelLibraryWindow
+                        ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+                        if (window != null)
+                        {
+                            Dictionary<string, object> parameters = new Dictionary<string, object>
+                            {
+                                { "modelId", _modelId },
+                                { "version", _version }
+                            };
+                            window.NavigateToView(ModelLibraryWindow.ViewType.Preview3D, parameters);
+                        }
                     }
                 }
             }

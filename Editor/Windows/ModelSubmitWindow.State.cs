@@ -15,7 +15,7 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Submission mode indicating whether this is a new model or an update to an existing one.
         /// </summary>
-        private enum SubmitMode
+        public enum SubmitMode
         {
             /// <summary>Creating a new model entry in the repository.</summary>
             New,
@@ -26,7 +26,7 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Tab selection for the submission form.
         /// </summary>
-        private enum FormTab
+        public enum FormTab
         {
             /// <summary>Basic information tab (name, version, description, tags).</summary>
             BasicInfo,

@@ -17,7 +17,7 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Tab selection for the settings window.
         /// </summary>
-        private enum SettingsTab
+        public enum SettingsTab
         {
             /// <summary>User settings tab (name, role).</summary>
             User,
@@ -61,12 +61,16 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Opens the unified settings window.
+        /// Now navigates to the Settings view in ModelLibraryWindow instead of opening a separate window.
         /// </summary>
         public static void Open()
         {
-            UnifiedSettingsWindow w = GetWindow<UnifiedSettingsWindow>("Model Library Settings");
-            w.minSize = new Vector2(500, 400);
-            w.Show();
+            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+            if (window != null)
+            {
+                window.NavigateToView(ModelLibraryWindow.ViewType.Settings);
+                window.InitializeSettingsState();
+            }
         }
 
         private void OnEnable() => LoadSettings();

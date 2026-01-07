@@ -1,12 +1,13 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
 {
     /// <summary>
-    /// Dedicated reference window listing keyboard shortcuts and productivity tips for the Model Library.
+    /// Partial class containing ModelLibraryShortcutsWindow view implementation for ModelLibraryWindow.
     /// </summary>
-    public class ModelLibraryShortcutsWindow : EditorWindow
+    public partial class ModelLibraryWindow
     {
         private struct ShortcutEntry
         {
@@ -32,7 +33,7 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        private static readonly ShortcutSection[] __Sections =
+        private static readonly ShortcutSection[] __SHORTCUT_SECTIONS =
         {
             new ShortcutSection(
                 "Global",
@@ -70,32 +71,25 @@ namespace ModelLibrary.Editor.Windows
                 })
         };
 
-        private Vector2 _scrollPosition;
+        /// <summary>
+        /// Scroll position for shortcuts view.
+        /// </summary>
+        private Vector2 _shortcutsScrollPosition;
 
         /// <summary>
-        /// Opens the shortcuts window.
-        /// Now navigates to the Shortcuts view in ModelLibraryWindow instead of opening a separate window.
+        /// Draws the Shortcuts view.
         /// </summary>
-        public static void Open()
-        {
-            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
-            if (window != null)
-            {
-                window.NavigateToView(ModelLibraryWindow.ViewType.Shortcuts);
-            }
-        }
-
-        private void OnGUI()
+        private void DrawShortcutsView()
         {
             GUILayout.Space(8f);
             EditorGUILayout.LabelField("Keyboard Shortcuts", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox("Keep this window open while exploring the Model Library. Many shortcuts mirror familiar IDE bindings.", MessageType.Info);
 
             GUILayout.Space(4f);
-            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
-            for (int i = 0; i < __Sections.Length; i++)
+            _shortcutsScrollPosition = EditorGUILayout.BeginScrollView(_shortcutsScrollPosition);
+            for (int i = 0; i < __SHORTCUT_SECTIONS.Length; i++)
             {
-                DrawSection(__Sections[i]);
+                DrawShortcutSection(__SHORTCUT_SECTIONS[i]);
                 GUILayout.Space(10f);
             }
             EditorGUILayout.EndScrollView();
@@ -106,13 +100,17 @@ namespace ModelLibrary.Editor.Windows
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Open Help Center", GUILayout.Width(160f), GUILayout.Height(24f)))
             {
-                ModelLibraryHelpWindow.OpenToSection(ModelLibraryHelpWindow.HelpSection.Shortcuts);
+                Dictionary<string, object> parameters = new Dictionary<string, object>
+                {
+                    { "helpSection", ModelLibraryHelpWindow.HelpSection.Shortcuts }
+                };
+                NavigateToView(ViewType.Help, parameters);
             }
             EditorGUILayout.EndHorizontal();
             GUILayout.Space(6f);
         }
 
-        private void DrawSection(ShortcutSection section)
+        private void DrawShortcutSection(ShortcutSection section)
         {
             GUIStyle headerStyle = new GUIStyle(EditorStyles.boldLabel)
             {
@@ -132,3 +130,4 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
+

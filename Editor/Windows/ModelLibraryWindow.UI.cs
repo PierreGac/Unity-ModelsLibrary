@@ -23,13 +23,75 @@ namespace ModelLibrary.Editor.Windows
             HandleKeyboardShortcuts();
             DrawNotification();
 
-            // Draw loading overlay if refresh or loading is in progress
+            // Draw loading overlay if refresh or loading is in progress (applies to all views)
             if (_refreshingManifest || _loadingIndex)
             {
                 DrawLoadingOverlay();
                 return; // Block all UI interaction during loading
             }
 
+            // Draw Previous button if not on Browser view
+            if (_currentView != ViewType.Browser)
+            {
+                DrawPreviousButton();
+            }
+
+            // Route to appropriate view based on current view type
+            switch (_currentView)
+            {
+                case ViewType.Browser:
+                    DrawBrowserView();
+                    break;
+                case ViewType.FirstRunWizard:
+                    DrawFirstRunWizardView();
+                    break;
+                case ViewType.Submit:
+                    DrawSubmitView();
+                    break;
+                case ViewType.ModelDetails:
+                    DrawModelDetailsView();
+                    break;
+                case ViewType.Help:
+                    DrawHelpView();
+                    break;
+                case ViewType.Shortcuts:
+                    DrawShortcutsView();
+                    break;
+                case ViewType.Settings:
+                    DrawSettingsView();
+                    break;
+                case ViewType.ErrorLog:
+                    DrawErrorLogView();
+                    break;
+                case ViewType.PerformanceProfiler:
+                    DrawPerformanceProfilerView();
+                    break;
+                case ViewType.Analytics:
+                    DrawAnalyticsView();
+                    break;
+                case ViewType.BulkTag:
+                    DrawBulkTagView();
+                    break;
+                case ViewType.BatchUpload:
+                    DrawBatchUploadView();
+                    break;
+                case ViewType.VersionComparison:
+                    DrawVersionComparisonView();
+                    break;
+                case ViewType.Preview3D:
+                    DrawPreview3DView();
+                    break;
+                default:
+                    DrawBrowserView();
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Draws the main browser view with model listing, search, and filtering.
+        /// </summary>
+        private void DrawBrowserView()
+        {
             if (!FirstRunWizard.IsConfigured())
             {
                 DrawConfigurationRequired();
@@ -51,7 +113,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         FullRefresh();
                     },
-                    () => ModelSubmitWindow.Open());
+                    () => NavigateToView(ViewType.Submit));
                 return;
             }
 
@@ -80,7 +142,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         FullRefresh();
                     },
-                    () => ModelSubmitWindow.Open());
+                    () => NavigateToView(ViewType.Submit));
                 return;
             }
 
@@ -157,7 +219,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (GUILayout.Button("Submit Model", GUILayout.Width(120), GUILayout.Height(30)))
                         {
-                            ModelSubmitWindow.Open();
+                            NavigateToView(ViewType.Submit);
                         }
                     }
 
@@ -174,7 +236,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         FullRefresh();
                     },
-                    () => ModelSubmitWindow.Open());
+                    () => NavigateToView(ViewType.Submit));
                 return;
             }
 
@@ -199,6 +261,28 @@ namespace ModelLibrary.Editor.Windows
                 DrawThumbnailSizeSlider();
             }
         }
+
+
+
+
+
+
+
+
+        /// <summary>
+        /// Draws the BulkTag view. Shows bulk tag editor.
+        /// </summary>
+        private void DrawBulkTagView()
+        {
+            EditorGUILayout.HelpBox("Bulk Tag view is being integrated. For now, please use the separate Bulk Tag window.", MessageType.Info);
+            EditorGUILayout.Space();
+            if (GUILayout.Button("Open Bulk Tag Window", GUILayout.Height(30)))
+            {
+                // Bulk tag window requires service and entries - handled in Operations
+            }
+        }
+
+
 
         public void CloseWindow()
         {
@@ -274,7 +358,7 @@ namespace ModelLibrary.Editor.Windows
                     if (identityProvider.GetUserRole() == UserRole.Artist)
                     {
                         actionsMenu.AddSeparator(string.Empty);
-                        actionsMenu.AddItem(new GUIContent("Submit Model", "Open the submission form for new models or updates"), false, () => ModelSubmitWindow.Open());
+                        actionsMenu.AddItem(new GUIContent("Submit Model", "Open the submission form for new models or updates"), false, () => NavigateToView(ViewType.Submit));
                     }
                     actionsMenu.ShowAsContext();
                 }
@@ -358,7 +442,11 @@ namespace ModelLibrary.Editor.Windows
                     if (identityProvider.GetUserRole() == UserRole.Artist)
                     {
                         bulkMenu.AddSeparator(string.Empty);
-                        bulkMenu.AddItem(new GUIContent("Batch Upload...", "Upload multiple models from a directory structure"), false, () => BatchUploadWindow.Open());
+                        bulkMenu.AddItem(new GUIContent("Batch Upload...", "Upload multiple models from a directory structure"), false, () =>
+                        {
+                            NavigateToView(ViewType.BatchUpload);
+                            InitializeBatchUploadState();
+                        });
                     }
 
                     bulkMenu.ShowAsContext();
@@ -370,23 +458,23 @@ namespace ModelLibrary.Editor.Windows
                 if (GUILayout.Button(settingsMenuContent, EditorStyles.toolbarButton, GUILayout.Width(80)))
                 {
                     GenericMenu settingsMenu = new GenericMenu();
-                    settingsMenu.AddItem(new GUIContent("Help / Documentation", "Open the Model Library help center"), false, () => ModelLibraryHelpWindow.Open());
-                    settingsMenu.AddItem(new GUIContent("Keyboard Shortcuts", "View all keyboard shortcuts"), false, () => ModelLibraryShortcutsWindow.Open());
+                    settingsMenu.AddItem(new GUIContent("Help / Documentation", "Open the Model Library help center"), false, () => NavigateToView(ViewType.Help));
+                    settingsMenu.AddItem(new GUIContent("Keyboard Shortcuts", "View all keyboard shortcuts"), false, () => NavigateToView(ViewType.Shortcuts));
                     settingsMenu.AddSeparator(string.Empty);
-                    settingsMenu.AddItem(new GUIContent("Settings", "Adjust user and repository preferences"), false, () => UnifiedSettingsWindow.Open());
+                    settingsMenu.AddItem(new GUIContent("Settings", "Adjust user and repository preferences"), false, () => NavigateToView(ViewType.Settings));
                     settingsMenu.AddSeparator(string.Empty);
-                    settingsMenu.AddItem(new GUIContent("Error Log Viewer", "Review recent errors and clear suppressions"), false, () => ErrorLogViewerWindow.Open());
-                    settingsMenu.AddItem(new GUIContent("Performance Profiler", "View async operation performance metrics"), false, () => PerformanceProfilerWindow.Open());
+                    settingsMenu.AddItem(new GUIContent("Error Log Viewer", "Review recent errors and clear suppressions"), false, () => NavigateToView(ViewType.ErrorLog));
+                    settingsMenu.AddItem(new GUIContent("Performance Profiler", "View async operation performance metrics"), false, () => NavigateToView(ViewType.PerformanceProfiler));
 
                     // Add analytics option for Admin and Artist roles
                     if (currentRole == UserRole.Admin || currentRole == UserRole.Artist)
                     {
                         settingsMenu.AddSeparator(string.Empty);
-                        settingsMenu.AddItem(new GUIContent("Analytics", "View model usage statistics and reports"), false, () => AnalyticsWindow.Open());
+                        settingsMenu.AddItem(new GUIContent("Analytics", "View model usage statistics and reports"), false, () => NavigateToView(ViewType.Analytics));
                     }
 
                     settingsMenu.AddSeparator(string.Empty);
-                    settingsMenu.AddItem(new GUIContent("Configuration Wizard", "Run the guided setup workflow"), false, () => FirstRunWizard.MaybeShow());
+                    settingsMenu.AddItem(new GUIContent("Configuration Wizard", "Run the guided setup workflow"), false, () => NavigateToView(ViewType.FirstRunWizard));
                     settingsMenu.ShowAsContext();
                 }
 
@@ -402,7 +490,7 @@ namespace ModelLibrary.Editor.Windows
                 float helpButtonWidth = generalHelpContent.image != null ? 28f : 50f;
                 if (GUILayout.Button(generalHelpContent, EditorStyles.toolbarButton, GUILayout.Width(helpButtonWidth)))
                 {
-                    ModelLibraryHelpWindow.OpenToSection(ModelLibraryHelpWindow.HelpSection.Overview);
+                    NavigateToView(ViewType.Help);
                 }
 
                 GUILayout.FlexibleSpace();
@@ -419,7 +507,7 @@ namespace ModelLibrary.Editor.Windows
 
                 if (GUILayout.Button(new GUIContent($"👤 {roleLabel}", roleTooltip), roleStyle, GUILayout.Width(90)))
                 {
-                    UnifiedSettingsWindow.Open();
+                    NavigateToView(ViewType.Settings);
                 }
 
                 GUILayout.Label("Sort:", EditorStyles.miniLabel, GUILayout.Width(35));
@@ -926,7 +1014,12 @@ namespace ModelLibrary.Editor.Windows
 
                     if (GUILayout.Button("Details", GUILayout.Width(70f)))
                     {
-                        ModelDetailsWindow.Open(entry.id, entry.latestVersion);
+                        Dictionary<string, object> parameters = new Dictionary<string, object>
+                        {
+                            { "modelId", entry.id },
+                            { "version", entry.latestVersion }
+                        };
+                        NavigateToView(ViewType.ModelDetails, parameters);
                     }
 
                     bool downloaded = IsDownloaded(entry.id, entry.latestVersion);
@@ -1069,14 +1162,24 @@ namespace ModelLibrary.Editor.Windows
                         GUIContent buttonContent = new GUIContent(string.Empty, tooltip);
                         if (GUI.Button(thumbRect, buttonContent, GUIStyle.none))
                         {
-                            ModelDetailsWindow.Open(entry.id, entry.latestVersion);
+                            Dictionary<string, object> parameters = new Dictionary<string, object>
+                            {
+                                { "modelId", entry.id },
+                                { "version", entry.latestVersion }
+                            };
+                            NavigateToView(ViewType.ModelDetails, parameters);
                         }
                     }
                     else
                     {
                         DrawThumbnailPlaceholder(thumbRect, entry.name, isLoadingThumbnail || isLoadingMeta, () =>
                         {
-                            ModelDetailsWindow.Open(entry.id, entry.latestVersion);
+                            Dictionary<string, object> parameters = new Dictionary<string, object>
+                            {
+                                { "modelId", entry.id },
+                                { "version", entry.latestVersion }
+                            };
+                            NavigateToView(ViewType.ModelDetails, parameters);
                         });
 
                         // Set tooltip for placeholder
@@ -1263,14 +1366,24 @@ namespace ModelLibrary.Editor.Windows
                 GUIContent buttonContent = new GUIContent(string.Empty, tooltip);
                 if (GUI.Button(thumbRect, buttonContent, GUIStyle.none))
                 {
-                    ModelDetailsWindow.Open(entry.id, entry.latestVersion);
+                    Dictionary<string, object> parameters = new Dictionary<string, object>
+                    {
+                        { "modelId", entry.id },
+                        { "version", entry.latestVersion }
+                    };
+                    NavigateToView(ViewType.ModelDetails, parameters);
                 }
             }
             else
             {
                 DrawThumbnailPlaceholder(thumbRect, entry.name, isLoadingThumbnail || isLoadingMeta, () =>
                 {
-                    ModelDetailsWindow.Open(entry.id, entry.latestVersion);
+                    Dictionary<string, object> parameters = new Dictionary<string, object>
+                    {
+                        { "modelId", entry.id },
+                        { "version", entry.latestVersion }
+                    };
+                    NavigateToView(ViewType.ModelDetails, parameters);
                 });
 
                 // Set tooltip for placeholder
@@ -1467,14 +1580,14 @@ namespace ModelLibrary.Editor.Windows
 
             if ((currentEvent.keyCode == KeyCode.Comma || currentEvent.keyCode == KeyCode.Semicolon) && ctrlOrCmd)
             {
-                UnifiedSettingsWindow.Open();
+                NavigateToView(ViewType.Settings);
                 currentEvent.Use();
                 return;
             }
 
             if (ctrlOrCmd && shift && currentEvent.keyCode == KeyCode.L)
             {
-                ModelLibraryShortcutsWindow.Open();
+                NavigateToView(ViewType.Shortcuts);
                 currentEvent.Use();
                 return;
             }
@@ -1657,7 +1770,12 @@ namespace ModelLibrary.Editor.Windows
                 {
                     if (TryGetKeyboardSelectedEntry(out ModelIndex.Entry openEntry))
                     {
-                        ModelDetailsWindow.Open(openEntry.id, openEntry.latestVersion);
+                        Dictionary<string, object> parameters = new Dictionary<string, object>
+                        {
+                            { "modelId", openEntry.id },
+                            { "version", openEntry.latestVersion }
+                        };
+                        NavigateToView(ViewType.ModelDetails, parameters);
                         currentEvent.Use();
                         return;
                     }
@@ -1665,7 +1783,14 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        private void ShowSearchHelpDialog() => ModelLibraryHelpWindow.OpenToSection(ModelLibraryHelpWindow.HelpSection.Searching);
+        private void ShowSearchHelpDialog()
+        {
+            Dictionary<string, object> parameters = new Dictionary<string, object>
+            {
+                { "helpSection", ModelLibraryHelpWindow.HelpSection.Searching }
+            };
+            NavigateToView(ViewType.Help, parameters);
+        }
 
         private void UpdateKeyboardSelectionState(List<ModelIndex.Entry> entries)
         {

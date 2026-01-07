@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -47,26 +48,33 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Opens the help window.
+        /// Now navigates to the Help view in ModelLibraryWindow instead of opening a separate window.
         /// </summary>
         public static void Open()
         {
-            ModelLibraryHelpWindow window = GetWindow<ModelLibraryHelpWindow>("Model Library Help");
-            window.InitializeWindowBounds();
-            window.Show();
+            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+            if (window != null)
+            {
+                window.NavigateToView(ModelLibraryWindow.ViewType.Help);
+            }
         }
 
         /// <summary>
         /// Opens the help window focusing on a specific section.
+        /// Now navigates to the Help view in ModelLibraryWindow instead of opening a separate window.
         /// </summary>
         /// <param name="section">The section to display.</param>
         public static void OpenToSection(HelpSection section)
         {
-            ModelLibraryHelpWindow window = GetWindow<ModelLibraryHelpWindow>("Model Library Help");
-            window._selectedSection = section;
-            window._scrollPosition = Vector2.zero;
-            window.InitializeWindowBounds();
-            window.Show();
-            window.Focus();
+            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+            if (window != null)
+            {
+                Dictionary<string, object> parameters = new Dictionary<string, object>
+                {
+                    { "helpSection", section }
+                };
+                window.NavigateToView(ModelLibraryWindow.ViewType.Help, parameters);
+            }
         }
 
         private void InitializeWindowBounds()

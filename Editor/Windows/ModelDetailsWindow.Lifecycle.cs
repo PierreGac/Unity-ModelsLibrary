@@ -21,6 +21,7 @@ namespace ModelLibrary.Editor.Windows
         /// Opens the model details window for a specific model version.
         /// Marks notifications as read when details are viewed.
         /// Prevents opening during play mode.
+        /// Now navigates to the ModelDetails view in ModelLibraryWindow instead of opening a separate window.
         /// </summary>
         /// <param name="id">The unique identifier of the model.</param>
         /// <param name="version">The version of the model to display.</param>
@@ -37,23 +38,22 @@ namespace ModelLibrary.Editor.Windows
             NotificationStateManager.MarkNotesAsRead(id, version);
             NotificationStateManager.MarkUpdateAsRead(id);
 
-            ModelDetailsWindow w = GetWindow<ModelDetailsWindow>("Model Details");
-            w._modelId = id; w._version = version; w.Init();
-            w.Show();
-
-            // Refresh Model Library windows to update notification badges immediately
-            ModelLibraryWindow[] windows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
-            for (int i = 0; i < windows.Length; i++)
+            // Navigate to ModelDetails view in ModelLibraryWindow
+            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+            if (window != null)
             {
-                ModelLibraryWindow window = windows[i];
-                if (window != null)
+                Dictionary<string, object> parameters = new Dictionary<string, object>
                 {
-                    // Update counts and window title to reflect read state changes
-                    window.UpdateNotesCount();
-                    window.UpdateUpdateCount();
-                    window.UpdateWindowTitle();
-                    window.Repaint(); // Force UI refresh to show updated badges
-                }
+                    { "modelId", id },
+                    { "version", version }
+                };
+                window.NavigateToView(ModelLibraryWindow.ViewType.ModelDetails, parameters);
+                
+                // Update counts and window title to reflect read state changes
+                window.UpdateNotesCount();
+                window.UpdateUpdateCount();
+                window.UpdateWindowTitle();
+                window.Repaint(); // Force UI refresh to show updated badges
             }
         }
 
@@ -277,6 +277,8 @@ namespace ModelLibrary.Editor.Windows
                         {
                             Debug.Log($"[ModelDetailsWindow] Found local version {meta.version} for {_modelId}");
                             foundLocalVersion = meta.version;
+                            // Store the install path (directory containing the manifest file)
+                            _installPath = System.IO.Path.GetDirectoryName(manifestPath);
                             break;
                         }
                     }

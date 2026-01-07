@@ -12,11 +12,18 @@ namespace ModelLibrary.Editor.Windows
         private double _lastRefresh;
         private const double REFRESH_INTERVAL = 1.0;
 
+        /// <summary>
+        /// Opens the performance profiler window.
+        /// Now navigates to the PerformanceProfiler view in ModelLibraryWindow instead of opening a separate window.
+        /// </summary>
         public static void Open()
         {
-            PerformanceProfilerWindow window = GetWindow<PerformanceProfilerWindow>("Model Library Performance");
-            window.minSize = new Vector2(500f, 300f);
-            window.Show();
+            // Navigate to PerformanceProfiler view in ModelLibraryWindow
+            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+            if (window != null)
+            {
+                window.NavigateToView(ModelLibraryWindow.ViewType.PerformanceProfiler);
+            }
         }
 
         private void OnEnable()

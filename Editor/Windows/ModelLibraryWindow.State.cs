@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using ModelLibrary.Data;
+using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Services;
+using ModelLibrary.Editor.Settings;
 using ModelLibrary.Editor.Utils;
+using UnityEditor;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
@@ -96,6 +99,104 @@ namespace ModelLibrary.Editor.Windows
         private ModelLibraryUIDrawer.FilterMode _filterMode = ModelLibraryUIDrawer.FilterMode.All;
         private InstallPathHelper _installPathHelper = new InstallPathHelper();
         private float _thumbnailSize = __DEFAULT_THUMBNAIL_SIZE;
+
+        // Navigation state
+        /// <summary>Current active view type.</summary>
+        private ViewType _currentView = ViewType.Browser;
+        /// <summary>Previous view type for back navigation.</summary>
+        private ViewType? _previousView = null;
+        /// <summary>Parameters for the previous view.</summary>
+        private Dictionary<string, object> _previousViewParameters = new Dictionary<string, object>();
+        /// <summary>View-specific parameters stored as key-value pairs.</summary>
+        private readonly Dictionary<string, object> _viewParameters = new Dictionary<string, object>();
+        /// <summary>Model ID being inspected (used for navigation from details to comparison/preview and back).</summary>
+        private string _inspectedModelId = null;
+        /// <summary>Version of the model being inspected (used for navigation from details to comparison/preview and back).</summary>
+        private string _inspectedModelVersion = null;
+
+        // FirstRunWizard state (for view mode)
+        /// <summary>Wizard step state.</summary>
+        private FirstRunWizard.WizardStep _wizardStep = FirstRunWizard.WizardStep.Welcome;
+        /// <summary>User name for wizard.</summary>
+        private string _wizardUserName;
+        /// <summary>User role for wizard.</summary>
+        private UserRole _wizardUserRole;
+        /// <summary>Repository root for wizard.</summary>
+        private string _wizardRepoRoot;
+        /// <summary>Repository kind for wizard.</summary>
+        private ModelLibrarySettings.RepositoryKind _wizardRepoKind;
+        /// <summary>Repository validation message.</summary>
+        private string _wizardRepoValidationMessage;
+        /// <summary>Repository validation message type.</summary>
+        private MessageType _wizardRepoValidationType = MessageType.Info;
+        /// <summary>Whether repository has been tested.</summary>
+        private bool _wizardRepoTested;
+        /// <summary>Repository test message.</summary>
+        private string _wizardRepoTestMessage;
+        /// <summary>Repository test message type.</summary>
+        private MessageType _wizardRepoTestMessageType = MessageType.None;
+        /// <summary>Whether to open help after finishing wizard.</summary>
+        private bool _wizardOpenHelpAfterFinish = true;
+
+        // ModelLibraryHelpWindow state (for view mode)
+        /// <summary>Selected help section.</summary>
+        private ModelLibraryHelpWindow.HelpSection _helpSelectedSection = ModelLibraryHelpWindow.HelpSection.Overview;
+        /// <summary>Scroll position for help content.</summary>
+        private Vector2 _helpScrollPosition = Vector2.zero;
+
+        // ModelSubmitWindow state (for view mode) - using a hidden instance for now
+        /// <summary>Hidden ModelSubmitWindow instance for reuse.</summary>
+        private ModelSubmitWindow _submitWindowInstance;
+
+        // BatchUploadWindow state (for view mode)
+        /// <summary>Selected source directory for batch upload.</summary>
+        private string _batchUploadSourceDirectory = string.Empty;
+        /// <summary>List of batch upload items.</summary>
+        private List<BatchUploadService.BatchUploadItem> _batchUploadItems = new List<BatchUploadService.BatchUploadItem>();
+        /// <summary>Scroll position for batch upload items list.</summary>
+        private Vector2 _batchUploadScrollPosition;
+        /// <summary>Whether batch upload is in progress.</summary>
+        private bool _batchUploadIsUploading = false;
+        /// <summary>Batch upload service instance.</summary>
+        private BatchUploadService _batchUploadService;
+
+        // UnifiedSettingsWindow state (for view mode)
+        /// <summary>Settings tab selection.</summary>
+        private UnifiedSettingsWindow.SettingsTab _settingsSelectedTab = UnifiedSettingsWindow.SettingsTab.User;
+        /// <summary>User identity provider for settings.</summary>
+        private SimpleUserIdentityProvider _settingsIdentityProvider;
+        /// <summary>Current user name in settings form.</summary>
+        private string _settingsUserName;
+        /// <summary>Current user role in settings form.</summary>
+        private UserRole _settingsUserRole;
+        /// <summary>Repository settings instance.</summary>
+        private ModelLibrarySettings _settingsInstance;
+        /// <summary>Repository kind in settings form.</summary>
+        private ModelLibrarySettings.RepositoryKind _settingsRepositoryKind;
+        /// <summary>Repository root in settings form.</summary>
+        private string _settingsRepositoryRoot;
+        /// <summary>Local cache root in settings form.</summary>
+        private string _settingsLocalCacheRoot;
+        /// <summary>Whether connection test is in progress.</summary>
+        private bool _settingsTestingConnection = false;
+        /// <summary>Last connection test result message.</summary>
+        private string _settingsConnectionTestResult = null;
+        /// <summary>Whether last connection test was successful.</summary>
+        private bool _settingsConnectionTestSuccess = false;
+        /// <summary>Timestamp of last connection test.</summary>
+        private DateTime _settingsLastConnectionTest = DateTime.MinValue;
+        /// <summary>Number of models found in last successful connection test.</summary>
+        private int _settingsLastModelCount = 0;
+        /// <summary>Whether settings have unsaved changes.</summary>
+        private bool _settingsHasUnsavedChanges = false;
+
+        // ModelVersionComparisonWindow state (for view mode)
+        /// <summary>Model ID for version comparison.</summary>
+        private string _versionComparisonModelId;
+        /// <summary>Initial right version for comparison.</summary>
+        private string _versionComparisonInitialRightVersion;
+        /// <summary>Hidden ModelVersionComparisonWindow instance for reuse.</summary>
+        private ModelVersionComparisonWindow _versionComparisonInstance;
 
         [Serializable]
         private sealed class ImportHistoryEntry

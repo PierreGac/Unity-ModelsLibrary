@@ -82,23 +82,49 @@ namespace ModelLibrary.Editor.Windows
                 EditorGUILayout.Space(5);
             }
 
-            // Delete model button
-            EditorGUILayout.HelpBox("⚠️ WARNING: Deleting the entire model will permanently remove all versions, metadata, and files from the repository. This action cannot be undone.", MessageType.Warning);
-            using (new EditorGUILayout.HorizontalScope())
+            // Delete model button or Remove from project button
+            if (_isInstalled && !string.IsNullOrEmpty(_installPath))
             {
-                GUILayout.FlexibleSpace();
-                using (new EditorGUI.DisabledScope(!canDeleteModel))
+                // Show "Remove from project" for installed models
+                EditorGUILayout.HelpBox("Remove this model from your project. This will delete the model files from Assets but will not remove it from the repository.", MessageType.Info);
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    Color originalColor = GUI.color;
-                    GUI.color = new Color(1f, 0.3f, 0.3f); // Darker red for model deletion
-                    if (GUILayout.Button("Delete this model", GUILayout.Width(200), GUILayout.Height(26)))
+                    GUILayout.FlexibleSpace();
+                    using (new EditorGUI.DisabledScope(_deletingModel))
                     {
-                        if (ConfirmModelDeletion())
+                        Color originalColor = GUI.color;
+                        GUI.color = new Color(1f, 0.6f, 0.2f); // Orange for removal from project
+                        if (GUILayout.Button("Remove from project", GUILayout.Width(200), GUILayout.Height(26)))
                         {
-                            _ = DeleteModelAsync();
+                            if (ConfirmRemoveFromProject())
+                            {
+                                _ = RemoveFromProjectAsync();
+                            }
                         }
+                        GUI.color = originalColor;
                     }
-                    GUI.color = originalColor;
+                }
+            }
+            else
+            {
+                // Show "Delete this model" for non-installed models (database deletion)
+                EditorGUILayout.HelpBox("⚠️ WARNING: Deleting the entire model will permanently remove all versions, metadata, and files from the repository. This action cannot be undone.", MessageType.Warning);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.FlexibleSpace();
+                    using (new EditorGUI.DisabledScope(!canDeleteModel))
+                    {
+                        Color originalColor = GUI.color;
+                        GUI.color = new Color(1f, 0.3f, 0.3f); // Darker red for model deletion
+                        if (GUILayout.Button("Delete this model", GUILayout.Width(200), GUILayout.Height(26)))
+                        {
+                            if (ConfirmModelDeletion())
+                            {
+                                _ = DeleteModelAsync();
+                            }
+                        }
+                        GUI.color = originalColor;
+                    }
                 }
             }
         }
@@ -396,6 +422,134 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
+        /// <summary>
+        /// Confirms removal of the model from the project with the user through a dialog.
+        /// </summary>
+        /// <returns>True if the user confirmed removal, false otherwise.</returns>
+        private bool ConfirmRemoveFromProject()
+        {
+            if (_meta == null || _meta.identity == null)
+            {
+                Debug.LogError("[ModelDetailsWindow] Cannot confirm removal: metadata is null");
+                return false;
+            }
+            
+            string modelName = _meta.identity.name ?? "Unknown Model";
+            return EditorUtility.DisplayDialog(
+                "Remove from Project",
+                $"Are you sure you want to remove '{modelName}' from your project?\n\n" +
+                "This will delete the model files from the Assets folder, but the model will remain in the repository.",
+                "Remove",
+                "Cancel");
+        }
+
+        /// <summary>
+        /// Asynchronously removes the model from the project by deleting its install directory.
+        /// This does not delete the model from the repository, only from the local project.
+        /// </summary>
+        private async Task RemoveFromProjectAsync()
+        {
+            if (_deletingModel || string.IsNullOrEmpty(_installPath))
+            {
+                return;
+            }
+
+            _deletingModel = true;
+            try
+            {
+                string modelName = _meta?.identity?.name ?? _modelId ?? "Unknown Model";
+                EditorUtility.DisplayProgressBar("Removing from Project", $"Removing {modelName} from project...", ProgressBarConstants.MID_OPERATION);
+
+                await Task.Yield();
+
+                // Delete the install directory using AssetDatabase
+                // The install path should already be relative to project root (e.g., "Assets/Models/ModelName")
+                string relativePath = _installPath.Replace('\\', '/');
+                
+                // Ensure path starts with "Assets/" for AssetDatabase
+                if (!relativePath.StartsWith("Assets/"))
+                {
+                    // If path is absolute, convert to relative
+                    string projectRoot = System.IO.Path.GetFullPath("Assets/..").Replace('\\', '/');
+                    string normalizedInstallPath = _installPath.Replace('\\', '/');
+                    if (normalizedInstallPath.StartsWith(projectRoot))
+                    {
+                        relativePath = normalizedInstallPath.Substring(projectRoot.Length).TrimStart('/');
+                    }
+                    else
+                    {
+                        // Fallback: try to extract relative path from absolute path
+                        string assetsPath = System.IO.Path.GetFullPath("Assets").Replace('\\', '/');
+                        if (normalizedInstallPath.StartsWith(assetsPath))
+                        {
+                            relativePath = normalizedInstallPath.Substring(assetsPath.Length).TrimStart('/');
+                        }
+                    }
+                }
+
+                // Delete using AssetDatabase (handles both files and directories)
+                if (!string.IsNullOrEmpty(relativePath) && System.IO.Directory.Exists(_installPath))
+                {
+                    AssetDatabase.DeleteAsset(relativePath);
+                    AssetDatabase.Refresh();
+                }
+
+                EditorUtility.ClearProgressBar();
+
+                // Clear installation status
+                _isInstalled = false;
+                _installedVersion = null;
+                _installPath = null;
+
+                // Store values for use in delayCall
+                string removedModelName = modelName;
+                string removedModelId = _modelId;
+
+                // Schedule UI operations on the main thread
+                EditorApplication.delayCall += () =>
+                {
+                    EditorUtility.DisplayDialog("Removed from Project", $"Removed '{removedModelName}' from your project.", "OK");
+
+                    // Refresh Model Library windows to update installation status
+                    ModelLibraryWindow[] windows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
+                    for (int i = 0; i < windows.Length; i++)
+                    {
+                        ModelLibraryWindow window = windows[i];
+                        // Invalidate the cache for this specific model
+                        window.InvalidateLocalInstallCache(removedModelId);
+                        // Refresh the manifest cache to pick up the removal
+                        window.RefreshManifestCache();
+                        // Navigate back to browser if we're on the details view for this model
+                        if (window.GetCurrentView() == ModelLibraryWindow.ViewType.ModelDetails)
+                        {
+                            string currentModelId = window.GetViewParameter<string>("modelId", string.Empty);
+                            if (string.Equals(currentModelId, removedModelId, System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                window.NavigateToView(ModelLibraryWindow.ViewType.Browser);
+                            }
+                        }
+                    }
+
+                    // Refresh the details window to show updated state (if still open)
+                    Repaint();
+                };
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.ClearProgressBar();
+
+                string errorMessage = ex.Message;
+                EditorApplication.delayCall += () =>
+                {
+                    ErrorHandler.ShowError("Removal Failed", $"Failed to remove model from project: {errorMessage}", ex);
+                };
+            }
+            finally
+            {
+                _deletingModel = false;
+            }
+        }
+
         private async Task ImportToProject()
         {
             try
@@ -410,7 +564,7 @@ namespace ModelLibrary.Editor.Windows
                 (string cacheRoot, ModelMeta meta) = await service.DownloadModelVersionAsync(_modelId, _version);
 
                 EditorUtility.DisplayProgressBar("Importing Model", "Copying files to Assets folder...", ProgressBarConstants.COPYING_IMAGES);
-                await ModelProjectImporter.ImportFromCacheAsync(cacheRoot, meta, cleanDestination: true);
+                string installPath = await ModelProjectImporter.ImportFromCacheAsync(cacheRoot, meta, cleanDestination: true);
 
                 EditorUtility.DisplayProgressBar("Importing Model", "Finalizing import...", ProgressBarConstants.FINALIZING);
                 await Task.Delay(DelayConstants.UI_UPDATE_DELAY_MS); // Brief pause for UI update
@@ -418,11 +572,49 @@ namespace ModelLibrary.Editor.Windows
                 EditorUtility.ClearProgressBar();
 
                 // Track analytics
-
                 AnalyticsService.RecordEvent("import", _modelId, _version, meta.identity.name);
 
-                // Refresh installation status after import
+                // Update ModelLibraryWindow cache to mark model as installed
+                // This ensures the browser view immediately shows the model as installed
+                ModelLibraryWindow[] windows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
+                for (int i = 0; i < windows.Length; i++)
+                {
+                    ModelLibraryWindow window = windows[i];
+                    if (window != null)
+                    {
+                        // Read the manifest file and update the cache
+                        string manifestPath = System.IO.Path.Combine(installPath, ".modelLibrary.meta.json");
+                        if (!System.IO.File.Exists(manifestPath))
+                        {
+                            manifestPath = System.IO.Path.Combine(installPath, "modelLibrary.meta.json");
+                        }
+                        
+                        if (System.IO.File.Exists(manifestPath))
+                        {
+                            try
+                            {
+                                string json = await System.IO.File.ReadAllTextAsync(manifestPath);
+                                ModelMeta manifestMeta = JsonUtil.FromJson<ModelMeta>(json);
+                                if (manifestMeta != null && manifestMeta.identity != null && manifestMeta.identity.id == _modelId)
+                                {
+                                    // Update the cache using the public method
+                                    window.UpdateLocalInstallCache(_modelId, manifestMeta);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.LogWarning($"[ModelDetailsWindow] Failed to update ModelLibraryWindow cache: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            // Fallback: use the meta we have if manifest file doesn't exist yet
+                            window.UpdateLocalInstallCache(_modelId, meta);
+                        }
+                    }
+                }
 
+                // Refresh installation status after import
                 _ = CheckInstallationStatusAsync();
 
                 // Store values for use in delayCall (capture before closing window)

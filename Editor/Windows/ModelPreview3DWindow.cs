@@ -71,6 +71,14 @@ namespace ModelLibrary.Editor.Windows
         private List<string> _tempAssets = new List<string>();
         /// <summary>Cache root path for the downloaded model version (for cleanup on errors).</summary>
         private string _cacheRoot = null;
+        /// <summary>Dictionary mapping texture names to their asset paths for reloading when focus is regained.</summary>
+        private Dictionary<string, string> _texturePaths = new Dictionary<string, string>();
+        /// <summary>Dictionary mapping materials to their texture property mappings for reloading.</summary>
+        private Dictionary<Material, Dictionary<string, string>> _materialTextureMappings = new Dictionary<Material, Dictionary<string, string>>();
+        /// <summary>Track whether the window had focus in the previous frame.</summary>
+        private bool _hadFocus = false;
+        /// <summary>Whether we've subscribed to EditorApplication.update for focus detection.</summary>
+        private bool _subscribedToUpdate = false;
 
         /// <summary>
         /// Information about a mesh in the model.
@@ -89,6 +97,10 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         /// <param name="modelId">The unique identifier of the model.</param>
         /// <param name="version">The version of the model to preview.</param>
+        /// <summary>
+        /// Opens the 3D preview window.
+        /// Now navigates to the Preview3D view in ModelLibraryWindow instead of opening a separate window.
+        /// </summary>
         public static void Open(string modelId, string version)
         {
             // Don't open during play mode
@@ -98,25 +110,55 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            ModelPreview3DWindow window = GetWindow<ModelPreview3DWindow>("3D Preview");
-            window._modelId = modelId;
-            window._version = version;
-            window._service = null;
-            window._meta = null;
-            window._meshes.Clear();
-            window._selectedMeshIndex = __DEFAULT_SELECTED_MESH_INDEX;
-            window._isLoading = true;
-            window._cacheRoot = null;
-            window.Show();
-            window.Repaint();
-            _ = window.LoadModelAsync();
+            // Navigate to Preview3D view in ModelLibraryWindow
+            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+            if (window != null)
+            {
+                Dictionary<string, object> parameters = new Dictionary<string, object>
+                {
+                    { "modelId", modelId },
+                    { "version", version }
+                };
+                window.NavigateToView(ModelLibraryWindow.ViewType.Preview3D, parameters);
+                // Initialize preview state will be handled in the view implementation
+            }
         }
 
         /// <summary>
         /// Unity lifecycle method called when the window is enabled.
-        /// Initializes the preview utility.
+        /// Initializes the preview utility and subscribes to update events for focus detection.
         /// </summary>
-        private void OnEnable() => _previewUtil = new PreviewUtility3D();
+        private void OnEnable()
+        {
+            _previewUtil = new PreviewUtility3D();
+            _hadFocus = focusedWindow == this;
+            
+            // Subscribe to EditorApplication.update to detect focus changes
+            if (!_subscribedToUpdate)
+            {
+                EditorApplication.update += OnEditorUpdate;
+                _subscribedToUpdate = true;
+            }
+        }
+        
+        /// <summary>
+        /// Called every frame by EditorApplication.update to detect focus changes.
+        /// </summary>
+        private void OnEditorUpdate()
+        {
+            bool hasFocus = focusedWindow == this;
+            
+            // If we just regained focus, reload textures and force repaint
+            if (!_hadFocus && hasFocus)
+            {
+                if (ReloadTexturesIfNeeded())
+                {
+                    Repaint();
+                }
+            }
+            
+            _hadFocus = hasFocus;
+        }
 
         /// <summary>
         /// Unity lifecycle method called when the window is disabled.
@@ -124,6 +166,13 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void OnDisable()
         {
+            // Unsubscribe from update events
+            if (_subscribedToUpdate)
+            {
+                EditorApplication.update -= OnEditorUpdate;
+                _subscribedToUpdate = false;
+            }
+            
             CleanupPreviewResources();
         }
 
@@ -174,6 +223,10 @@ namespace ModelLibrary.Editor.Windows
             _meshes.Clear();
 
             CleanupTempAssets();
+
+            // Clear texture path mappings
+            _texturePaths.Clear();
+            _materialTextureMappings.Clear();
 
             // Clear cache root reference
             _cacheRoot = null;
@@ -413,6 +466,8 @@ namespace ModelLibrary.Editor.Windows
                             string texName = Path.GetFileNameWithoutExtension(textureFile);
                             loadedTextures[texName] = loadedTex;
                             textureNameToPath[texName] = tempTexturePath;
+                            // Store texture path for reloading when focus is regained
+                            _texturePaths[texName] = tempTexturePath;
                             //Debug.Log($"Loaded texture file: {texName} from {tempTexturePath}");
                         }
                     }
@@ -537,6 +592,13 @@ namespace ModelLibrary.Editor.Windows
 
                                     if (matchingTex != null)
                                     {
+                                        // Store mapping for reloading when focus is regained
+                                        if (!_materialTextureMappings.ContainsKey(loadedMat))
+                                        {
+                                            _materialTextureMappings[loadedMat] = new Dictionary<string, string>();
+                                        }
+                                        _materialTextureMappings[loadedMat][propName] = matchingTex.name;
+                                        
                                         // Configure texture as normal map if this is a normal map property
                                         if (isNormalMapProperty)
                                         {
@@ -673,6 +735,12 @@ namespace ModelLibrary.Editor.Windows
                             {
                                 // Create an instance so we can safely modify keywords and properties
                                 materialToUseForPreview = new Material(materialToUse);
+
+                                // Copy texture mappings from source material to preview material for reloading
+                                if (_materialTextureMappings.TryGetValue(materialToUse, out Dictionary<string, string> sourceMappings))
+                                {
+                                    _materialTextureMappings[materialToUseForPreview] = new Dictionary<string, string>(sourceMappings);
+                                }
 
                                 // Preserve important material properties for correct rendering
                                 // This ensures alpha clipping, specular highlights, and environment reflections work correctly
@@ -868,6 +936,16 @@ namespace ModelLibrary.Editor.Windows
                 EditorGUI.DrawRect(_previewRect, new Color(__PREVIEW_BACKGROUND_GRAY, __PREVIEW_BACKGROUND_GRAY, __PREVIEW_BACKGROUND_GRAY, 1f));
             }
 
+            // Reload textures if they became null (e.g., after losing focus)
+            // Do this before rendering so textures are ready
+            bool texturesReloaded = ReloadTexturesIfNeeded();
+            
+            // If textures were reloaded, force a repaint on the next frame to ensure preview updates
+            if (texturesReloaded && Event.current.type == EventType.Repaint)
+            {
+                EditorApplication.delayCall += () => Repaint();
+            }
+
             if (_previewUtil != null && _selectedMeshIndex >= 0 && _selectedMeshIndex < _meshes.Count && _previewRect.width > 0 && _previewRect.height > 0)
             {
                 MeshInfo meshInfo = _meshes[_selectedMeshIndex];
@@ -892,6 +970,34 @@ namespace ModelLibrary.Editor.Windows
             {
                 Debug.LogWarning($"Cannot render preview: mesh={meshInfo.mesh != null}, previewUtil={_previewUtil != null}");
                 return;
+            }
+
+            // Quick check: if material has null textures, try to reload them immediately before rendering
+            if (meshInfo.material != null && meshInfo.material.shader != null)
+            {
+                int propertyCount = meshInfo.material.shader.GetPropertyCount();
+                for (int i = 0; i < propertyCount; i++)
+                {
+                    if (meshInfo.material.shader.GetPropertyType(i) == UnityEngine.Rendering.ShaderPropertyType.Texture)
+                    {
+                        string propName = meshInfo.material.shader.GetPropertyName(i);
+                        Texture tex = meshInfo.material.GetTexture(propName);
+                        if (tex == null && _materialTextureMappings.TryGetValue(meshInfo.material, out Dictionary<string, string> mappings))
+                        {
+                            if (mappings.TryGetValue(propName, out string texName) && _texturePaths.TryGetValue(texName, out string texturePath))
+                            {
+                                if (File.Exists(texturePath))
+                                {
+                                    Texture2D quickReload = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+                                    if (quickReload != null)
+                                    {
+                                        meshInfo.material.SetTexture(propName, quickReload);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             try
@@ -938,6 +1044,167 @@ namespace ModelLibrary.Editor.Windows
                 ErrorLogger.LogError("Render Preview Failed", $"Failed to render preview: {ex.Message}", ErrorHandler.ErrorCategory.Unknown, ex, $"Mesh: {meshInfo.name}, Material: {meshInfo.material?.name ?? "null"}");
                 EditorGUI.DrawRect(_previewRect, new Color(__ERROR_BACKGROUND_RED, 0f, 0f, 1f)); // Red background on error
             }
+        }
+
+        /// <summary>
+        /// Reloads textures that have become null, typically after Unity loses and regains focus.
+        /// Returns true if any textures were reloaded.
+        /// </summary>
+        /// <returns>True if textures were reloaded, false otherwise.</returns>
+        private bool ReloadTexturesIfNeeded()
+        {
+            if (_meshes.Count == 0 || _texturePaths.Count == 0)
+            {
+                return false;
+            }
+
+            bool needsRepaint = false;
+            int reloadedCount = 0;
+
+            for (int i = 0; i < _meshes.Count; i++)
+            {
+                MeshInfo meshInfo = _meshes[i];
+                if (meshInfo.material == null)
+                {
+                    continue;
+                }
+
+                // Get texture mappings for this material (try direct lookup first, then by matching)
+                Dictionary<string, string> textureMappings = null;
+                if (!_materialTextureMappings.TryGetValue(meshInfo.material, out textureMappings))
+                {
+                    // Try to find mappings by checking all materials - material instance might be different object
+                    foreach (KeyValuePair<Material, Dictionary<string, string>> kvp in _materialTextureMappings)
+                    {
+                        if (kvp.Key != null && kvp.Key.shader == meshInfo.material.shader && 
+                            kvp.Key.name == meshInfo.material.name)
+                        {
+                            textureMappings = kvp.Value;
+                            // Update mapping to use current material instance
+                            _materialTextureMappings[meshInfo.material] = new Dictionary<string, string>(textureMappings);
+                            break;
+                        }
+                    }
+                }
+                
+                // If we still don't have mappings, try to rebuild them by checking all texture properties
+                if (textureMappings == null && meshInfo.material.shader != null)
+                {
+                    textureMappings = new Dictionary<string, string>();
+                    int propertyCount = meshInfo.material.shader.GetPropertyCount();
+                    for (int j = 0; j < propertyCount; j++)
+                    {
+                        if (meshInfo.material.shader.GetPropertyType(j) == UnityEngine.Rendering.ShaderPropertyType.Texture)
+                        {
+                            string propName = meshInfo.material.shader.GetPropertyName(j);
+                            Texture tex = meshInfo.material.GetTexture(propName);
+                            if (tex != null && !string.IsNullOrEmpty(tex.name))
+                            {
+                                // Try to find matching texture path
+                                foreach (KeyValuePair<string, string> texPath in _texturePaths)
+                                {
+                                    if (texPath.Key.Equals(tex.name, StringComparison.OrdinalIgnoreCase) ||
+                                        texPath.Key.Contains(tex.name) || tex.name.Contains(texPath.Key))
+                                    {
+                                        textureMappings[propName] = texPath.Key;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (textureMappings.Count > 0)
+                    {
+                        _materialTextureMappings[meshInfo.material] = textureMappings;
+                    }
+                }
+
+                if (textureMappings == null || textureMappings.Count == 0)
+                {
+                    continue;
+                }
+
+                // Check each texture property and reload if null
+                foreach (KeyValuePair<string, string> mapping in textureMappings)
+                {
+                    string propName = mapping.Key;
+                    string texName = mapping.Value;
+
+                    Texture currentTex = meshInfo.material.GetTexture(propName);
+                    
+                    // If texture is null but we have a path, reload it
+                    if (currentTex == null && _texturePaths.TryGetValue(texName, out string texturePath))
+                    {
+                        // Verify the file still exists
+                        if (!File.Exists(texturePath))
+                        {
+                            continue;
+                        }
+                        
+                        // Force asset database refresh first to ensure assets are loaded
+                        AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+                        
+                        Texture2D reloadedTex = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+                        if (reloadedTex != null)
+                        {
+                            try
+                            {
+                                // Store old texture for comparison
+                                Texture oldTex = meshInfo.material.GetTexture(propName);
+                                
+                                // Set texture and force update
+                                meshInfo.material.SetTexture(propName, reloadedTex);
+                                
+                                // Force Unity to recognize the material change
+                                UnityEditorInternal.InternalEditorUtility.SetIsInspectorExpanded(meshInfo.material, false);
+                                
+                                // Verify the texture was actually set
+                                Texture verifyTex = meshInfo.material.GetTexture(propName);
+                                if (verifyTex != null && verifyTex == reloadedTex)
+                                {
+                                    // Force material update and mark for repaint
+                                    EditorUtility.SetDirty(meshInfo.material);
+                                    needsRepaint = true;
+                                    reloadedCount++;
+                                    
+                                    // Force preview utility to re-render by invalidating any cached state
+                                    if (_previewUtil != null)
+                                    {
+                                        // Trigger a repaint to force re-render with new texture
+                                        EditorApplication.delayCall += () => Repaint();
+                                    }
+                                    
+                                    Debug.Log($"[ModelPreview3DWindow] Successfully reloaded texture '{texName}' for property '{propName}' on material '{meshInfo.material.name}'");
+                                }
+                                else
+                                {
+                                    Debug.LogWarning($"[ModelPreview3DWindow] Texture reloaded but not properly set. Property: {propName}, Texture: {texName}, Material: {meshInfo.material.name}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.LogWarning($"[ModelPreview3DWindow] Failed to reload texture '{texName}' for property '{propName}': {ex.Message}");
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (reloadedCount > 0)
+            {
+                Debug.Log($"[ModelPreview3DWindow] Reloaded {reloadedCount} texture(s) after focus regain - forcing repaint");
+                // Force immediate repaint to show updated textures
+                Repaint();
+                return true;
+            }
+            else if (needsRepaint)
+            {
+                Repaint();
+                return true;
+            }
+            
+            return false;
         }
 
         /// <summary>

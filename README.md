@@ -840,6 +840,10 @@ This section tracks known issues and planned improvements based on user feedback
 
 - **Cache cleanup after version deletion**: When deleting a version and restoring the previous one, the freshly deleted version remains displayed in the UI. Clicking on it opens a window that stays empty with "loading meta" message. Even after manually deleting the folder in the cache, the issue persists.
 
+- **3D Preview causing import errors**: If a 3D Preview is launched for an asset before importing it, an "access denied" error occurs during the import process. The workaround is to manually delete the cache folder for that model version.
+
+- **3D Preview textures disappear on focus loss**: When the Unity Editor loses focus (e.g., switching to another application) and then regains focus, textures in the 3D Preview window disappear. The textures are reloaded from asset paths, but the preview display does not update to show them. This appears to be related to Unity's asset reference system when the editor loses focus. Workaround: Close and reopen the 3D Preview window to restore textures.
+
 ### Import & GUID Management
 
 - **Frequent GUID conflicts**: GUID conflicts occur frequently during imports. The only solution to avoid losing references is to use the "Keep" button, which can be tedious.
@@ -855,6 +859,10 @@ This section tracks known issues and planned improvements based on user feedback
 - **Asset path display**: The asset path should be displayed in the preview window to help users understand where assets are located.
 
 - **Absolute vs relative path confusion**: The distinction between absolute and relative paths is not clear to users. Better documentation or UI clarification is needed to explain when each path type is used and why.
+
+### Model Submission Issues
+
+- **Paths not always saved on submission**: When submitting a model, the relative and absolute paths (Assets > Relative/Absolute Path fields) are not always written/saved correctly. They sometimes remain at their default values instead of being updated with the user's input.
 
 ---
 

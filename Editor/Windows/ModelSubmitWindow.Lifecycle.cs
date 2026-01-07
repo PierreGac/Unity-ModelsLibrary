@@ -18,6 +18,7 @@ namespace ModelLibrary.Editor.Windows
         /// Opens the model submission window.
         /// Checks user role and only allows Artists to access the submission interface.
         /// Prevents opening during play mode.
+        /// Now navigates to the Submit view in ModelLibraryWindow instead of opening a separate window.
         /// </summary>
         public static void Open()
         {
@@ -41,8 +42,13 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            ModelSubmitWindow w = GetWindow<ModelSubmitWindow>("Submit Model");
-            w.Show();
+            // Navigate to Submit view in ModelLibraryWindow
+            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+            if (window != null)
+            {
+                window.NavigateToView(ModelLibraryWindow.ViewType.Submit);
+                window.InitializeSubmitState();
+            }
         }
 
         private void OnEnable()

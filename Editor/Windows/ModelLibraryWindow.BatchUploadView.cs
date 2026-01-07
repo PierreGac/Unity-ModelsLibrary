@@ -13,77 +13,65 @@ using UnityEngine;
 namespace ModelLibrary.Editor.Windows
 {
     /// <summary>
-    /// Window for batch uploading multiple models at once from a directory structure.
-    /// Scans a selected directory for model folders (subdirectories containing FBX/OBJ files),
-    /// allows artists to review and edit metadata for each model, then uploads them sequentially.
-    /// Only accessible to users with the Artist role.
+    /// Partial class containing BatchUploadWindow view implementation for ModelLibraryWindow.
     /// </summary>
-    public class BatchUploadWindow : EditorWindow
+    public partial class ModelLibraryWindow
     {
         /// <summary>
-        /// Word-wrapped text area style for automatic line wrapping.
+        /// Word-wrapped text area style for automatic line wrapping in batch upload forms.
+        /// Shared style instance to avoid allocations.
         /// </summary>
-        private static GUIStyle _wordWrappedTextAreaStyle;
-        
+        private static GUIStyle _batchUploadWordWrappedTextAreaStyle;
+
         /// <summary>
-        /// Gets or creates the word-wrapped text area style.
+        /// Gets or creates the word-wrapped text area style for batch upload forms.
         /// </summary>
-        private static GUIStyle GetWordWrappedTextAreaStyle()
+        /// <returns>A GUIStyle with word wrapping enabled for text areas.</returns>
+        private static GUIStyle GetBatchUploadWordWrappedTextAreaStyle()
         {
-            _wordWrappedTextAreaStyle ??= new GUIStyle(EditorStyles.textArea)
+            _batchUploadWordWrappedTextAreaStyle ??= new GUIStyle(EditorStyles.textArea)
             {
                 wordWrap = true
             };
-            return _wordWrappedTextAreaStyle;
+            return _batchUploadWordWrappedTextAreaStyle;
         }
-        /// <summary>Selected source directory containing model folders.</summary>
-        private string _sourceDirectory = string.Empty;
-        /// <summary>List of model items found during directory scanning.</summary>
-        private List<BatchUploadService.BatchUploadItem> _uploadItems = new List<BatchUploadService.BatchUploadItem>();
-        /// <summary>Scroll position for the upload items list.</summary>
-        private Vector2 _scrollPosition;
-        /// <summary>Flag indicating if a batch upload is currently in progress.</summary>
-        private bool _isUploading = false;
-        /// <summary>Service instance for repository operations.</summary>
-        private ModelLibraryService _service;
-        /// <summary>Service instance for batch upload operations.</summary>
-        private BatchUploadService _batchService;
 
         /// <summary>
-        /// Opens the batch upload window.
-        /// Checks user role and only allows Artists to access batch upload functionality.
-        /// Now navigates to the BatchUpload view in ModelLibraryWindow instead of opening a separate window.
+        /// Initializes batch upload state when navigating to the BatchUpload view.
+        /// Sets up the service instances needed for batch upload operations.
         /// </summary>
-        public static void Open()
+        public void InitializeBatchUploadState()
         {
-            // Only allow Artists to use batch upload
+            // Initialize main service if needed
+            if (_service == null)
+            {
+                IModelRepository repo = RepositoryFactory.CreateRepository();
+                _service = new ModelLibraryService(repo);
+            }
+
+            // Initialize batch upload service with identity provider
+            _batchUploadService = new BatchUploadService(_service, new SimpleUserIdentityProvider());
+        }
+
+        /// <summary>
+        /// Draws the BatchUpload view.
+        /// Provides a UI for selecting a directory, scanning for models, and uploading multiple models at once.
+        /// Only accessible to users with the Artist role.
+        /// </summary>
+        private void DrawBatchUploadView()
+        {
+            // Check role access - batch upload is restricted to Artists
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
             if (identityProvider.GetUserRole() != UserRole.Artist)
             {
-                EditorUtility.DisplayDialog("Access Denied",
-                    "Batch upload is only available for Artists. Please switch to Artist role in User Settings.",
-                    "OK");
+                EditorGUILayout.HelpBox("Batch upload is only available for Artists. Please switch to Artist role in User Settings.", MessageType.Warning);
+                if (GUILayout.Button("Go to Settings", GUILayout.Height(30)))
+                {
+                    NavigateToView(ViewType.Settings);
+                }
                 return;
             }
 
-            // Navigate to BatchUpload view in ModelLibraryWindow
-            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
-            if (window != null)
-            {
-                window.NavigateToView(ModelLibraryWindow.ViewType.BatchUpload);
-                window.InitializeBatchUploadState();
-            }
-        }
-
-        private void OnEnable()
-        {
-            IModelRepository repo = RepositoryFactory.CreateRepository();
-            _service = new ModelLibraryService(repo);
-            _batchService = new BatchUploadService(_service, new SimpleUserIdentityProvider());
-        }
-
-        private void OnGUI()
-        {
             EditorGUILayout.LabelField("Batch Upload Models", EditorStyles.boldLabel);
             EditorGUILayout.Space();
 
@@ -97,14 +85,14 @@ namespace ModelLibrary.Editor.Windows
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.LabelField("Source Directory:", GUILayout.Width(120));
-                EditorGUILayout.TextField(_sourceDirectory);
+                EditorGUILayout.TextField(_batchUploadSourceDirectory);
                 if (GUILayout.Button("Browse...", GUILayout.Width(80)))
                 {
-                    string selected = EditorUtility.OpenFolderPanel("Select Directory with Models", _sourceDirectory, "");
+                    string selected = EditorUtility.OpenFolderPanel("Select Directory with Models", _batchUploadSourceDirectory, "");
                     if (!string.IsNullOrEmpty(selected))
                     {
-                        _sourceDirectory = selected;
-                        ScanDirectory();
+                        _batchUploadSourceDirectory = selected;
+                        ScanBatchUploadDirectory();
                     }
                 }
             }
@@ -114,20 +102,20 @@ namespace ModelLibrary.Editor.Windows
             // Scan button
             if (GUILayout.Button("Scan Directory", GUILayout.Height(30)))
             {
-                ScanDirectory();
+                ScanBatchUploadDirectory();
             }
 
             EditorGUILayout.Space();
 
             // Upload items list
-            if (_uploadItems.Count > 0)
+            if (_batchUploadItems.Count > 0)
             {
-                EditorGUILayout.LabelField($"Found {_uploadItems.Count} model(s):", EditorStyles.boldLabel);
-                _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+                EditorGUILayout.LabelField($"Found {_batchUploadItems.Count} model(s):", EditorStyles.boldLabel);
+                _batchUploadScrollPosition = EditorGUILayout.BeginScrollView(_batchUploadScrollPosition);
 
-                foreach (BatchUploadService.BatchUploadItem item in _uploadItems)
+                for (int i = 0; i < _batchUploadItems.Count; i++)
                 {
-                    DrawUploadItem(item);
+                    DrawBatchUploadItem(_batchUploadItems[i]);
                 }
 
                 EditorGUILayout.EndScrollView();
@@ -138,16 +126,16 @@ namespace ModelLibrary.Editor.Windows
                 {
                     if (GUILayout.Button("Select All", GUILayout.Width(100)))
                     {
-                        foreach (BatchUploadService.BatchUploadItem item in _uploadItems)
+                        for (int i = 0; i < _batchUploadItems.Count; i++)
                         {
-                            item.selected = true;
+                            _batchUploadItems[i].selected = true;
                         }
                     }
                     if (GUILayout.Button("Deselect All", GUILayout.Width(100)))
                     {
-                        foreach (BatchUploadService.BatchUploadItem item in _uploadItems)
+                        for (int i = 0; i < _batchUploadItems.Count; i++)
                         {
-                            item.selected = false;
+                            _batchUploadItems[i].selected = false;
                         }
                     }
                 }
@@ -155,22 +143,27 @@ namespace ModelLibrary.Editor.Windows
                 EditorGUILayout.Space();
 
                 // Upload button
-                int selectedCount = _uploadItems.Count(i => i.selected);
-                using (new EditorGUI.DisabledScope(selectedCount == 0 || _isUploading))
+                int selectedCount = _batchUploadItems.Count(i => i.selected);
+                using (new EditorGUI.DisabledScope(selectedCount == 0 || _batchUploadIsUploading))
                 {
                     if (GUILayout.Button($"Upload Selected ({selectedCount})", GUILayout.Height(35)))
                     {
-                        _ = UploadSelectedAsync();
+                        _ = UploadBatchSelectedAsync();
                     }
                 }
             }
-            else if (!string.IsNullOrEmpty(_sourceDirectory))
+            else if (!string.IsNullOrEmpty(_batchUploadSourceDirectory))
             {
                 EditorGUILayout.HelpBox("No models found in the selected directory. Make sure subdirectories contain FBX or OBJ files.", MessageType.Warning);
             }
         }
 
-        private void DrawUploadItem(BatchUploadService.BatchUploadItem item)
+        /// <summary>
+        /// Draws a single batch upload item in the list.
+        /// Displays model name, version, description, tags, and folder path with editing capabilities.
+        /// </summary>
+        /// <param name="item">The batch upload item to display.</param>
+        private void DrawBatchUploadItem(BatchUploadService.BatchUploadItem item)
         {
             using (new EditorGUILayout.VerticalScope("box"))
             {
@@ -183,7 +176,7 @@ namespace ModelLibrary.Editor.Windows
                 item.version = EditorGUILayout.TextField("Version", item.version);
                 // Constrain text area to available width and enable word wrapping for automatic line breaks
                 Rect textAreaRect = GUILayoutUtility.GetRect(0, 40, GUILayout.ExpandWidth(true));
-                item.description = EditorGUI.TextArea(textAreaRect, item.description, GetWordWrappedTextAreaStyle());
+                item.description = EditorGUI.TextArea(textAreaRect, item.description, GetBatchUploadWordWrappedTextAreaStyle());
 
                 // Tags
                 EditorGUILayout.LabelField("Tags (comma-separated):");
@@ -200,31 +193,33 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Scans the selected directory for model folders and populates the upload items list.
-        /// Each subdirectory containing FBX or OBJ files is treated as a separate model.
         /// </summary>
-        private void ScanDirectory()
+        private void ScanBatchUploadDirectory()
         {
-            if (string.IsNullOrEmpty(_sourceDirectory) || !Directory.Exists(_sourceDirectory))
+            if (string.IsNullOrEmpty(_batchUploadSourceDirectory) || !Directory.Exists(_batchUploadSourceDirectory))
             {
                 EditorUtility.DisplayDialog("Invalid Directory", "Please select a valid directory.", "OK");
                 return;
             }
 
-            _uploadItems = BatchUploadService.ScanDirectoryForModels(_sourceDirectory);
+            _batchUploadItems = BatchUploadService.ScanDirectoryForModels(_batchUploadSourceDirectory);
             Repaint();
         }
 
         /// <summary>
         /// Uploads all selected models from the upload items list.
-        /// Processes each selected item sequentially, builds metadata, and submits to the repository.
-        /// Displays a summary dialog with successful and failed uploads.
         /// </summary>
-        private async Task UploadSelectedAsync()
+        private async Task UploadBatchSelectedAsync()
         {
-            _isUploading = true;
+            _batchUploadIsUploading = true;
             try
             {
-                BatchUploadService.BatchUploadResult result = await _batchService.UploadBatchAsync(_uploadItems);
+                if (_batchUploadService == null)
+                {
+                    InitializeBatchUploadState();
+                }
+
+                BatchUploadService.BatchUploadResult result = await _batchUploadService.UploadBatchAsync(_batchUploadItems);
 
                 // Show results
                 string message = $"Upload Complete!\n\n";
@@ -234,8 +229,9 @@ namespace ModelLibrary.Editor.Windows
                 if (result.failedUploads.Count > 0)
                 {
                     message += "\n\nFailed uploads:\n";
-                    foreach (BatchUploadService.BatchUploadResult.UploadInfo info in result.failedUploads)
+                    for (int i = 0; i < result.failedUploads.Count; i++)
                     {
+                        BatchUploadService.BatchUploadResult.UploadInfo info = result.failedUploads[i];
                         message += $"• {info.modelName}: {info.errorMessage}\n";
                     }
                 }
@@ -243,10 +239,19 @@ namespace ModelLibrary.Editor.Windows
                 EditorUtility.DisplayDialog("Batch Upload Results", message, "OK");
 
                 // Refresh index
-                await _service.RefreshIndexAsync();
+                if (_service != null)
+                {
+                    await _service.RefreshIndexAsync();
+                }
+
+                // Refresh browser view if we're still on batch upload view
+                if (_currentView == ViewType.BatchUpload)
+                {
+                    RefreshIndex();
+                }
 
                 // Clear selection and refresh
-                _uploadItems.Clear();
+                _batchUploadItems.Clear();
                 Repaint();
             }
             catch (System.Exception ex)
@@ -255,7 +260,7 @@ namespace ModelLibrary.Editor.Windows
             }
             finally
             {
-                _isUploading = false;
+                _batchUploadIsUploading = false;
             }
         }
     }

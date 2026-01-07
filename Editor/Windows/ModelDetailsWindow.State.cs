@@ -72,6 +72,8 @@ namespace ModelLibrary.Editor.Windows
         private string _installedVersion;
         private bool _hasUpdate;
         private bool _checkingInstallStatus;
+        /// <summary>Install path where the model is installed in the project (e.g., "Assets/Models/ModelName").</summary>
+        private string _installPath;
     }
 }
 

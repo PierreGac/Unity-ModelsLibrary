@@ -361,10 +361,46 @@ namespace ModelLibrary.Editor.Windows
             return false;
         }
 
-        private void InvalidateLocalInstall(string modelId)
+        /// <summary>
+        /// Invalidates the local install cache for a specific model.
+        /// This should be called when a model is removed from the project.
+        /// </summary>
+        /// <param name="modelId">The model ID to invalidate.</param>
+        public void InvalidateLocalInstallCache(string modelId)
         {
             _localInstallCache.Remove(modelId);
             _negativeCache.Remove(modelId);
+            _manifestCache.Remove(modelId);
+        }
+
+        /// <summary>
+        /// Updates the local install cache for a specific model.
+        /// This should be called when a model is imported to immediately mark it as installed.
+        /// </summary>
+        /// <param name="modelId">The model ID to update.</param>
+        /// <param name="meta">The model metadata to cache.</param>
+        public void UpdateLocalInstallCache(string modelId, ModelMeta meta)
+        {
+            if (string.IsNullOrEmpty(modelId) || meta == null)
+            {
+                return;
+            }
+
+            _localInstallCache[modelId] = meta;
+            _manifestCache[modelId] = meta;
+            _negativeCache.Remove(modelId);
+            
+            // Ensure manifest cache is marked as initialized
+            if (!_manifestCacheInitialized)
+            {
+                _manifestCacheInitialized = true;
+            }
+            
+            // Force repaint if viewing browser to show updated status
+            if (_currentView == ViewType.Browser)
+            {
+                Repaint();
+            }
         }
 
         private async Task RefreshManifestCacheAsync()
@@ -381,12 +417,26 @@ namespace ModelLibrary.Editor.Windows
             }
 
             _refreshingManifest = true;
+            // Don't clear the cache if it was just populated (e.g., after import)
+            // Instead, we'll merge the existing cache with newly discovered files
+            // This prevents losing entries that were just added
+            Dictionary<string, ModelMeta> existingCache = new Dictionary<string, ModelMeta>(_manifestCache);
             _manifestCache.Clear();
             _negativeCache.Clear();
 
             try
             {
-                EditorUtility.DisplayProgressBar("Refreshing Manifest Cache", "Scanning for model manifests...", 0f);
+                EditorUtility.DisplayProgressBar("Refreshing Manifest Cache", "Refreshing AssetDatabase...", 0f);
+                
+                // Ensure AssetDatabase is refreshed before scanning to pick up newly imported files
+                // This is critical for discovering newly imported models
+                AssetDatabase.Refresh();
+                // Longer delay to ensure file system and AssetDatabase have fully settled
+                // File.WriteAllText() may not immediately flush to disk, and AssetDatabase.Refresh()
+                // may need time to process the new files
+                await Task.Delay(250); // 250ms delay to allow file system and AssetDatabase to settle
+
+                EditorUtility.DisplayProgressBar("Refreshing Manifest Cache", "Scanning for model manifests...", 0.1f);
 
                 // Move file enumeration to background thread to avoid blocking
                 List<string> manifestPaths = await ManifestDiscoveryUtility.DiscoverAllManifestFilesAsync("Assets");
@@ -502,6 +552,8 @@ namespace ModelLibrary.Editor.Windows
                         {
                             _manifestCache[modelId] = parsed;
                             _localInstallCache[modelId] = parsed;
+                            // Remove from existing cache if it was there (to avoid duplicates)
+                            existingCache.Remove(modelId);
                         }
                     }
                     catch (Exception ex)
@@ -513,6 +565,23 @@ namespace ModelLibrary.Editor.Windows
                     if (i % 10 == 0)
                     {
                         await Task.Yield();
+                    }
+                }
+
+                // Merge any remaining entries from existing cache that weren't re-discovered
+                // This preserves entries that were just added (e.g., during import) but might
+                // not be discoverable yet due to file system timing
+                foreach (KeyValuePair<string, ModelMeta> entry in existingCache)
+                {
+                    // Only keep entries that have a valid model ID and aren't already in the cache
+                    if (!string.IsNullOrEmpty(entry.Key) && 
+                        entry.Value != null && 
+                        entry.Value.identity != null &&
+                        !string.IsNullOrEmpty(entry.Value.identity.id) &&
+                        !_manifestCache.ContainsKey(entry.Key))
+                    {
+                        _manifestCache[entry.Key] = entry.Value;
+                        _localInstallCache[entry.Key] = entry.Value;
                     }
                 }
 

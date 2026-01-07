@@ -59,17 +59,27 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Opens the version comparison window.
+        /// Now navigates to the VersionComparison view in ModelLibraryWindow instead of opening a separate window.
         /// </summary>
         /// <param name="modelId">Model to compare.</param>
         /// <param name="preferredRightVersion">Optional version to pre-select as the newer side.</param>
         public static void Open(string modelId, string preferredRightVersion = null)
         {
-            ModelVersionComparisonWindow window = GetWindow<ModelVersionComparisonWindow>("Version Comparison");
-            window._modelId = modelId;
-            window._initialRightVersion = preferredRightVersion;
-            window.Init();
-            window.Show();
-            window.Focus();
+            // Navigate to VersionComparison view in ModelLibraryWindow
+            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
+            if (window != null)
+            {
+                Dictionary<string, object> parameters = new Dictionary<string, object>
+                {
+                    { "modelId", modelId }
+                };
+                if (!string.IsNullOrEmpty(preferredRightVersion))
+                {
+                    parameters["preferredRightVersion"] = preferredRightVersion;
+                }
+                window.NavigateToView(ModelLibraryWindow.ViewType.VersionComparison, parameters);
+                window.InitializeVersionComparisonState();
+            }
         }
 
         private void Init()
