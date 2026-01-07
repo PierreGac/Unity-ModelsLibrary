@@ -68,6 +68,8 @@ namespace ModelLibrary.Editor.Windows
         private readonly Dictionary<string, CancellationTokenSource> _importCancellationTokens = new Dictionary<string, CancellationTokenSource>();
         private readonly List<ImportHistoryEntry> _importHistory = new List<ImportHistoryEntry>();
 
+        private string _authenticationError = null;
+
         private readonly HashSet<string> _selectedTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private TagCacheManager _tagCacheManager = new TagCacheManager();
         private FilterPresetManager _filterPresetManager;

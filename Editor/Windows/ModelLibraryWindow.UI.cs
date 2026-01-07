@@ -57,6 +57,21 @@ namespace ModelLibrary.Editor.Windows
 
             ModelIndex index = _indexCache;
             DrawTagFilter(index);
+            
+            // Show authentication error if present
+            if (!string.IsNullOrEmpty(_authenticationError))
+            {
+                EditorGUILayout.Space(20);
+                EditorGUILayout.HelpBox(_authenticationError, MessageType.Error);
+                EditorGUILayout.Space(10);
+                if (GUILayout.Button("Retry Connection", GUILayout.Height(30)))
+                {
+                    _authenticationError = null;
+                    FullRefresh();
+                }
+                return;
+            }
+            
             if (index == null || index.entries == null)
             {
                 ModelLibraryUIDrawer.DrawEmptyState("No models available",

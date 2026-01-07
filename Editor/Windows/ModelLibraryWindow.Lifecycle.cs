@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
@@ -124,6 +125,7 @@ namespace ModelLibrary.Editor.Windows
 
             _indexCache = null;
             _loadingIndex = false;
+            _authenticationError = null; // Clear any previous authentication errors
             ClearMetaCache();
             InitializeServices();
         }
@@ -153,6 +155,7 @@ namespace ModelLibrary.Editor.Windows
             }
 
             _indexCache = null;
+            _authenticationError = null; // Clear any previous authentication errors
             _ = LoadIndexAsync();
             _ = RefreshManifestCacheAsync();
         }
@@ -206,6 +209,7 @@ namespace ModelLibrary.Editor.Windows
                 EditorUtility.DisplayProgressBar("Loading Model Library", "Loading index from repository...", 0.1f);
 
                 _indexCache = await _service.GetIndexAsync();
+                _authenticationError = null; // Clear any previous authentication errors
 
                 // Check again after async operation - play mode might have started
                 if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -213,6 +217,27 @@ namespace ModelLibrary.Editor.Windows
                     EditorUtility.ClearProgressBar();
                     _loadingIndex = false;
                     return;
+                }
+
+                // If index is empty and repository is a network path, check if it's due to authentication
+                if (_indexCache != null && (_indexCache.entries == null || _indexCache.entries.Count == 0))
+                {
+                    IModelRepository repository = _service != null ? RepositoryFactory.CreateRepository() : null;
+                    if (repository is FileSystemRepository fsRepo && !string.IsNullOrEmpty(fsRepo.Root))
+                    {
+                        string rootPath = fsRepo.Root;
+                        if (IsNetworkPathHelper(rootPath) && !CanAccessNetworkPathHelper(rootPath))
+                        {
+                            _authenticationError = $"Cannot access network repository: {rootPath}. Network authentication required. Please verify:\n" +
+                                "• Your Windows credentials are correct\n" +
+                                "• You are logged into the server\n" +
+                                "• VPN connection is active (if required)\n" +
+                                "• Network path is accessible";
+                            titleContent.text = "Model Library - Authentication Error";
+                            Repaint();
+                            return;
+                        }
+                    }
                 }
 
                 TriggerCacheWarming();
@@ -228,13 +253,11 @@ namespace ModelLibrary.Editor.Windows
                 // Only show errors if not entering play mode
                 if (!EditorApplication.isPlayingOrWillChangePlaymode)
                 {
+                    _authenticationError = ex.Message;
                     string errorMessage = "Unable to access the repository. ";
-                    if (ex.Message.Contains("authentication") || ex.Message.Contains("credentials"))
+                    if (ex.Message.Contains("authentication") || ex.Message.Contains("credentials") || ex.Message.Contains("Network authentication"))
                     {
-                        errorMessage += "Network authentication required. Please verify:\n" +
-                                       "• Your Windows credentials are correct\n" +
-                                       "• You are logged into the server\n" +
-                                       "• VPN connection is active (if required)";
+                        errorMessage = ex.Message; // Use the detailed message from the exception
                     }
                     else
                     {
@@ -252,6 +275,24 @@ namespace ModelLibrary.Editor.Windows
                     // Check if index is empty vs. actual error
                     if (_indexCache != null && (_indexCache.entries == null || _indexCache.entries.Count == 0))
                     {
+                        // Check if this might be an authentication issue
+                        IModelRepository repository = _service != null ? RepositoryFactory.CreateRepository() : null;
+                        if (repository is FileSystemRepository fsRepo && !string.IsNullOrEmpty(fsRepo.Root))
+                        {
+                            string rootPath = fsRepo.Root;
+                            if (IsNetworkPathHelper(rootPath) && !CanAccessNetworkPathHelper(rootPath))
+                            {
+                                _authenticationError = $"Cannot access network repository: {rootPath}. Network authentication required. Please verify:\n" +
+                                    "• Your Windows credentials are correct\n" +
+                                    "• You are logged into the server\n" +
+                                    "• VPN connection is active (if required)\n" +
+                                    "• Network path is accessible";
+                                ErrorHandler.ShowError("Authentication Required", _authenticationError, ex);
+                                titleContent.text = "Model Library - Authentication Error";
+                                return;
+                            }
+                        }
+
                         ErrorHandler.ShowError("No Models Found",
                             "The repository appears to be empty or inaccessible. Please verify:\n" +
                             "• Repository path is correct\n" +
@@ -668,6 +709,78 @@ namespace ModelLibrary.Editor.Windows
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
             ClearThumbnailCache();
             _loadingThumbnails.Clear();
+        }
+
+        /// <summary>
+        /// Helper method to check if a path is on a network drive (UNC path or mapped network drive).
+        /// </summary>
+        private static bool IsNetworkPathHelper(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return false;
+            }
+
+            // Check for UNC path (\\server\share)
+            if (path.StartsWith(@"\\"))
+            {
+                return true;
+            }
+
+            // Check for mapped network drive (Z: where Z is mapped to network)
+            if (path.Length >= 2 && path[1] == ':' && char.IsLetter(path[0]))
+            {
+                try
+                {
+                    DriveInfo drive = new DriveInfo(path.Substring(0, 2));
+                    return drive.DriveType == DriveType.Network;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Helper method to check if a network path is accessible.
+        /// </summary>
+        private static bool CanAccessNetworkPathHelper(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return false;
+            }
+
+            try
+            {
+                string rootPath = Path.GetPathRoot(path);
+                if (string.IsNullOrEmpty(rootPath))
+                {
+                    // Local path without drive letter, assume accessible
+                    return true;
+                }
+
+                // Use lightweight Directory.Exists check
+                return Directory.Exists(rootPath);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Access denied - path exists but we don't have permission
+                return false;
+            }
+            catch (IOException)
+            {
+                // Network error or path doesn't exist
+                return false;
+            }
+            catch (Exception)
+            {
+                // Any other exception indicates the path is not accessible
+                return false;
+            }
         }
     }
 }

@@ -308,8 +308,10 @@ namespace ModelLibrary.Editor.Repository
         /// Loads the global models index from the repository.
         /// The index file is stored at the repository root as "models_index.json".
         /// Returns an empty index if the file doesn't exist (new repository).
+        /// Throws UnauthorizedAccessException if network authentication is required but not available.
         /// </summary>
         /// <returns>The model index, or an empty index if the file doesn't exist.</returns>
+        /// <exception cref="UnauthorizedAccessException">Thrown when network authentication is required but not available.</exception>
         public async Task<ModelIndex> LoadIndexAsync()
         {
             // Build the full path to the models index file
@@ -320,16 +322,22 @@ namespace ModelLibrary.Editor.Repository
             
             try
             {
+                // For network paths, verify accessibility before attempting to read
+                if (IsNetworkPath(path))
+                {
+                    if (!CanAccessNetworkPath(path))
+                    {
+                        throw new UnauthorizedAccessException($"Cannot access network repository: {Root}. Network authentication required. Please verify:\n" +
+                            "• Your Windows credentials are correct\n" +
+                            "• You are logged into the server\n" +
+                            "• VPN connection is active (if required)\n" +
+                            "• Network path is accessible");
+                    }
+                }
+
                 if (!FileExistsCached(path))
                 {
-                    // Check if directory is accessible (especially for network paths)
-                    if (IsNetworkPath(path))
-                    {
-                        if (!CanAccessNetworkPath(path))
-                        {
-                            throw new UnauthorizedAccessException($"Cannot access network path: {path}. Please verify your Windows credentials are correct and you are logged into the server.");
-                        }
-                    }
+                    // File doesn't exist - this is a new/empty repository
                     return new ModelIndex();
                 }
 
@@ -346,6 +354,30 @@ namespace ModelLibrary.Editor.Repository
             catch (UnauthorizedAccessException)
             {
                 // Re-throw UnauthorizedAccessException as-is (already has proper message)
+                throw;
+            }
+            catch (Exception ex) when (IsNetworkPath(path))
+            {
+                // For network paths, any exception during file operations might indicate authentication issues
+                // Check if it's an authentication-related error
+                IOException ioEx = ex as IOException;
+                if (ioEx != null && IsNetworkAuthError(ioEx))
+                {
+                    throw new UnauthorizedAccessException($"Network authentication required for repository: {Root}. Please verify your credentials and network connection.", ex);
+                }
+                
+                // For other exceptions on network paths, check if we can access the path
+                // If we can't access it, it's likely an authentication issue
+                if (!CanAccessNetworkPath(path))
+                {
+                    throw new UnauthorizedAccessException($"Cannot access network repository: {Root}. Network authentication required. Please verify:\n" +
+                        "• Your Windows credentials are correct\n" +
+                        "• You are logged into the server\n" +
+                        "• VPN connection is active (if required)\n" +
+                        "• Network path is accessible", ex);
+                }
+                
+                // Re-throw if it's not an authentication issue
                 throw;
             }
         }
