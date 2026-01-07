@@ -2,7 +2,7 @@
 
 A comprehensive Unity Editor tool that enables teams to version, browse, submit, and import 3D models (FBX, OBJ, materials, textures) from a shared repository. Features include intelligent caching, automatic update detection, role-based permissions, and seamless integration with Unity's asset pipeline.
 
-![Unity Version](https://img.shields.io/badge/Unity-6000.2.6f2-blue)
+![Unity Version](https://img.shields.io/badge/Unity-6000.3.2f1-blue)
 ![.NET Standard](https://img.shields.io/badge/.NET-Standard%202.1-green)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
