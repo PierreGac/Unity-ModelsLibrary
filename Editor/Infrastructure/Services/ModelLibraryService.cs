@@ -196,7 +196,13 @@ namespace ModelLibrary.Editor.Services
             // Save meta too (for quick access)
             // Use dot prefix to hide from Unity Project window
             string localMetaPath = Path.Combine(cacheRoot, "." + ModelMeta.MODEL_JSON);
-            File.WriteAllText(localMetaPath, JsonUtil.ToJson(meta));
+            string metaJson = JsonUtil.ToJson(meta);
+            
+            // Use retry logic for file write to handle locked files
+            await RetryFileOperationAsync(async () =>
+            {
+                await Task.Run(() => File.WriteAllText(localMetaPath, metaJson));
+            }, maxRetries: 3, initialDelayMs: 200);
 
             // Pull all files present in the repository under id/version (payload, deps, images, etc.)
             string versionRootRel = PathUtils.SanitizePathSeparator(Path.Combine(id, version));
@@ -302,6 +308,117 @@ namespace ModelLibrary.Editor.Services
         /// <param name="meta">Model metadata containing the latest version information.</param>
         private async Task UpdateIndexWithLatestMetaAsync(ModelMeta meta)
             => await _indexService.UpdateIndexWithLatestMetaAsync(meta);
+
+        /// <summary>
+        /// Clears the local cache for a specific model version, releasing file handles.
+        /// Forces garbage collection and waits for pending finalizers to ensure all file handles are released.
+        /// Uses retry logic with exponential backoff to handle locked files.
+        /// </summary>
+        /// <param name="modelId">The model ID to clear cache for. Must not be null or empty.</param>
+        /// <param name="version">The version to clear cache for. Must not be null or empty.</param>
+        /// <exception cref="ArgumentException">Thrown if modelId or version is null or empty.</exception>
+        public async Task ClearCacheForModelAsync(string modelId, string version)
+        {
+            if (string.IsNullOrEmpty(modelId))
+            {
+                throw new ArgumentException("Model ID cannot be null or empty", nameof(modelId));
+            }
+            
+            if (string.IsNullOrEmpty(version))
+            {
+                throw new ArgumentException("Version cannot be null or empty", nameof(version));
+            }
+
+            ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
+            string cacheRoot = EditorPaths.LibraryPath(Path.Combine(settings.localCacheRoot, modelId, version));
+            
+            if (!Directory.Exists(cacheRoot))
+            {
+                // Already cleared or doesn't exist - nothing to do
+                return;
+            }
+
+            await RetryFileOperationAsync(async () =>
+            {
+                // Force garbage collection to release any file handles that might be holding locks
+                // Note: GC.Collect() is expensive and should only be used when necessary (e.g., file handle cleanup)
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+                GC.WaitForPendingFinalizers();
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+                
+                // Double-check directory still exists after GC (it might have been deleted by another process)
+                if (Directory.Exists(cacheRoot))
+                {
+                    Directory.Delete(cacheRoot, recursive: true);
+                }
+            }, maxRetries: 3, initialDelayMs: 500);
+        }
+
+        /// <summary>
+        /// Retries a file operation with exponential backoff to handle locked files.
+        /// Attempts the operation up to maxRetries times, with exponential backoff between retries.
+        /// If all retries fail, the last exception is propagated.
+        /// </summary>
+        /// <param name="operation">The async operation to retry. Must not be null.</param>
+        /// <param name="maxRetries">Maximum number of retry attempts (default: 3). Must be at least 1.</param>
+        /// <param name="initialDelayMs">Initial delay in milliseconds before first retry (default: 500). Used for exponential backoff.</param>
+        /// <exception cref="ArgumentNullException">Thrown if operation is null.</exception>
+        /// <exception cref="ArgumentException">Thrown if maxRetries is less than 1.</exception>
+        private static async Task RetryFileOperationAsync(Func<Task> operation, int maxRetries = 3, int initialDelayMs = 500)
+        {
+            if (operation == null)
+            {
+                throw new ArgumentNullException(nameof(operation));
+            }
+            
+            if (maxRetries < 1)
+            {
+                throw new ArgumentException("maxRetries must be at least 1", nameof(maxRetries));
+            }
+
+            Exception lastException = null;
+            
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                try
+                {
+                    await operation();
+                    return; // Success - exit immediately
+                }
+                catch (IOException ex) when (attempt < maxRetries - 1)
+                {
+                    // Store exception for potential re-throw if all retries fail
+                    lastException = ex;
+                    
+                    // Exponential backoff: delay increases with each attempt (500ms, 1000ms, 2000ms, etc.)
+                    int delayMs = initialDelayMs * (int)Math.Pow(2, attempt);
+                    await Task.Delay(delayMs);
+                }
+                catch (UnauthorizedAccessException ex) when (attempt < maxRetries - 1)
+                {
+                    // Store exception for potential re-throw if all retries fail
+                    lastException = ex;
+                    
+                    // Exponential backoff for access denied errors
+                    int delayMs = initialDelayMs * (int)Math.Pow(2, attempt);
+                    await Task.Delay(delayMs);
+                }
+                catch (Exception ex)
+                {
+                    // For non-retryable exceptions or final attempt, propagate immediately
+                    throw;
+                }
+            }
+            
+            // All retries exhausted - throw the last exception we encountered
+            if (lastException != null)
+            {
+                throw lastException;
+            }
+            
+            // This should never be reached, but included for safety
+            throw new InvalidOperationException($"Operation failed after {maxRetries} attempts with no exception captured.");
+        }
 
         /// <summary>
         /// Ensures a changelog entry exists for the specified version in the model metadata.

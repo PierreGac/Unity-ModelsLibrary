@@ -38,8 +38,11 @@ namespace ModelLibrary.Editor.Windows
 
             if (_meta == null) { GUILayout.Label("Loading meta..."); return; }
 
-            EditorGUILayout.LabelField(_meta.identity.name, EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"v{_meta.version} by {_meta.author}");
+            string modelName = _meta?.identity?.name ?? "Unknown Model";
+            string version = _meta?.version ?? "Unknown";
+            string author = _meta?.author ?? "Unknown";
+            EditorGUILayout.LabelField(modelName, EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"v{version} by {author}");
 
             // Delete version button (with safety checks)
             DrawDeleteVersionButton();

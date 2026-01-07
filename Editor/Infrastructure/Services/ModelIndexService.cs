@@ -44,6 +44,14 @@ namespace ModelLibrary.Editor.Services
         }
 
         /// <summary>
+        /// Invalidates the index cache, forcing a reload on next access.
+        /// </summary>
+        public void InvalidateCache()
+        {
+            _indexCache = null;
+        }
+
+        /// <summary>
         /// Enumerates all available versions for a specific model by inspecting repository contents.
         /// Returns versions sorted in descending semantic order (latest first).
         /// </summary>

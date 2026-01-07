@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Services;
 using ModelLibrary.Editor.Utils;
@@ -64,6 +65,7 @@ namespace ModelLibrary.Editor.Windows
 
         private readonly HashSet<string> _importsInProgress = new HashSet<string>();
         private readonly Dictionary<string, bool> _importCancellation = new Dictionary<string, bool>();
+        private readonly Dictionary<string, CancellationTokenSource> _importCancellationTokens = new Dictionary<string, CancellationTokenSource>();
         private readonly List<ImportHistoryEntry> _importHistory = new List<ImportHistoryEntry>();
 
         private readonly HashSet<string> _selectedTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

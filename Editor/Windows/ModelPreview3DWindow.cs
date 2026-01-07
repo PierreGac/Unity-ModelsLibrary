@@ -121,6 +121,32 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void OnDisable()
         {
+            CleanupPreviewResources();
+        }
+
+        /// <summary>
+        /// Unity lifecycle method called when the window is destroyed.
+        /// Ensures all resources are fully released, including forcing garbage collection.
+        /// Note: GC.Collect() is expensive and should only be used when necessary (e.g., file handle cleanup on window close).
+        /// </summary>
+        private void OnDestroy()
+        {
+            CleanupPreviewResources();
+            
+            // Force garbage collection to release any remaining file handles
+            // This is necessary because Unity's asset system may hold file handles that prevent deletion
+            // We use forced collection with blocking to ensure all finalizers run before we return
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+            GC.WaitForPendingFinalizers();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+        }
+
+        /// <summary>
+        /// Cleans up all preview resources including meshes, materials, preview utility, and temporary assets.
+        /// </summary>
+        private void CleanupPreviewResources()
+        {
+            // Clean up preview utility
             if (_previewUtil != null)
             {
                 _previewUtil.Dispose();
@@ -128,13 +154,19 @@ namespace ModelLibrary.Editor.Windows
             }
 
             // Clean up mesh copies (materials are assets, so they'll be cleaned up with asset deletion)
-            foreach (MeshInfo meshInfo in _meshes)
+            for (int i = 0; i < _meshes.Count; i++)
             {
+                MeshInfo meshInfo = _meshes[i];
                 if (meshInfo.mesh != null)
                 {
                     DestroyImmediate(meshInfo.mesh);
+                    meshInfo.mesh = null;
                 }
-                // Don't destroy materials - they're assets that will be deleted with the temp directory
+                if (meshInfo.material != null)
+                {
+                    DestroyImmediate(meshInfo.material);
+                    meshInfo.material = null;
+                }
             }
             _meshes.Clear();
 
@@ -143,21 +175,28 @@ namespace ModelLibrary.Editor.Windows
             for (int i = _tempAssets.Count - 1; i >= 0; i--)
             {
                 string tempAsset = _tempAssets[i];
-                if (Directory.Exists(tempAsset))
+                try
                 {
-                    // Delete entire directory - this will delete all assets inside
-                    FileUtil.DeleteFileOrDirectory(tempAsset);
-                    string metaPath = tempAsset + ".meta";
-                    if (File.Exists(metaPath))
+                    if (Directory.Exists(tempAsset))
                     {
-                        FileUtil.DeleteFileOrDirectory(metaPath);
+                        // Delete entire directory - this will delete all assets inside
+                        FileUtil.DeleteFileOrDirectory(tempAsset);
+                        string metaPath = tempAsset + ".meta";
+                        if (File.Exists(metaPath))
+                        {
+                            FileUtil.DeleteFileOrDirectory(metaPath);
+                        }
+                    }
+                    else if (File.Exists(tempAsset))
+                    {
+                        // Use AssetDatabase.DeleteAsset to properly delete assets
+                        // This handles both files and their .meta files
+                        AssetDatabase.DeleteAsset(tempAsset);
                     }
                 }
-                else if (File.Exists(tempAsset))
+                catch (Exception ex)
                 {
-                    // Use AssetDatabase.DeleteAsset to properly delete assets
-                    // This handles both files and their .meta files
-                    AssetDatabase.DeleteAsset(tempAsset);
+                    Debug.LogWarning($"[ModelPreview3DWindow] Failed to delete temp asset {tempAsset}: {ex.Message}");
                 }
             }
             _tempAssets.Clear();
@@ -656,8 +695,20 @@ namespace ModelLibrary.Editor.Windows
             }
 
             // Model info
-            EditorGUILayout.LabelField(_meta.identity.name, EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"Version: {_meta.version}");
+            string modelName = _meta?.identity?.name ?? "Unknown Model";
+            string version = _meta?.version ?? "Unknown";
+            EditorGUILayout.LabelField(modelName, EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Version: {version}");
+            
+            // Display asset paths
+            if (!string.IsNullOrEmpty(_meta.installPath))
+            {
+                EditorGUILayout.LabelField("Install Path:", _meta.installPath);
+            }
+            if (!string.IsNullOrEmpty(_meta.relativePath))
+            {
+                EditorGUILayout.LabelField("Relative Path:", _meta.relativePath);
+            }
 
             EditorGUILayout.Space(__UI_SPACING);
 

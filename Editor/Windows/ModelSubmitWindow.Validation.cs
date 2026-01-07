@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Utils;
+using UnityEditor;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
@@ -94,6 +96,12 @@ namespace ModelLibrary.Editor.Windows
             List<string> changelogErrors = ChangelogValidator.ValidateChangelog(_changeSummary, isUpdateMode);
             errors.AddRange(changelogErrors);
 
+            // Validate that at least one valid asset is selected
+            if (!HasValidAssetSelection())
+            {
+                errors.Add("Please select at least one valid model asset (FBX or OBJ file)");
+            }
+
             if (_mode == SubmitMode.New)
             {
                 // Check for duplicate model name
@@ -117,11 +125,22 @@ namespace ModelLibrary.Editor.Windows
                 else
                 {
                     ModelIndex.Entry selectedModel = _existingModels[Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1)];
+                    
+                    // Validate selected model entry
+                    if (selectedModel == null)
+                    {
+                        errors.Add("Selected model entry is invalid");
+                        return errors;
+                    }
 
                     // Check for duplicate version
-                    if (string.Equals(selectedModel.latestVersion, _version, StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(selectedModel.latestVersion))
                     {
-                        errors.Add($"Version {_version} already exists for model '{selectedModel.name}'");
+                        errors.Add("Selected model has no version information");
+                    }
+                    else if (string.Equals(selectedModel.latestVersion, _version, StringComparison.OrdinalIgnoreCase))
+                    {
+                        errors.Add($"Version {_version} already exists for model '{selectedModel.name ?? "Unknown"}'");
                     }
                     else if (SemVer.TryParse(selectedModel.latestVersion, out SemVer prev) && SemVer.TryParse(_version, out SemVer next))
                     {
@@ -134,6 +153,36 @@ namespace ModelLibrary.Editor.Windows
             }
 
             return errors;
+        }
+
+        /// <summary>
+        /// Checks if the current selection contains at least one valid model asset (FBX or OBJ file).
+        /// </summary>
+        /// <returns>True if at least one valid asset is selected, false otherwise.</returns>
+        private bool HasValidAssetSelection()
+        {
+            if (Selection.assetGUIDs == null || Selection.assetGUIDs.Length == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < Selection.assetGUIDs.Length; i++)
+            {
+                string guid = Selection.assetGUIDs[i];
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (string.IsNullOrEmpty(path) || AssetDatabase.IsValidFolder(path))
+                {
+                    continue;
+                }
+
+                string ext = Path.GetExtension(path).ToLowerInvariant();
+                if (ext == ".fbx" || ext == ".obj")
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool ShouldDisableSubmit(List<string> validationErrors, bool metadataReady)

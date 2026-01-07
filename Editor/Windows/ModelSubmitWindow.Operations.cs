@@ -215,8 +215,15 @@ namespace ModelLibrary.Editor.Windows
                 _relativePath = _latestSelectedMeta?.relativePath ?? GetDefaultRelativePath();
                 _version = SuggestNextVersion(entry.latestVersion);
             }
-            catch
+            catch (Exception ex)
             {
+                // Log the error but don't show a dialog - this is a background operation
+                // The UI will show that no base metadata is available
+                ErrorLogger.LogError("Load Base Meta Failed", 
+                    $"Failed to load base metadata for model update: {ex.Message}", 
+                    ErrorHandler.CategorizeException(ex), 
+                    ex, 
+                    $"ModelId: {entry?.id}, Version: {entry?.latestVersion}");
                 _latestSelectedMeta = null;
             }
             finally
@@ -275,9 +282,28 @@ namespace ModelLibrary.Editor.Windows
 
             if (_mode == SubmitMode.Update)
             {
+                if (_existingModels == null || _existingModels.Count == 0)
+                {
+                    ErrorHandler.ShowErrorDialog("Validation Error", 
+                        "No existing models available for update. Please switch to 'New Model' mode.", 
+                        ErrorHandler.ErrorCategory.Validation);
+                    _isSubmitting = false;
+                    return;
+                }
+                
                 ModelIndex.Entry entry = _existingModels[Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1)];
+                
+                if (entry == null)
+                {
+                    ErrorHandler.ShowErrorDialog("Validation Error", 
+                        "Selected model entry is invalid. Please select a different model.", 
+                        ErrorHandler.ErrorCategory.Validation);
+                    _isSubmitting = false;
+                    return;
+                }
+                
                 identityId = entry.id;
-                identityName = entry.name;
+                identityName = entry.name ?? _name; // Fallback to current name if entry.name is null
                 previousVersion = entry.latestVersion;
             }
 
@@ -285,6 +311,27 @@ namespace ModelLibrary.Editor.Windows
             _isSubmitting = true;
             _cancelSubmission = false;
             string progressTitle = _mode == SubmitMode.Update ? "Submitting Update" : "Submitting Model";
+
+            // Validate and normalize paths before submission
+            // Ensure paths are not empty or using default values (which indicates they weren't properly set)
+            string finalInstallPath = string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath.Trim();
+            string finalRelativePath = string.IsNullOrWhiteSpace(_relativePath) ? GetDefaultRelativePath() : _relativePath.Trim();
+            
+            // Warn if paths are using defaults (may indicate user didn't set them intentionally)
+            if (finalInstallPath == DefaultInstallPath())
+            {
+                Debug.LogWarning($"[ModelSubmitWindow] Install path using default value. Consider setting a custom path.");
+            }
+            
+            if (finalRelativePath == GetDefaultRelativePath())
+            {
+                Debug.LogWarning($"[ModelSubmitWindow] Relative path using default value. Consider setting a custom path.");
+            }
+            
+            // Log paths for debugging (only in development builds to avoid log spam)
+            #if UNITY_EDITOR && DEVELOPMENT_BUILD
+            Debug.Log($"[ModelSubmitWindow] Submitting with installPath: '{finalInstallPath}', relativePath: '{finalRelativePath}'");
+            #endif
 
             try
             {
@@ -296,7 +343,17 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
-                ModelMeta meta = await ModelDeployer.BuildMetaFromSelectionAsync(identityName, identityId, _version, _description, _imageAbsPaths, _tags, _installPath, _relativePath, _idProvider);
+                ModelMeta meta = await ModelDeployer.BuildMetaFromSelectionAsync(identityName, identityId, _version, _description, _imageAbsPaths, _tags, finalInstallPath, finalRelativePath, _idProvider);
+                
+                // Verify paths were set in meta
+                if (string.IsNullOrWhiteSpace(meta.installPath) || meta.installPath == DefaultInstallPath())
+                {
+                    Debug.LogWarning($"[ModelSubmitWindow] Meta installPath was not set correctly. Expected: '{finalInstallPath}', Got: '{meta.installPath}'");
+                }
+                if (string.IsNullOrWhiteSpace(meta.relativePath) || meta.relativePath == GetDefaultRelativePath())
+                {
+                    Debug.LogWarning($"[ModelSubmitWindow] Meta relativePath was not set correctly. Expected: '{finalRelativePath}', Got: '{meta.relativePath}'");
+                }
 
                 if (_cancelSubmission)
                 {

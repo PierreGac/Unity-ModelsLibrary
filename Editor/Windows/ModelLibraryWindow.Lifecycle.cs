@@ -223,13 +223,46 @@ namespace ModelLibrary.Editor.Windows
                 Repaint();
                 titleContent.text = "Model Library";
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                // Only show errors if not entering play mode
+                if (!EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    string errorMessage = "Unable to access the repository. ";
+                    if (ex.Message.Contains("authentication") || ex.Message.Contains("credentials"))
+                    {
+                        errorMessage += "Network authentication required. Please verify:\n" +
+                                       "• Your Windows credentials are correct\n" +
+                                       "• You are logged into the server\n" +
+                                       "• VPN connection is active (if required)";
+                    }
+                    else
+                    {
+                        errorMessage += ex.Message;
+                    }
+                    ErrorHandler.ShowError("Authentication Required", errorMessage, ex);
+                    titleContent.text = "Model Library - Authentication Error";
+                }
+            }
             catch (Exception ex)
             {
                 // Only show errors if not entering play mode
                 if (!EditorApplication.isPlayingOrWillChangePlaymode)
                 {
-                    ErrorHandler.ShowError("Load Failed",
-                        "Unable to load the model library from the repository. Please check your connection and settings.", ex);
+                    // Check if index is empty vs. actual error
+                    if (_indexCache != null && (_indexCache.entries == null || _indexCache.entries.Count == 0))
+                    {
+                        ErrorHandler.ShowError("No Models Found",
+                            "The repository appears to be empty or inaccessible. Please verify:\n" +
+                            "• Repository path is correct\n" +
+                            "• Network connection is available\n" +
+                            "• Repository server is accessible", ex);
+                    }
+                    else
+                    {
+                        ErrorHandler.ShowError("Load Failed",
+                            "Unable to load the model library from the repository. Please check your connection and settings.", ex);
+                    }
                     titleContent.text = "Model Library - Error";
                 }
             }

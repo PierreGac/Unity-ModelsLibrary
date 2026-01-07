@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Services;
@@ -49,6 +50,8 @@ namespace ModelLibrary.Editor.Windows
 
             _importsInProgress.Add(id);
             _importCancellation[id] = false;
+            CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+            _importCancellationTokens[id] = cancellationTokenSource;
             string progressTitle = isUpgrade ? "Updating Model" : "Importing Model";
 
             try
@@ -60,6 +63,7 @@ namespace ModelLibrary.Editor.Windows
 
                 if (_importCancellation.TryGetValue(id, out bool cancelled) && cancelled)
                 {
+                    cancellationTokenSource.Cancel();
                     return;
                 }
 
@@ -67,6 +71,7 @@ namespace ModelLibrary.Editor.Windows
 
                 if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)
                 {
+                    cancellationTokenSource.Cancel();
                     return;
                 }
 
@@ -85,12 +90,14 @@ namespace ModelLibrary.Editor.Windows
                 if (choice == 2)
                 {
                     _importCancellation[id] = true;
+                    cancellationTokenSource.Cancel();
                     titleContent.text = "Model Library";
                     return;
                 }
 
                 if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)
                 {
+                    cancellationTokenSource.Cancel();
                     return;
                 }
 
@@ -100,6 +107,7 @@ namespace ModelLibrary.Editor.Windows
                     if (string.IsNullOrEmpty(custom))
                     {
                         _importCancellation[id] = true;
+                        cancellationTokenSource.Cancel();
                         titleContent.text = "Model Library";
                         return;
                     }
@@ -108,14 +116,16 @@ namespace ModelLibrary.Editor.Windows
 
                 if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)
                 {
+                    cancellationTokenSource.Cancel();
                     return;
                 }
 
                 EditorUtility.DisplayProgressBar(progressTitle, "Copying files to Assets folder...", ProgressBarConstants.COPYING);
-                await ModelProjectImporter.ImportFromCacheAsync(root, meta, true, chosenInstallPath, isUpgrade);
+                await ModelProjectImporter.ImportFromCacheAsync(root, meta, true, chosenInstallPath, isUpgrade, cancellationTokenSource.Token);
 
                 if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)
                 {
+                    cancellationTokenSource.Cancel();
                     return;
                 }
 
@@ -207,18 +217,18 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                if (!(_importCancellation.TryGetValue(id, out bool cancelled) && cancelled))
+                if (ex is OperationCanceledException || (_importCancellation.TryGetValue(id, out bool cancelled) && cancelled))
+                {
+                    ShowNotification("Import Cancelled", $"The import of '{id}' was cancelled.");
+                    Debug.Log($"Import cancelled: {id}");
+                }
+                else
                 {
                     string operation = isUpgrade ? "Update" : "Import";
                     string operationLower = operation.ToLowerInvariant();
                     ErrorHandler.ShowErrorWithRetry($"{operation} Failed",
                         $"The model could not be {operationLower}ed into your project.",
                         () => _ = Import(id, version, isUpgrade, previousVersion), ex);
-                }
-                else
-                {
-                    ShowNotification("Import Cancelled", $"The import of '{id}' was cancelled.");
-                    Debug.Log($"Import cancelled: {id}");
                 }
             }
             finally
@@ -227,6 +237,11 @@ namespace ModelLibrary.Editor.Windows
                 titleContent.text = "Model Library";
                 _importsInProgress.Remove(id);
                 _importCancellation.Remove(id);
+                if (_importCancellationTokens.TryGetValue(id, out CancellationTokenSource cts))
+                {
+                    cts.Dispose();
+                    _importCancellationTokens.Remove(id);
+                }
             }
         }
 
@@ -235,6 +250,10 @@ namespace ModelLibrary.Editor.Windows
             if (_importsInProgress.Contains(modelId))
             {
                 _importCancellation[modelId] = true;
+                if (_importCancellationTokens.TryGetValue(modelId, out CancellationTokenSource cts))
+                {
+                    cts.Cancel();
+                }
             }
         }
 

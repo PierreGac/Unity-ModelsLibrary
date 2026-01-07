@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Utils;
@@ -17,22 +18,32 @@ namespace ModelLibrary.Editor.Services
     /// </summary>
     public static class ModelProjectImporter
     {
-        public static async Task<string> ImportFromCacheAsync(string cacheVersionRoot, ModelMeta meta, bool cleanDestination = true, string overrideInstallPath = null, bool isUpdate = false)
+        public static async Task<string> ImportFromCacheAsync(string cacheVersionRoot, ModelMeta meta, bool cleanDestination = true, string overrideInstallPath = null, bool isUpdate = false, CancellationToken cancellationToken = default)
         {
-            // Determine destination folder with validation and logging
-            string destRel = ResolveDestinationPath(meta, overrideInstallPath);
-            string destAbs = Path.GetFullPath(destRel);
+            // Track imported files for rollback on cancellation
+            List<string> importedFiles = new List<string>();
+            List<string> importedDirectories = new List<string>();
 
-            Debug.Log($"[ModelProjectImporter] Importing model '{(meta != null && meta.identity != null ? meta.identity.name : "Unknown")}' to path: {destRel}");
-
-            // Get existing GUIDs BEFORE import to avoid false positive conflicts
-            HashSet<string> existingGuidsBeforeImport = new HashSet<string>();
-            if (!isUpdate && meta != null && meta.assetGuids != null && meta.assetGuids.Count > 0)
+            try
             {
-                string[] allGuids = AssetDatabase.FindAssets(string.Empty);
-                existingGuidsBeforeImport = new HashSet<string>(allGuids);
-                Debug.Log($"[ModelProjectImporter] Found {existingGuidsBeforeImport.Count} existing GUIDs before import");
-            }
+                // Determine destination folder with validation and logging
+                string destRel = ResolveDestinationPath(meta, overrideInstallPath);
+                string destAbs = Path.GetFullPath(destRel);
+
+                Debug.Log($"[ModelProjectImporter] Importing model '{(meta != null && meta.identity != null ? meta.identity.name : "Unknown")}' to path: {destRel}");
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Get existing GUIDs BEFORE import to avoid false positive conflicts
+                HashSet<string> existingGuidsBeforeImport = new HashSet<string>();
+                if (!isUpdate && meta != null && meta.assetGuids != null && meta.assetGuids.Count > 0)
+                {
+                    string[] allGuids = AssetDatabase.FindAssets(string.Empty);
+                    existingGuidsBeforeImport = new HashSet<string>(allGuids);
+                    Debug.Log($"[ModelProjectImporter] Found {existingGuidsBeforeImport.Count} existing GUIDs before import");
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
 
             // Ensure destination is a directory, not a file
             if (File.Exists(destAbs))
@@ -82,11 +93,16 @@ namespace ModelLibrary.Editor.Services
                         }
 
                         File.Copy(file, target, overwrite: true);
+                        importedFiles.Add(target);
                         string srcMeta = file + FileExtensions.META;
                         if (File.Exists(srcMeta))
                         {
-                            File.Copy(srcMeta, target + FileExtensions.META, overwrite: true);
+                            string targetMeta = target + FileExtensions.META;
+                            File.Copy(srcMeta, targetMeta, overwrite: true);
+                            importedFiles.Add(targetMeta);
                         }
+                        
+                        cancellationToken.ThrowIfCancellationRequested();
                     }
                     catch (Exception ex)
                     {
@@ -96,6 +112,12 @@ namespace ModelLibrary.Editor.Services
                         throw;
                     }
                 }
+            }
+            
+            // Track destination directory
+            if (!importedDirectories.Contains(destAbs))
+            {
+                importedDirectories.Add(destAbs);
             }
 
             // Copy dependency files (any depth) directly into destAbs (flatten) and skip shaders. Copy .meta alongside when present
@@ -125,11 +147,16 @@ namespace ModelLibrary.Editor.Services
                         }
 
                         File.Copy(file, target, overwrite: true);
+                        importedFiles.Add(target);
                         string srcMeta = file + FileExtensions.META;
                         if (File.Exists(srcMeta))
                         {
-                            File.Copy(srcMeta, target + FileExtensions.META, overwrite: true);
+                            string targetMeta = target + FileExtensions.META;
+                            File.Copy(srcMeta, targetMeta, overwrite: true);
+                            importedFiles.Add(targetMeta);
                         }
+                        
+                        cancellationToken.ThrowIfCancellationRequested();
                     }
                     catch (Exception ex)
                     {
@@ -141,10 +168,15 @@ namespace ModelLibrary.Editor.Services
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Persist manifest for local version tracking
             // Use dot prefix to hide from Unity Project window
             string manifestPath = Path.Combine(destAbs, ".modelLibrary.meta.json");
             File.WriteAllText(manifestPath, JsonUtil.ToJson(meta));
+            importedFiles.Add(manifestPath);
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             // Refresh to register new files
             AssetDatabase.Refresh();
@@ -156,16 +188,21 @@ namespace ModelLibrary.Editor.Services
 
             Debug.Log($"[ModelProjectImporter] Created hidden manifest file: {manifestRelativePath}");
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Check for GUID conflicts after import (only for new imports, not updates)
             if (!isUpdate)
             {
-                await CheckForGuidConflictsAsync(meta, destAbs, existingGuidsBeforeImport);
+                cancellationToken.ThrowIfCancellationRequested();
+                await CheckForGuidConflictsAsync(meta, destAbs, existingGuidsBeforeImport, cancellationToken);
             }
             else
             {
                 // For updates, log that GUID conflicts are expected and normal
                 Debug.Log($"[ModelProjectImporter] Model update completed for '{meta.identity.name}'. GUID conflicts are expected and normal for updates.");
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             // Restore per-file model importer settings captured in meta (if present)
             foreach (string file in Directory.GetFiles(destAbs, "*", SearchOption.TopDirectoryOnly))
@@ -205,6 +242,69 @@ namespace ModelLibrary.Editor.Services
             }
 
             return await Task.FromResult(destRel);
+            }
+            catch (OperationCanceledException)
+            {
+                // Rollback: Delete all imported files and directories
+                Debug.LogWarning($"[ModelProjectImporter] Import cancelled. Rolling back {importedFiles.Count} files...");
+                RollbackImport(importedFiles, importedDirectories);
+                throw;
+            }
+            catch (Exception ex) when (cancellationToken.IsCancellationRequested)
+            {
+                // Rollback if cancellation was requested, even if exception is not OperationCanceledException
+                Debug.LogWarning($"[ModelProjectImporter] Import cancelled (token cancelled). Rolling back {importedFiles.Count} files...");
+                RollbackImport(importedFiles, importedDirectories);
+                throw new OperationCanceledException("Import cancelled.", ex);
+            }
+        }
+
+        /// <summary>
+        /// Rolls back a cancelled import by deleting all imported files and directories.
+        /// Deletes files and directories in reverse order to handle dependencies correctly.
+        /// Logs warnings for any files that cannot be deleted but continues with the rollback.
+        /// </summary>
+        /// <param name="importedFiles">List of file paths that were imported and need to be deleted. Can be null or empty.</param>
+        /// <param name="importedDirectories">List of directory paths that were created and need to be deleted. Can be null or empty.</param>
+        private static void RollbackImport(List<string> importedFiles, List<string> importedDirectories)
+        {
+            // Delete files in reverse order
+            for (int i = importedFiles.Count - 1; i >= 0; i--)
+            {
+                string file = importedFiles[i];
+                try
+                {
+                    if (File.Exists(file))
+                    {
+                        File.SetAttributes(file, FileAttributes.Normal);
+                        File.Delete(file);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[ModelProjectImporter] Failed to delete file during rollback: {file}, Error: {ex.Message}");
+                }
+            }
+
+            // Delete directories in reverse order
+            for (int i = importedDirectories.Count - 1; i >= 0; i--)
+            {
+                string dir = importedDirectories[i];
+                try
+                {
+                    if (Directory.Exists(dir))
+                    {
+                        Directory.Delete(dir, recursive: true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[ModelProjectImporter] Failed to delete directory during rollback: {dir}, Error: {ex.Message}");
+                }
+            }
+
+            AssetDatabase.Refresh();
+            Debug.Log($"[ModelProjectImporter] Rollback completed. Deleted {importedFiles.Count} files and {importedDirectories.Count} directories.");
         }
 
         /// <summary>
@@ -357,7 +457,8 @@ namespace ModelLibrary.Editor.Services
         /// <param name="meta">Model metadata containing asset GUIDs to check.</param>
         /// <param name="destAbs">Absolute path to the destination directory where the model was imported.</param>
         /// <param name="existingGuidsBeforeImport">Set of GUIDs that existed before import (for accurate conflict detection).</param>
-        private static async Task CheckForGuidConflictsAsync(ModelMeta meta, string destAbs, HashSet<string> existingGuidsBeforeImport = null)
+        /// <param name="cancellationToken">Cancellation token to check for cancellation requests.</param>
+        private static async Task CheckForGuidConflictsAsync(ModelMeta meta, string destAbs, HashSet<string> existingGuidsBeforeImport = null, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -406,58 +507,10 @@ namespace ModelLibrary.Editor.Services
                 // Only show conflict dialog for actual conflicts (different models), not same-model GUIDs
                 if (conflictingGuids.Count > 0)
                 {
-                    string conflictMessage = $"GUID conflicts detected for model '{meta.identity.name}':\n\n";
-                    int shownCount = 0;
-                    foreach (string guid in conflictingGuids.Take(5))
-                    {
-                        string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                        string fileName = Path.GetFileName(assetPath);
-                        conflictMessage += $"• {fileName} ({guid})\n  → {assetPath}\n";
-                        shownCount++;
-                    }
-                    if (conflictingGuids.Count > 5)
-                    {
-                        conflictMessage += $"... and {conflictingGuids.Count - 5} more conflicts\n";
-                    }
-                    conflictMessage += "\nThis may cause issues with asset references.";
-
-                    Debug.LogWarning($"[ModelProjectImporter] {conflictMessage}");
-
-                    // Show improved dialog with multiple options
-                    int choice = EditorUtility.DisplayDialogComplex(
-                        "GUID Conflicts Detected",
-                        conflictMessage + "\n\nHow would you like to resolve these conflicts?",
-                        "Regenerate GUIDs",
-                        "Keep Existing",
-                        "Cancel Import"
-                    );
-
-                    if (choice == 0) // Regenerate GUIDs
-                    {
-                        await RegenerateGuidsForImportedModelAsync(destAbs);
-                        Debug.Log($"[ModelProjectImporter] Regenerated GUIDs for {conflictingGuids.Count} conflicting assets.");
-                    }
-                    else if (choice == 1) // Keep Existing
-                    {
-                        Debug.Log($"[ModelProjectImporter] Keeping existing assets with conflicting GUIDs. Imported model may have broken references.");
-                    }
-                    else // Cancel Import (choice == 2)
-                    {
-                        // Clean up the import
-                        if (Directory.Exists(destAbs))
-                        {
-                            try
-                            {
-                                Directory.Delete(destAbs, true);
-                                AssetDatabase.Refresh();
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.LogError($"[ModelProjectImporter] Failed to clean up cancelled import: {ex.Message}");
-                            }
-                        }
-                        throw new Exception("Import cancelled due to GUID conflicts.");
-                    }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    // Auto-keep existing GUIDs to preserve references (default behavior)
+                    // This prevents losing references when importing models with conflicting GUIDs
+                    await HandleGuidConflictsAsync(meta, conflictingGuids, destAbs, cancellationToken);
                 }
                 else if (sameModelGuids.Count > 0)
                 {
@@ -503,6 +556,62 @@ namespace ModelLibrary.Editor.Services
             catch (Exception ex)
             {
                 Debug.LogError($"[ModelProjectImporter] Error regenerating GUIDs: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Handles GUID conflicts by auto-keeping existing GUIDs to preserve references.
+        /// Shows a dialog with options to regenerate GUIDs or keep existing ones.
+        /// Default behavior is to keep existing GUIDs to prevent losing references.
+        /// </summary>
+        /// <param name="meta">Model metadata containing asset GUIDs.</param>
+        /// <param name="conflictingGuids">List of GUIDs that conflict with existing assets.</param>
+        /// <param name="destAbs">Absolute path to the destination directory.</param>
+        /// <param name="cancellationToken">Cancellation token to check for cancellation requests.</param>
+        private static async Task HandleGuidConflictsAsync(ModelMeta meta, List<string> conflictingGuids, string destAbs, CancellationToken cancellationToken = default)
+        {
+            string conflictMessage = $"GUID conflicts detected for model '{meta.identity.name}':\n\n";
+            int shownCount = 0;
+            for (int i = 0; i < conflictingGuids.Count && i < 5; i++)
+            {
+                string guid = conflictingGuids[i];
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                string fileName = Path.GetFileName(assetPath);
+                conflictMessage += $"• {fileName} ({guid})\n  → {assetPath}\n";
+                shownCount++;
+            }
+            if (conflictingGuids.Count > 5)
+            {
+                conflictMessage += $"... and {conflictingGuids.Count - 5} more conflicts\n";
+            }
+            conflictMessage += "\nKeeping existing GUIDs to preserve references. This is the recommended option.";
+
+            Debug.LogWarning($"[ModelProjectImporter] {conflictMessage}");
+
+            // Show dialog with "Keep Existing" as the default (middle button)
+            int choice = EditorUtility.DisplayDialogComplex(
+                "GUID Conflicts Detected",
+                conflictMessage + "\n\nHow would you like to resolve these conflicts?",
+                "Regenerate GUIDs",
+                "Keep Existing (Recommended)",
+                "Cancel Import"
+            );
+
+            if (choice == 0) // Regenerate GUIDs
+            {
+                await RegenerateGuidsForImportedModelAsync(destAbs);
+                Debug.Log($"[ModelProjectImporter] Regenerated GUIDs for {conflictingGuids.Count} conflicting assets.");
+            }
+            else if (choice == 1) // Keep Existing (Recommended)
+            {
+                // Auto-keep existing GUIDs - this preserves references
+                Debug.Log($"[ModelProjectImporter] Preserving {conflictingGuids.Count} existing GUIDs to maintain references. This is the recommended approach.");
+            }
+            else // Cancel Import (choice == 2)
+            {
+                // Cancel the import - this will trigger rollback in the catch block
+                Debug.LogWarning($"[ModelProjectImporter] Import cancelled by user due to GUID conflicts.");
+                throw new OperationCanceledException("Import cancelled due to GUID conflicts.");
             }
         }
     }

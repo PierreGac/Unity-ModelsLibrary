@@ -124,15 +124,40 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawAssetsTab()
         {
-            EditorGUILayout.LabelField("Install Path", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("The absolute path in the Unity project where the model will be installed (e.g., Assets/Models/ModelName).", MessageType.Info);
-            _installPath = EditorGUILayout.TextField("Install Path", string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath);
+            EditorGUILayout.LabelField(new GUIContent("Install Path", 
+                "The absolute path where the model will be installed in YOUR Unity project.\n" +
+                "Example: Assets/Models/MyModel\n\n" +
+                "This is where users will find the model after importing it into their project."), EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Install Path: Where the model will be placed in YOUR Unity project.\n" +
+                "This is the full path starting with 'Assets/' that users will see in their Project window.\n" +
+                "Example: Assets/Models/MyModel", 
+                MessageType.Info);
+            string displayInstallPath = string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath;
+            string newInstallPath = EditorGUILayout.TextField(new GUIContent("Install Path", 
+                "The absolute path where the model will be installed in your Unity project (e.g., Assets/Models/MyModel)"), 
+                displayInstallPath);
+            
+            // Always update the field value to ensure it's captured
+            if (newInstallPath != displayInstallPath || string.IsNullOrWhiteSpace(_installPath))
+            {
+                _installPath = newInstallPath;
+                SaveDraft(); // Auto-save when path changes
+            }
 
             EditorGUILayout.Space(10);
 
             // Relative Path with validation feedback
-            EditorGUILayout.LabelField("Relative Path", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("The relative path from the Assets folder (e.g., Models/ModelName). This is used for organizing models in the repository.", MessageType.Info);
+            EditorGUILayout.LabelField(new GUIContent("Relative Path", 
+                "The path relative to the Assets folder where model files are stored in the repository.\n" +
+                "Example: Models/MyModel\n\n" +
+                "This is used for organizing files in the repository, not in your project."), EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Relative Path: How files are organized in the REPOSITORY (not in your project).\n" +
+                "This is the path relative to the Assets folder, used for repository file organization.\n" +
+                "Example: Models/MyModel\n\n" +
+                "Note: This is different from Install Path - Install Path is for YOUR project, Relative Path is for the repository.", 
+                MessageType.Info);
             DrawRelativePathField();
 
             // Advanced path options (progressive disclosure)
@@ -260,16 +285,17 @@ namespace ModelLibrary.Editor.Windows
             }
 
             // Draw the text field
-            string newRelativePath = EditorGUILayout.TextField("Relative Path",
-                string.IsNullOrWhiteSpace(_relativePath) ? GetDefaultRelativePath() : _relativePath);
+            string displayRelativePath = string.IsNullOrWhiteSpace(_relativePath) ? GetDefaultRelativePath() : _relativePath;
+            string newRelativePath = EditorGUILayout.TextField("Relative Path", displayRelativePath);
 
             // Restore original color
             GUI.color = originalColor;
 
-            // Update the field value
-            if (newRelativePath != _relativePath)
+            // Always update the field value to ensure it's captured
+            if (newRelativePath != displayRelativePath || string.IsNullOrWhiteSpace(_relativePath))
             {
                 _relativePath = newRelativePath;
+                SaveDraft(); // Auto-save when path changes
             }
 
             // Show validation feedback

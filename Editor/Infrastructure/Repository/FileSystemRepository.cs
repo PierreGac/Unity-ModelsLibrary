@@ -37,6 +37,14 @@ namespace ModelLibrary.Editor.Repository
         /// <summary>Time span before directory cache entries expire (5 minutes).</summary>
         private static readonly TimeSpan DirectoryCacheExpiry = TimeSpan.FromMinutes(5);
 
+        // Windows Error Codes for Network Authentication
+        /// <summary>Windows error code: ERROR_ACCESS_DENIED (5) - Access is denied.</summary>
+        private const int ERROR_ACCESS_DENIED = 5;
+        /// <summary>Windows error code: ERROR_BAD_NETPATH (53) - The network path was not found.</summary>
+        private const int ERROR_BAD_NETPATH = 53;
+        /// <summary>Windows error code: ERROR_LOGON_FAILURE (1326) - The user name or password is incorrect.</summary>
+        private const int ERROR_LOGON_FAILURE = 1326;
+
         /// <summary>
         /// Initialize the repository with a root directory path.
         /// Normalizes path separators to match the current operating system.
@@ -83,6 +91,81 @@ namespace ModelLibrary.Editor.Repository
                 // Fallback to direct File.Exists() call
                 return File.Exists(p);
             });
+        }
+
+        /// <summary>
+        /// Checks if an IOException represents a network authentication error.
+        /// Detects common Windows error codes and message patterns that indicate authentication failures.
+        /// </summary>
+        /// <param name="ex">The IOException to check. Can be null.</param>
+        /// <returns>True if the exception indicates a network authentication error, false otherwise.</returns>
+        private static bool IsNetworkAuthError(IOException ex)
+        {
+            if (ex == null)
+            {
+                return false;
+            }
+
+            // Check for common network authentication error codes
+            // Extract the low 16 bits of HResult which contain the Windows error code
+            int errorCode = ex.HResult & 0xFFFF;
+            
+            // Check for known network authentication error codes
+            bool isKnownErrorCode = errorCode == ERROR_ACCESS_DENIED || 
+                                    errorCode == ERROR_LOGON_FAILURE || 
+                                    errorCode == ERROR_BAD_NETPATH;
+            
+            // Also check error message for common authentication-related phrases
+            string message = ex.Message ?? string.Empty;
+            bool hasAuthMessage = message.IndexOf("access denied", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                  message.IndexOf("logon failure", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                  message.IndexOf("network path", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            return isKnownErrorCode || hasAuthMessage;
+        }
+
+        /// <summary>
+        /// Checks if a network path is accessible by attempting to access the root directory.
+        /// Uses a lightweight check (Directory.Exists) instead of enumerating files to avoid performance issues.
+        /// </summary>
+        /// <param name="path">The path to check. Can be null or empty.</param>
+        /// <returns>True if the path is accessible, false if access is denied or the path is invalid.</returns>
+        private static bool CanAccessNetworkPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return false;
+            }
+
+            try
+            {
+                string rootPath = Path.GetPathRoot(path);
+                if (string.IsNullOrEmpty(rootPath))
+                {
+                    // Local path without drive letter, assume accessible
+                    return true;
+                }
+
+                // Use lightweight Directory.Exists check instead of Directory.GetFiles
+                // Directory.GetFiles can be extremely slow on network drives and may timeout
+                // Directory.Exists is much faster and sufficient for accessibility check
+                return Directory.Exists(rootPath);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Access denied - path exists but we don't have permission
+                return false;
+            }
+            catch (IOException)
+            {
+                // Network error or path doesn't exist
+                return false;
+            }
+            catch (Exception)
+            {
+                // Any other exception indicates the path is not accessible
+                return false;
+            }
         }
 
         /// <summary>
@@ -234,16 +317,37 @@ namespace ModelLibrary.Editor.Repository
 
             // If the index file doesn't exist, return an empty index (new repository)
             UnityEngine.Debug.Log($"Loading index from {path}");
-            if (!FileExistsCached(path))
+            
+            try
             {
-                return new ModelIndex();
+                if (!FileExistsCached(path))
+                {
+                    // Check if directory is accessible (especially for network paths)
+                    if (IsNetworkPath(path))
+                    {
+                        if (!CanAccessNetworkPath(path))
+                        {
+                            throw new UnauthorizedAccessException($"Cannot access network path: {path}. Please verify your Windows credentials are correct and you are logged into the server.");
+                        }
+                    }
+                    return new ModelIndex();
+                }
+
+                // Read the JSON file asynchronously to avoid blocking the UI thread
+                string json = await AsyncProfiler.MeasureAsync("FileSystemRepository.ReadIndex", () => File.ReadAllTextAsync(path));
+
+                // Parse the JSON into a ModelIndex object, or return empty if parsing fails
+                return JsonUtil.FromJson<ModelIndex>(json) ?? new ModelIndex();
             }
-
-            // Read the JSON file asynchronously to avoid blocking the UI thread
-            string json = await AsyncProfiler.MeasureAsync("FileSystemRepository.ReadIndex", () => File.ReadAllTextAsync(path));
-
-            // Parse the JSON into a ModelIndex object, or return empty if parsing fails
-            return JsonUtil.FromJson<ModelIndex>(json) ?? new ModelIndex();
+            catch (IOException ex) when (IsNetworkAuthError(ex))
+            {
+                throw new UnauthorizedAccessException($"Network authentication required for repository: {Root}. Please verify your credentials and network connection.", ex);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Re-throw UnauthorizedAccessException as-is (already has proper message)
+                throw;
+            }
         }
 
         /// <summary>

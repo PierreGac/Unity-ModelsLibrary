@@ -103,11 +103,23 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
+        /// <summary>
+        /// Confirms version deletion with the user through a dialog.
+        /// Shows additional warning if deleting the latest version.
+        /// </summary>
+        /// <returns>True if the user confirmed deletion, false otherwise.</returns>
         private bool ConfirmVersionDeletion()
         {
+            if (_meta == null || _meta.identity == null)
+            {
+                Debug.LogError("[ModelDetailsWindow] Cannot confirm deletion: metadata is null");
+                return false;
+            }
+            
+            string modelName = _meta.identity.name ?? "Unknown Model";
             bool confirmed = EditorUtility.DisplayDialog(
                 "Delete Version",
-                $"Are you sure you want to delete version {_version} of '{_meta.identity.name}'?\n\n" +
+                $"Are you sure you want to delete version {_version ?? "Unknown"} of '{modelName}'?\n\n" +
                 "This permanently removes the version folder, payload files, preview images, and metadata from the repository.",
                 "Delete",
                 "Cancel");
@@ -129,11 +141,22 @@ namespace ModelLibrary.Editor.Windows
             return true;
         }
 
+        /// <summary>
+        /// Confirms model deletion with the user through a dialog with double confirmation.
+        /// </summary>
+        /// <returns>True if the user confirmed deletion through both dialogs, false otherwise.</returns>
         private bool ConfirmModelDeletion()
         {
+            if (_meta == null || _meta.identity == null)
+            {
+                Debug.LogError("[ModelDetailsWindow] Cannot confirm deletion: metadata is null");
+                return false;
+            }
+            
+            string modelName = _meta.identity.name ?? "Unknown Model";
             bool confirmed = EditorUtility.DisplayDialog(
                 "Delete Model",
-                $"⚠️ WARNING: Are you sure you want to delete the entire model '{_meta.identity.name}'?\n\n" +
+                $"⚠️ WARNING: Are you sure you want to delete the entire model '{modelName}'?\n\n" +
                 "This will permanently remove:\n" +
                 "• All versions of this model\n" +
                 "• All payload files, metadata, and preview images\n" +
@@ -148,9 +171,10 @@ namespace ModelLibrary.Editor.Windows
             }
 
             // Double confirmation for model deletion
+            // Reuse modelName variable from above
             return EditorUtility.DisplayDialog(
                 "Final Confirmation",
-                $"You are about to PERMANENTLY DELETE '{_meta.identity.name}' and all its versions.\n\n" +
+                $"You are about to PERMANENTLY DELETE '{modelName}' and all its versions.\n\n" +
                 "Are you absolutely sure?",
                 "Yes, I'm Sure",
                 "Cancel");
@@ -169,7 +193,8 @@ namespace ModelLibrary.Editor.Windows
             _deletingModel = true;
             try
             {
-                EditorUtility.DisplayProgressBar("Deleting Model", $"Deleting {_meta.identity.name} and all versions...", ProgressBarConstants.MID_OPERATION);
+                string modelName = _meta?.identity?.name ?? _modelId ?? "Unknown Model";
+                EditorUtility.DisplayProgressBar("Deleting Model", $"Deleting {modelName} and all versions...", ProgressBarConstants.MID_OPERATION);
 
                 // Yield to allow UI to update before starting the deletion
 
@@ -182,15 +207,16 @@ namespace ModelLibrary.Editor.Windows
                 if (!deleted)
                 {
                     // Schedule error dialog on main thread to avoid blocking
+                    // Reuse modelName variable from above
                     EditorApplication.delayCall += () =>
                     {
-                        ErrorHandler.ShowError("Deletion Failed", $"The repository returned an error while deleting model '{_meta.identity.name}'.");
+                        ErrorHandler.ShowError("Deletion Failed", $"The repository returned an error while deleting model '{modelName}'.");
                     };
                     return;
                 }
 
                 // Store values for use in delayCall (capture before closing window)
-                string deletedModelName = _meta.identity.name;
+                string deletedModelName = _meta?.identity?.name ?? _modelId ?? "Unknown Model";
 
                 // Schedule all UI operations on the main thread to avoid blocking
                 EditorApplication.delayCall += () =>
@@ -244,7 +270,9 @@ namespace ModelLibrary.Editor.Windows
             _deletingVersion = true;
             try
             {
-                EditorUtility.DisplayProgressBar("Deleting Version", $"Deleting {_meta.identity.name} v{_version}...", ProgressBarConstants.MID_OPERATION);
+                string modelName = _meta?.identity?.name ?? _modelId ?? "Unknown Model";
+                string version = _version ?? "Unknown";
+                EditorUtility.DisplayProgressBar("Deleting Version", $"Deleting {modelName} v{version}...", ProgressBarConstants.MID_OPERATION);
 
                 // Yield to allow UI to update before starting the deletion
 
@@ -264,14 +292,22 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
+                // Clear local cache for the deleted version
+                EditorUtility.DisplayProgressBar("Deleting Version", "Clearing local cache...", ProgressBarConstants.MID_OPERATION);
+                await _service.ClearCacheForModelAsync(_modelId, _version);
+
+                // Invalidate index cache to force refresh
+                await _service.RefreshIndexAsync();
+
                 // Refresh version list after deletion to get updated list
                 EditorUtility.DisplayProgressBar("Deleting Version", "Refreshing version list...", ProgressBarConstants.MID_OPERATION);
                 await LoadVersionListAsync();
                 EditorUtility.ClearProgressBar();
 
                 // Store values for use in delayCall (capture before closing window)
-                string deletedVersion = _version;
-                string modelName = _meta?.identity?.name ?? _modelId;
+                // Reuse modelName and version variables from above
+                string deletedVersion = version;
+                string modelNameForDelayCall = modelName;
                 string modelIdToOpen = _modelId;
                 
                 // Get next available version from refreshed list
@@ -288,8 +324,8 @@ namespace ModelLibrary.Editor.Windows
                     {
                         // Show success dialog on main thread
                         string message = hasOtherVersions
-                            ? $"Removed version {deletedVersion} of '{modelName}'."
-                            : $"Removed version {deletedVersion} of '{modelName}'. This was the last version.";
+                            ? $"Removed version {deletedVersion} of '{modelNameForDelayCall}'."
+                            : $"Removed version {deletedVersion} of '{modelNameForDelayCall}'. This was the last version.";
                         EditorUtility.DisplayDialog("Version Deleted", message, "OK");
 
                         // Refresh Model Library windows
