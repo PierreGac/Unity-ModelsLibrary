@@ -69,6 +69,8 @@ namespace ModelLibrary.Editor.Windows
         private bool _isLoading = false;
         /// <summary>List of temporary asset paths that need cleanup on window close.</summary>
         private List<string> _tempAssets = new List<string>();
+        /// <summary>Cache root path for the downloaded model version (for cleanup on errors).</summary>
+        private string _cacheRoot = null;
 
         /// <summary>
         /// Information about a mesh in the model.
@@ -104,6 +106,7 @@ namespace ModelLibrary.Editor.Windows
             window._meshes.Clear();
             window._selectedMeshIndex = __DEFAULT_SELECTED_MESH_INDEX;
             window._isLoading = true;
+            window._cacheRoot = null;
             window.Show();
             window.Repaint();
             _ = window.LoadModelAsync();
@@ -170,6 +173,21 @@ namespace ModelLibrary.Editor.Windows
             }
             _meshes.Clear();
 
+            CleanupTempAssets();
+
+            // Clear cache root reference
+            _cacheRoot = null;
+
+            // Refresh asset database to ensure cleanup is complete
+            AssetDatabase.Refresh();
+        }
+
+        /// <summary>
+        /// Cleans up temporary assets created during preview.
+        /// Called both during normal cleanup and on errors.
+        /// </summary>
+        private void CleanupTempAssets()
+        {
             // Clean up temporary assets and directories
             // Process in reverse order to delete files before directories
             for (int i = _tempAssets.Count - 1; i >= 0; i--)
@@ -200,9 +218,47 @@ namespace ModelLibrary.Editor.Windows
                 }
             }
             _tempAssets.Clear();
+        }
 
-            // Refresh asset database to ensure cleanup is complete
-            AssetDatabase.Refresh();
+        /// <summary>
+        /// Attempts to clean up the cache folder if it's in a locked or bad state.
+        /// This helps recover from access denied errors during preview.
+        /// </summary>
+        /// <param name="cacheRoot">The cache root path to clean up.</param>
+        private void TryCleanupCacheFolder(string cacheRoot)
+        {
+            if (string.IsNullOrEmpty(cacheRoot) || !Directory.Exists(cacheRoot))
+            {
+                return;
+            }
+
+            try
+            {
+                // Wait a bit for any file handles to be released
+                System.Threading.Thread.Sleep(500);
+
+                // Try to delete any temporary files that might be locked
+                string[] tempFiles = Directory.GetFiles(cacheRoot, "*", SearchOption.AllDirectories);
+                for (int i = 0; i < tempFiles.Length; i++)
+                {
+                    string file = tempFiles[i];
+                    try
+                    {
+                        // Try to remove read-only attributes
+                        File.SetAttributes(file, FileAttributes.Normal);
+                    }
+                    catch
+                    {
+                        // Ignore errors setting attributes
+                    }
+                }
+
+                Debug.Log($"[ModelPreview3DWindow] Attempted cleanup of cache folder: {cacheRoot}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ModelPreview3DWindow] Failed to cleanup cache folder {cacheRoot}: {ex.Message}. Manual deletion may be required.");
+            }
         }
 
         /// <summary>
@@ -255,6 +311,7 @@ namespace ModelLibrary.Editor.Windows
         private async Task LoadMeshesAsync()
         {
             _meshes.Clear();
+            _cacheRoot = null;
 
             if (_meta == null || _meta.assetGuids == null)
             {
@@ -265,6 +322,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 // Download the model version to cache
                 (string cacheRoot, ModelMeta meta) = await _service.DownloadModelVersionAsync(_modelId, _version);
+                _cacheRoot = cacheRoot; // Track cache root for cleanup
 
                 // Find FBX/OBJ files in the cache
                 string[] meshFiles = Directory.GetFiles(cacheRoot, "*.fbx", SearchOption.AllDirectories)
@@ -355,7 +413,7 @@ namespace ModelLibrary.Editor.Windows
                             string texName = Path.GetFileNameWithoutExtension(textureFile);
                             loadedTextures[texName] = loadedTex;
                             textureNameToPath[texName] = tempTexturePath;
-                            Debug.Log($"Loaded texture file: {texName} from {tempTexturePath}");
+                            //Debug.Log($"Loaded texture file: {texName} from {tempTexturePath}");
                         }
                     }
                 }
@@ -630,10 +688,10 @@ namespace ModelLibrary.Editor.Windows
                                         {
                                             string propName = materialToUseForPreview.shader.GetPropertyName(j);
                                             Texture tex = materialToUseForPreview.GetTexture(propName);
-                                            if (tex == null)
+                                            /*if (tex == null)
                                             {
                                                 Debug.LogWarning($"Material '{materialToUseForPreview.name}' texture property '{propName}' is null. Material asset path: {AssetDatabase.GetAssetPath(materialToUseForPreview)}");
-                                            }
+                                            }*/
                                         }
                                     }
                                 }
@@ -661,9 +719,61 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                string errorMessage = $"Access denied while loading meshes for 3D preview. This may occur if:\n" +
+                    "• Files are locked by another process\n" +
+                    "• Unity is still importing assets\n" +
+                    "• Cache folder is in use\n\n" +
+                    "The cache folder may need to be manually deleted:\n" +
+                    (_cacheRoot != null ? _cacheRoot : "Cache path unknown");
+                
+                ErrorHandler.ShowError("Access Denied - 3D Preview", errorMessage, ex);
+                ErrorLogger.LogError("Load Meshes Failed", $"Access denied: {ex.Message}", ErrorHandler.ErrorCategory.FileSystem, ex, $"ModelId: {_modelId}, Version: {_version}, CacheRoot: {_cacheRoot}");
+                
+                // Attempt to clean up cache if it's in a bad state
+                if (_cacheRoot != null)
+                {
+                    TryCleanupCacheFolder(_cacheRoot);
+                }
+            }
+            catch (IOException ex) when (ex.Message.IndexOf("access denied", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                         ex.Message.IndexOf("being used by another process", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                string errorMessage = $"File access error while loading meshes for 3D preview. This may occur if:\n" +
+                    "• Files are locked by another process\n" +
+                    "• Unity is still importing assets\n" +
+                    "• Cache folder is in use\n\n" +
+                    "The cache folder may need to be manually deleted:\n" +
+                    (_cacheRoot != null ? _cacheRoot : "Cache path unknown");
+                
+                ErrorHandler.ShowError("File Access Error - 3D Preview", errorMessage, ex);
+                ErrorLogger.LogError("Load Meshes Failed", $"File access error: {ex.Message}", ErrorHandler.ErrorCategory.FileSystem, ex, $"ModelId: {_modelId}, Version: {_version}, CacheRoot: {_cacheRoot}");
+                
+                // Attempt to clean up cache if it's in a bad state
+                if (_cacheRoot != null)
+                {
+                    TryCleanupCacheFolder(_cacheRoot);
+                }
+            }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Load Meshes Failed", $"Failed to load meshes: {ex.Message}", ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}, Version: {_version}");
+                ErrorLogger.LogError("Load Meshes Failed", $"Failed to load meshes: {ex.Message}", ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}, Version: {_version}, CacheRoot: {_cacheRoot}");
+                
+                // Attempt to clean up cache on any error to prevent locked state
+                if (_cacheRoot != null)
+                {
+                    TryCleanupCacheFolder(_cacheRoot);
+                }
+            }
+            finally
+            {
+                // Always ensure temp assets are cleaned up, even on error
+                // This prevents leaving orphaned assets in the project
+                if (_tempAssets.Count > 0)
+                {
+                    CleanupTempAssets();
+                }
             }
         }
 
