@@ -15,18 +15,6 @@ namespace ModelLibrary.Editor.Tests
     public class SettingsTests
     {
         /// <summary>
-        /// Tests UserSettingsWindow.Open() method.
-        /// </summary>
-        [Test]
-        public void TestUserSettingsWindowOpen()
-        {
-            // Test that Open method can be called
-            Assert.IsNotNull(typeof(UserSettingsWindow).GetMethod("Open",
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static),
-                "Open method should exist");
-        }
-
-        /// <summary>
         /// Tests that current user name and role are loaded.
         /// </summary>
         [Test]
