@@ -8,6 +8,13 @@ namespace ModelLibrary.Editor.Windows
 {
     public class PerformanceProfilerWindow : EditorWindow
     {
+        private const float __COLUMN_OPERATION_WIDTH = 220f;
+        private const float __COLUMN_COUNT_WIDTH = 50f;
+        private const float __COLUMN_VALUE_WIDTH = 70f;
+        private const float __LABEL_WARN_WIDTH = 50f;
+        private const float __FIELD_THRESHOLD_WIDTH = 60f;
+        private const float __LABEL_UNIT_WIDTH = 20f;
+        private const float __BUTTON_CLEAR_WIDTH = 60f;
         private Vector2 _scroll;
         private double _lastRefresh;
         private const double REFRESH_INTERVAL = 1.0;
@@ -51,9 +58,10 @@ namespace ModelLibrary.Editor.Windows
 
         private void OnGUI()
         {
-            GUILayout.Space(6f);
+            GUILayout.Space(UIConstants.SPACING_SMALL);
+            UIStyles.DrawPageHeader("Performance Profiler", "Track async operation timings and warnings.");
             DrawToolbar();
-            GUILayout.Space(6f);
+            GUILayout.Space(UIConstants.SPACING_SMALL);
 
             if (!AsyncProfiler.Enabled)
             {
@@ -68,7 +76,7 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            using (new EditorGUILayout.VerticalScope("box"))
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
                 DrawHeaderRow();
                 _scroll = EditorGUILayout.BeginScrollView(_scroll);
@@ -85,29 +93,29 @@ namespace ModelLibrary.Editor.Windows
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
                 bool enabled = AsyncProfiler.Enabled;
-                bool newEnabled = GUILayout.Toggle(enabled, new GUIContent("Profiling", "Toggle async profiling for repository/service operations."), EditorStyles.toolbarButton);
+                bool newEnabled = GUILayout.Toggle(enabled, new GUIContent("Profiling", "Toggle async profiling for repository/service operations."), UIStyles.ToolbarButton);
                 if (newEnabled != enabled)
                 {
                     AsyncProfiler.Enabled = newEnabled;
                 }
 
-                GUILayout.Space(8f);
+                GUILayout.Space(UIConstants.SPACING_STANDARD);
 
                 double threshold = AsyncProfiler.WarningThresholdMs;
-                GUILayout.Label(new GUIContent("Warn ≥", "Log a warning when an operation exceeds this duration (ms)."), EditorStyles.miniLabel, GUILayout.Width(50f));
-                double newThreshold = EditorGUILayout.DoubleField(threshold, GUILayout.Width(60f));
+                GUILayout.Label(new GUIContent("Warn ≥", "Log a warning when an operation exceeds this duration (ms)."), UIStyles.MutedLabel, GUILayout.Width(__LABEL_WARN_WIDTH));
+                double newThreshold = EditorGUILayout.DoubleField(threshold, GUILayout.Width(__FIELD_THRESHOLD_WIDTH));
                 if (Math.Abs(newThreshold - threshold) > double.Epsilon)
                 {
                     AsyncProfiler.WarningThresholdMs = Math.Max(1d, newThreshold);
                 }
 
-                GUILayout.Label("ms", EditorStyles.miniLabel, GUILayout.Width(20f));
+                GUILayout.Label("ms", UIStyles.MutedLabel, GUILayout.Width(__LABEL_UNIT_WIDTH));
 
                 GUILayout.FlexibleSpace();
 
                 using (new EditorGUI.DisabledScope(!AsyncProfiler.Enabled))
                 {
-                    if (GUILayout.Button(new GUIContent("Clear", "Clear all recorded samples."), EditorStyles.toolbarButton, GUILayout.Width(60f)))
+                    if (GUILayout.Button(new GUIContent("Clear", "Clear all recorded samples."), UIStyles.ToolbarButton, GUILayout.Width(__BUTTON_CLEAR_WIDTH)))
                     {
                         AsyncProfiler.Clear();
                     }
@@ -119,12 +127,12 @@ namespace ModelLibrary.Editor.Windows
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                GUILayout.Label("Operation", EditorStyles.boldLabel, GUILayout.Width(220f));
-                GUILayout.Label("Count", EditorStyles.boldLabel, GUILayout.Width(50f));
-                GUILayout.Label("Last (ms)", EditorStyles.boldLabel, GUILayout.Width(70f));
-                GUILayout.Label("Avg (ms)", EditorStyles.boldLabel, GUILayout.Width(70f));
-                GUILayout.Label("Max (ms)", EditorStyles.boldLabel, GUILayout.Width(70f));
-                GUILayout.Label("Min (ms)", EditorStyles.boldLabel, GUILayout.Width(70f));
+                GUILayout.Label("Operation", UIStyles.SectionHeader, GUILayout.Width(__COLUMN_OPERATION_WIDTH));
+                GUILayout.Label("Count", UIStyles.SectionHeader, GUILayout.Width(__COLUMN_COUNT_WIDTH));
+                GUILayout.Label("Last (ms)", UIStyles.SectionHeader, GUILayout.Width(__COLUMN_VALUE_WIDTH));
+                GUILayout.Label("Avg (ms)", UIStyles.SectionHeader, GUILayout.Width(__COLUMN_VALUE_WIDTH));
+                GUILayout.Label("Max (ms)", UIStyles.SectionHeader, GUILayout.Width(__COLUMN_VALUE_WIDTH));
+                GUILayout.Label("Min (ms)", UIStyles.SectionHeader, GUILayout.Width(__COLUMN_VALUE_WIDTH));
                 GUILayout.FlexibleSpace();
             }
         }
@@ -133,12 +141,12 @@ namespace ModelLibrary.Editor.Windows
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                GUILayout.Label(sample.OperationName, GUILayout.Width(220f));
-                GUILayout.Label(sample.Count.ToString(), GUILayout.Width(50f));
-                GUILayout.Label(sample.LastDurationMs.ToString("F1"), GUILayout.Width(70f));
-                GUILayout.Label(sample.AverageDurationMs.ToString("F1"), GUILayout.Width(70f));
-                GUILayout.Label(sample.LongestDurationMs.ToString("F1"), GUILayout.Width(70f));
-                GUILayout.Label(sample.ShortestDurationMs.ToString("F1"), GUILayout.Width(70f));
+                GUILayout.Label(sample.OperationName, GUILayout.Width(__COLUMN_OPERATION_WIDTH));
+                GUILayout.Label(sample.Count.ToString(), GUILayout.Width(__COLUMN_COUNT_WIDTH));
+                GUILayout.Label(sample.LastDurationMs.ToString("F1"), GUILayout.Width(__COLUMN_VALUE_WIDTH));
+                GUILayout.Label(sample.AverageDurationMs.ToString("F1"), GUILayout.Width(__COLUMN_VALUE_WIDTH));
+                GUILayout.Label(sample.LongestDurationMs.ToString("F1"), GUILayout.Width(__COLUMN_VALUE_WIDTH));
+                GUILayout.Label(sample.ShortestDurationMs.ToString("F1"), GUILayout.Width(__COLUMN_VALUE_WIDTH));
                 GUILayout.FlexibleSpace();
             }
         }

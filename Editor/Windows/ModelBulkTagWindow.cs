@@ -16,6 +16,10 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public class ModelBulkTagWindow : EditorWindow
     {
+        private const float __LIST_SCROLL_HEIGHT = 100f;
+        private const float __BUTTON_APPLY_WIDTH = 120f;
+        private const float __BUTTON_CANCEL_WIDTH = 100f;
+
         private readonly List<ModelIndex.Entry> _entries = new List<ModelIndex.Entry>();
         private ModelLibraryService _service;
         private Action _onCompleted;
@@ -49,29 +53,32 @@ namespace ModelLibrary.Editor.Windows
 
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("Bulk Tag Operations", EditorStyles.boldLabel);
+            UIStyles.DrawPageHeader("Bulk Tag Operations", "Apply tag changes across selected models.");
             EditorGUILayout.HelpBox("Add or remove tags on the latest version of each selected model. A new metadata-only version will be published for each model that changes.", MessageType.Info);
 
-            GUILayout.Space(4f);
-            EditorGUILayout.LabelField($"Selected models: {_entries.Count}", EditorStyles.miniBoldLabel);
+            GUILayout.Space(UIConstants.SPACING_SMALL);
+            EditorGUILayout.LabelField($"Selected models: {_entries.Count}", UIStyles.MutedLabel);
 
-            _listScroll = EditorGUILayout.BeginScrollView(_listScroll, GUILayout.Height(100f));
-            for (int i = 0; i < _entries.Count; i++)
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                EditorGUILayout.LabelField("• " + _entries[i].name + " (latest v" + _entries[i].latestVersion + ")", EditorStyles.wordWrappedMiniLabel);
+                _listScroll = EditorGUILayout.BeginScrollView(_listScroll, GUILayout.Height(__LIST_SCROLL_HEIGHT));
+                for (int i = 0; i < _entries.Count; i++)
+                {
+                    EditorGUILayout.LabelField("• " + _entries[i].name + " (latest v" + _entries[i].latestVersion + ")", UIStyles.MutedLabel);
+                }
+                EditorGUILayout.EndScrollView();
             }
-            EditorGUILayout.EndScrollView();
 
-            GUILayout.Space(6f);
-            EditorGUILayout.LabelField("Tags to Add", EditorStyles.miniBoldLabel);
+            GUILayout.Space(UIConstants.SPACING_STANDARD);
+            UIStyles.DrawSectionHeader("Tags to Add");
             _tagsToAdd = EditorGUILayout.TextField(_tagsToAdd);
             EditorGUILayout.HelpBox("Separate multiple tags with commas. Tags are case-insensitive.", MessageType.None);
 
-            GUILayout.Space(4f);
-            EditorGUILayout.LabelField("Tags to Remove", EditorStyles.miniBoldLabel);
+            GUILayout.Space(UIConstants.SPACING_SMALL);
+            UIStyles.DrawSectionHeader("Tags to Remove");
             _tagsToRemove = EditorGUILayout.TextField(_tagsToRemove);
 
-            GUILayout.Space(6f);
+            GUILayout.Space(UIConstants.SPACING_STANDARD);
             _overwriteExistingCase = EditorGUILayout.ToggleLeft("Normalize casing of all tags (Title Case)", _overwriteExistingCase);
 
             GUILayout.FlexibleSpace();
@@ -81,19 +88,19 @@ namespace ModelLibrary.Editor.Windows
                 GUILayout.FlexibleSpace();
                 using (new EditorGUI.DisabledScope(_isProcessing))
                 {
-                    if (GUILayout.Button("Apply", GUILayout.Width(120f), GUILayout.Height(26f)))
+                    if (UIStyles.DrawPrimaryButton("Apply", GUILayout.Width(__BUTTON_APPLY_WIDTH), GUILayout.Height(UIConstants.BUTTON_HEIGHT_STANDARD)))
                     {
                         ApplyBulkTags();
                     }
-                    GUILayout.Space(6f);
-                    if (GUILayout.Button("Cancel", GUILayout.Width(100f), GUILayout.Height(26f)))
+                    GUILayout.Space(UIConstants.SPACING_STANDARD);
+                    if (UIStyles.DrawSecondaryButton("Cancel", GUILayout.Width(__BUTTON_CANCEL_WIDTH), GUILayout.Height(UIConstants.BUTTON_HEIGHT_STANDARD)))
                     {
                         Close();
                     }
                 }
             }
 
-            GUILayout.Space(4f);
+            GUILayout.Space(UIConstants.SPACING_SMALL);
         }
 
         private void ApplyBulkTags()

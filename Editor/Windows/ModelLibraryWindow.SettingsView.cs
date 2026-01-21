@@ -4,6 +4,7 @@ using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Repository;
 using ModelLibrary.Editor.Settings;
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -42,13 +43,14 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawSettingsView()
         {
+            UIStyles.DrawPageHeader("Settings", "Adjust user and repository preferences.");
             // Repaint during connection test to show animated loading indicator
             if (_settingsTestingConnection)
             {
                 Repaint();
             }
 
-            EditorGUILayout.Space(5);
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
 
             // Tab selection
             string[] tabLabels = { "User Settings", "Repository Settings" };
@@ -79,14 +81,16 @@ namespace ModelLibrary.Editor.Windows
             {
                 GUILayout.FlexibleSpace();
 
-                if (GUILayout.Button("Cancel", GUILayout.Width(100), GUILayout.Height(25)))
+                if (UIStyles.DrawSecondaryButton("Cancel", GUILayout.Width(100), GUILayout.Height(25)))
                 {
                     InitializeSettingsState(); // Reload to discard changes
                 }
 
+                GUILayout.Space(UIConstants.SPACING_SMALL);
+
                 using (new EditorGUI.DisabledScope(!_settingsHasUnsavedChanges))
                 {
-                    if (GUILayout.Button("Save", GUILayout.Width(100), GUILayout.Height(25)))
+                    if (UIStyles.DrawPrimaryButton("Save", GUILayout.Width(100), GUILayout.Height(25)))
                     {
                         SaveSettings();
                     }

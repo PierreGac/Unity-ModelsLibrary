@@ -1,3 +1,4 @@
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -46,9 +47,10 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawHelpView()
         {
-            GUILayout.Space(6f);
+            UIStyles.DrawPageHeader("Help Center", "Guides, tips, and troubleshooting.");
+            GUILayout.Space(UIConstants.SPACING_SMALL);
             DrawHelpSectionToolbar();
-            GUILayout.Space(8f);
+            GUILayout.Space(UIConstants.SPACING_STANDARD);
 
             _helpScrollPosition = EditorGUILayout.BeginScrollView(_helpScrollPosition);
 
@@ -93,19 +95,13 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawHelpSectionHeader(string title)
         {
-            GUIStyle headerStyle = new GUIStyle(EditorStyles.boldLabel)
-            {
-                fontSize = 16,
-                wordWrap = true
-            };
-            EditorGUILayout.LabelField(title, headerStyle);
-            GUILayout.Space(6f);
+            UIStyles.DrawSectionHeader(title);
         }
 
         private void DrawHelpParagraph(string text)
         {
             EditorGUILayout.LabelField(text, EditorStyles.wordWrappedLabel);
-            GUILayout.Space(4f);
+            GUILayout.Space(UIConstants.SPACING_SMALL);
         }
 
         private void DrawHelpBulletedList(string[] items)
@@ -114,7 +110,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 EditorGUILayout.LabelField("• " + items[i], EditorStyles.wordWrappedLabel);
             }
-            GUILayout.Space(6f);
+            GUILayout.Space(UIConstants.SPACING_STANDARD);
         }
 
         private void DrawHelpOverviewSection()

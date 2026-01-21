@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -85,9 +86,10 @@ namespace ModelLibrary.Editor.Windows
 
         private void OnGUI()
         {
-            GUILayout.Space(6f);
+            UIStyles.DrawPageHeader("Help Center", "Guides, tips, and troubleshooting.");
+            GUILayout.Space(UIConstants.SPACING_SMALL);
             DrawSectionToolbar();
-            GUILayout.Space(8f);
+            GUILayout.Space(UIConstants.SPACING_STANDARD);
 
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
 
@@ -132,19 +134,13 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawSectionHeader(string title)
         {
-            GUIStyle headerStyle = new GUIStyle(EditorStyles.boldLabel)
-            {
-                fontSize = 16,
-                wordWrap = true
-            };
-            EditorGUILayout.LabelField(title, headerStyle);
-            GUILayout.Space(6f);
+            UIStyles.DrawSectionHeader(title);
         }
 
         private void DrawParagraph(string text)
         {
             EditorGUILayout.LabelField(text, EditorStyles.wordWrappedLabel);
-            GUILayout.Space(4f);
+            GUILayout.Space(UIConstants.SPACING_SMALL);
         }
 
         private void DrawBulletedList(string[] items)
@@ -153,7 +149,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 EditorGUILayout.LabelField("• " + items[i], EditorStyles.wordWrappedLabel);
             }
-            GUILayout.Space(6f);
+            GUILayout.Space(UIConstants.SPACING_STANDARD);
         }
 
         private void DrawOverviewSection()

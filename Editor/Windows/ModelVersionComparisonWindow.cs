@@ -18,6 +18,12 @@ namespace ModelLibrary.Editor.Windows
     public class ModelVersionComparisonWindow : EditorWindow
     {
         private const float __ColumnWidth = 0.5f;
+        private const float __LABEL_BASE_WIDTH = 90f;
+        private const float __LABEL_COMPARE_WIDTH = 100f;
+        private const float __BUTTON_SWAP_WIDTH = 60f;
+        private const float __SUMMARY_SCROLL_HEIGHT = 100f;
+        private const float __DETAILS_SPACING = 12f;
+        private const float __FIELD_LABEL_WIDTH = 100f;
 
         private string _modelId;
         private string _initialRightVersion;
@@ -196,39 +202,40 @@ namespace ModelLibrary.Editor.Windows
                 Init();
             }
 
+            UIStyles.DrawPageHeader("Version Comparison", "Compare metadata across two versions.");
             DrawVersionSelectors();
 
             if (_isLoading)
             {
-                GUILayout.Space(10f);
-                EditorGUILayout.LabelField("Loading version data...", EditorStyles.miniLabel);
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
+                EditorGUILayout.LabelField("Loading version data...", UIStyles.MutedLabel);
                 return;
             }
 
             if (!string.IsNullOrEmpty(_errorMessage))
             {
-                GUILayout.Space(10f);
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
                 EditorGUILayout.HelpBox(_errorMessage, MessageType.Warning);
             }
 
             if (_leftMeta == null || _rightMeta == null)
             {
-                GUILayout.Space(10f);
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
                 EditorGUILayout.HelpBox("Select two versions to compare.", MessageType.Info);
                 return;
             }
 
-            GUILayout.Space(6f);
+            GUILayout.Space(UIConstants.SPACING_SMALL);
             DrawDiffSummary();
-            GUILayout.Space(8f);
+            GUILayout.Space(UIConstants.SPACING_STANDARD);
             DrawComparisonColumns();
         }
 
         private void DrawVersionSelectors()
         {
-            using (new EditorGUILayout.HorizontalScope())
+            using (new EditorGUILayout.HorizontalScope(UIStyles.CardBox))
             {
-                EditorGUILayout.LabelField("Base Version", GUILayout.Width(90f));
+                EditorGUILayout.LabelField("Base Version", UIStyles.MutedLabel, GUILayout.Width(__LABEL_BASE_WIDTH));
                 int leftIndex = Math.Max(0, _availableVersions.IndexOf(_leftVersion));
                 int newLeftIndex = EditorGUILayout.Popup(leftIndex, _availableVersions.ToArray());
 
@@ -238,8 +245,8 @@ namespace ModelLibrary.Editor.Windows
                     _ = LoadSelectedVersionsAsync();
                 }
 
-                GUILayout.Space(12f);
-                EditorGUILayout.LabelField("Compare With", GUILayout.Width(100f));
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
+                EditorGUILayout.LabelField("Compare With", UIStyles.MutedLabel, GUILayout.Width(__LABEL_COMPARE_WIDTH));
                 int rightIndex = Math.Max(0, _availableVersions.IndexOf(_rightVersion));
                 int newRightIndex = EditorGUILayout.Popup(rightIndex, _availableVersions.ToArray());
 
@@ -249,10 +256,10 @@ namespace ModelLibrary.Editor.Windows
                     _ = LoadSelectedVersionsAsync();
                 }
 
-                GUILayout.Space(6f);
+                GUILayout.Space(UIConstants.SPACING_SMALL);
                 using (new EditorGUI.DisabledScope(_leftVersion == null || _rightVersion == null || string.Equals(_leftVersion, _rightVersion, StringComparison.OrdinalIgnoreCase)))
                 {
-                    if (GUILayout.Button("Swap", GUILayout.Width(60f)))
+                    if (GUILayout.Button("Swap", GUILayout.Width(__BUTTON_SWAP_WIDTH)))
                     {
                         string temp = _leftVersion;
                         _leftVersion = _rightVersion;
@@ -265,30 +272,33 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawDiffSummary()
         {
-            EditorGUILayout.LabelField("Differences", EditorStyles.boldLabel);
-            if (_diffSummary.Count == 0)
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                EditorGUILayout.HelpBox("No metadata differences detected between the selected versions.", MessageType.Info);
-                return;
-            }
+                UIStyles.DrawSectionHeader("Differences");
+                if (_diffSummary.Count == 0)
+                {
+                    EditorGUILayout.HelpBox("No metadata differences detected between the selected versions.", MessageType.Info);
+                    return;
+                }
 
-            _summaryScroll = EditorGUILayout.BeginScrollView(_summaryScroll, GUILayout.Height(100f));
-            for (int i = 0; i < _diffSummary.Count; i++)
-            {
-                EditorGUILayout.LabelField("• " + _diffSummary[i], EditorStyles.wordWrappedLabel);
+                _summaryScroll = EditorGUILayout.BeginScrollView(_summaryScroll, GUILayout.Height(__SUMMARY_SCROLL_HEIGHT));
+                for (int i = 0; i < _diffSummary.Count; i++)
+                {
+                    EditorGUILayout.LabelField("• " + _diffSummary[i], EditorStyles.wordWrappedLabel);
+                }
+                EditorGUILayout.EndScrollView();
             }
-            EditorGUILayout.EndScrollView();
         }
 
         private void DrawComparisonColumns()
         {
-            EditorGUILayout.LabelField("Detailed Comparison", EditorStyles.boldLabel);
-            GUILayout.Space(4f);
+            UIStyles.DrawSectionHeader("Detailed Comparison");
+            GUILayout.Space(UIConstants.SPACING_SMALL);
 
             _detailsScroll = EditorGUILayout.BeginScrollView(_detailsScroll);
             EditorGUILayout.BeginHorizontal();
             DrawMetadataColumn("Base", _leftVersion, _leftMeta, false);
-            GUILayout.Space(12f);
+            GUILayout.Space(__DETAILS_SPACING);
             DrawMetadataColumn("Compare", _rightVersion, _rightMeta, true);
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndScrollView();
@@ -296,10 +306,10 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawMetadataColumn(string title, string version, ModelMeta meta, bool highlightChanges)
         {
-            using (new EditorGUILayout.VerticalScope("box", GUILayout.ExpandWidth(true)))
+            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox, GUILayout.ExpandWidth(true)))
             {
-                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
-                EditorGUILayout.LabelField($"Version {version}", EditorStyles.miniBoldLabel);
+                EditorGUILayout.LabelField(title, UIStyles.SectionHeader);
+                EditorGUILayout.LabelField($"Version {version}", UIStyles.MutedLabel);
 
                 DrawField("Author", string.IsNullOrEmpty(meta.author) ? "(unknown)" : meta.author, highlightChanges && !string.Equals(meta.author, _leftMeta?.author, StringComparison.Ordinal));
 
@@ -312,17 +322,17 @@ namespace ModelLibrary.Editor.Windows
                 DrawMultilineField("Description", string.IsNullOrEmpty(meta.description) ? "(none)" : meta.description,
                     highlightChanges && _comparison.DescriptionChanged);
 
-                GUILayout.Space(6f);
+                GUILayout.Space(UIConstants.SPACING_STANDARD);
                 DrawTagSection(meta, highlightChanges);
-                GUILayout.Space(6f);
+                GUILayout.Space(UIConstants.SPACING_STANDARD);
                 DrawPayloadSection(meta, highlightChanges);
-                GUILayout.Space(6f);
+                GUILayout.Space(UIConstants.SPACING_STANDARD);
                 DrawDependencySection(meta, highlightChanges);
-                GUILayout.Space(6f);
+                GUILayout.Space(UIConstants.SPACING_STANDARD);
                 DrawCountsSection(meta, highlightChanges);
-                GUILayout.Space(6f);
+                GUILayout.Space(UIConstants.SPACING_STANDARD);
                 DrawExtrasSection(meta, highlightChanges);
-                GUILayout.Space(6f);
+                GUILayout.Space(UIConstants.SPACING_STANDARD);
                 DrawChangelogSection(meta, highlightChanges);
             }
         }
@@ -331,7 +341,7 @@ namespace ModelLibrary.Editor.Windows
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                EditorGUILayout.LabelField(label + ":", GUILayout.Width(100f));
+                EditorGUILayout.LabelField(label + ":", GUILayout.Width(__FIELD_LABEL_WIDTH));
                 DrawValueLabel(value, highlight);
             }
         }

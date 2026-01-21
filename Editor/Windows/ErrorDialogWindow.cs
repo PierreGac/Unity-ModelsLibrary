@@ -12,6 +12,15 @@ namespace ModelLibrary.Editor.Windows
     public class ErrorDialogWindow : EditorWindow
     {
         private const string __SuppressionKeysPrefKey = "ModelLibrary.ErrorSuppressed.Keys";
+        private const float __WINDOW_MIN_WIDTH = 500f;
+        private const float __WINDOW_MIN_HEIGHT = 300f;
+        private const float __WINDOW_MAX_WIDTH = 600f;
+        private const float __WINDOW_MAX_HEIGHT = 500f;
+        private const float __MESSAGE_SCROLL_HEIGHT = 150f;
+        private const float __STACK_TRACE_HEIGHT = 100f;
+        private const float __BUTTON_WIDTH = 120f;
+        private const float __RETRY_BUTTON_PADDING_HORIZONTAL = 20f;
+        private const float __RETRY_BUTTON_PADDING_VERTICAL = 8f;
 
         private string _title;
         private string _message;
@@ -55,32 +64,27 @@ namespace ModelLibrary.Editor.Windows
             window._exception = exception;
             window._retryAction = retryAction;
             window.titleContent = new GUIContent(title);
-            window.minSize = new Vector2(500, 300);
-            window.maxSize = new Vector2(600, 500);
+            window.minSize = new Vector2(__WINDOW_MIN_WIDTH, __WINDOW_MIN_HEIGHT);
+            window.maxSize = new Vector2(__WINDOW_MAX_WIDTH, __WINDOW_MAX_HEIGHT);
             window.ShowUtility(); // Show as utility window (modal-like behavior)
             window.Focus();
         }
 
         private void OnGUI()
         {
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Title
-            GUIStyle titleStyle = new GUIStyle(EditorStyles.boldLabel);
-            titleStyle.fontSize = 16;
-            titleStyle.wordWrap = true;
-            EditorGUILayout.LabelField(_title, titleStyle);
+            EditorGUILayout.LabelField(_title, UIStyles.TitleLabel);
             
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Message (scrollable)
-            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition, GUILayout.Height(150));
-            GUIStyle messageStyle = new GUIStyle(EditorStyles.wordWrappedLabel);
-            messageStyle.fontSize = 12;
-            EditorGUILayout.LabelField(_message, messageStyle);
+            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition, GUILayout.Height(__MESSAGE_SCROLL_HEIGHT));
+            EditorGUILayout.LabelField(_message, EditorStyles.wordWrappedLabel);
             EditorGUILayout.EndScrollView();
 
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Category badge
             using (new EditorGUILayout.HorizontalScope())
@@ -94,7 +98,7 @@ namespace ModelLibrary.Editor.Windows
                 GUILayout.FlexibleSpace();
             }
 
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Details section (collapsible)
             if (_exception != null)
@@ -110,40 +114,30 @@ namespace ModelLibrary.Editor.Windows
                     }
                     if (!string.IsNullOrEmpty(_exception.StackTrace))
                     {
-                        EditorGUILayout.Space(5);
-                        EditorGUILayout.LabelField("Stack Trace:", EditorStyles.miniLabel);
-                        EditorGUILayout.TextArea(_exception.StackTrace, EditorStyles.wordWrappedMiniLabel, GUILayout.Height(100));
+                        EditorGUILayout.Space(UIConstants.SPACING_SMALL);
+                        EditorGUILayout.LabelField("Stack Trace:", UIStyles.MutedLabel);
+                        EditorGUILayout.TextArea(_exception.StackTrace, EditorStyles.wordWrappedMiniLabel, GUILayout.Height(__STACK_TRACE_HEIGHT));
                     }
                     EditorGUI.indentLevel--;
                 }
             }
 
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
-            EditorGUILayout.Space(5);
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
 
             // Don't show again checkbox
             _dontShowAgain = EditorGUILayout.ToggleLeft("Don't show this error again", _dontShowAgain);
 
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Buttons
             using (new EditorGUILayout.HorizontalScope())
             {
                 GUILayout.FlexibleSpace();
 
-                // Retry button (prominent)
-                GUIStyle retryStyle = new GUIStyle(GUI.skin.button);
-                retryStyle.fontSize = 13;
-                retryStyle.fontStyle = FontStyle.Bold;
-                retryStyle.padding = new RectOffset(20, 20, 8, 8);
-                
-                Color originalBgColor = GUI.backgroundColor;
-                GUI.backgroundColor = new Color(0.2f, 0.6f, 1f); // Blue
-                Color originalTextColor = GUI.color;
-                GUI.color = Color.white;
-
-                if (GUILayout.Button("Retry", retryStyle, GUILayout.Width(120), GUILayout.Height(35)))
+                // Retry button (prominent, using primary style)
+                if (UIStyles.DrawPrimaryButton("Retry", GUILayout.Width(__BUTTON_WIDTH), GUILayout.Height(UIConstants.BUTTON_HEIGHT_EXTRA_LARGE)))
                 {
                     HandleSuppression();
                     if (_retryAction != null)
@@ -161,20 +155,17 @@ namespace ModelLibrary.Editor.Windows
                     Close();
                 }
 
-                GUI.backgroundColor = originalBgColor;
-                GUI.color = originalTextColor;
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
 
-                GUILayout.Space(10);
-
-                // OK button
-                if (GUILayout.Button("OK", GUILayout.Width(120), GUILayout.Height(35)))
+                // OK button (using secondary style)
+                if (UIStyles.DrawSecondaryButton("OK", GUILayout.Width(__BUTTON_WIDTH), GUILayout.Height(UIConstants.BUTTON_HEIGHT_EXTRA_LARGE)))
                 {
                     HandleSuppression();
                     Close();
                 }
             }
 
-            EditorGUILayout.Space(5);
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
         }
 
         private void OnDestroy() => _isShowing = false;

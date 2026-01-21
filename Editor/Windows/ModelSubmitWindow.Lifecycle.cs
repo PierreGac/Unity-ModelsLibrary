@@ -4,6 +4,7 @@ using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Repository;
 using ModelLibrary.Editor.Services;
 using ModelLibrary.Editor.Settings;
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -192,7 +193,7 @@ namespace ModelLibrary.Editor.Windows
                 else
                 {
                     string buttonText = hasValidationErrors ? "Submit (Fix Issues First)" : "Submit";
-                    if (GUILayout.Button(buttonText, GUILayout.Height(30)))
+                    if (UIStyles.DrawPrimaryButton(buttonText, GUILayout.Height(30)))
                     {
                         // Clear draft on successful submission
                         ClearDraft();

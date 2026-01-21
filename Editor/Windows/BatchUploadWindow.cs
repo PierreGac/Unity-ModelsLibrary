@@ -20,6 +20,13 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public class BatchUploadWindow : EditorWindow
     {
+        private const float __SOURCE_LABEL_WIDTH = 120f;
+        private const float __BUTTON_BROWSE_WIDTH = 80f;
+        private const float __BUTTON_SELECT_WIDTH = 100f;
+        private const float __UPLOAD_BUTTON_HEIGHT = 35f;
+        private const float __UPLOAD_ITEM_TEXT_HEIGHT = 40f;
+        private const float __UPLOAD_ITEMS_SCROLL_HEIGHT = 100f;
+
         /// <summary>
         /// Word-wrapped text area style for automatic line wrapping.
         /// </summary>
@@ -84,21 +91,20 @@ namespace ModelLibrary.Editor.Windows
 
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("Batch Upload Models", EditorStyles.boldLabel);
-            EditorGUILayout.Space();
+            UIStyles.DrawPageHeader("Batch Upload Models", "Scan a folder and upload multiple models at once.");
 
             EditorGUILayout.HelpBox(
                 "Select a directory containing model folders. Each subdirectory with FBX/OBJ files will be treated as a separate model.",
                 MessageType.Info);
 
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Source directory selection
-            using (new EditorGUILayout.HorizontalScope())
+            using (EditorGUILayout.HorizontalScope scope = new EditorGUILayout.HorizontalScope(UIStyles.CardBox))
             {
-                EditorGUILayout.LabelField("Source Directory:", GUILayout.Width(120));
+                EditorGUILayout.LabelField("Source Directory:", UIStyles.MutedLabel, GUILayout.Width(__SOURCE_LABEL_WIDTH));
                 EditorGUILayout.TextField(_sourceDirectory);
-                if (GUILayout.Button("Browse...", GUILayout.Width(80)))
+                if (GUILayout.Button("Browse...", GUILayout.Width(__BUTTON_BROWSE_WIDTH)))
                 {
                     string selected = EditorUtility.OpenFolderPanel("Select Directory with Models", _sourceDirectory, "");
                     if (!string.IsNullOrEmpty(selected))
@@ -109,56 +115,59 @@ namespace ModelLibrary.Editor.Windows
                 }
             }
 
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Scan button
-            if (GUILayout.Button("Scan Directory", GUILayout.Height(30)))
+            if (GUILayout.Button("Scan Directory", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
             {
                 ScanDirectory();
             }
 
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Upload items list
             if (_uploadItems.Count > 0)
             {
-                EditorGUILayout.LabelField($"Found {_uploadItems.Count} model(s):", EditorStyles.boldLabel);
-                _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+                UIStyles.DrawSectionHeader($"Found {_uploadItems.Count} model(s)");
+                _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition, GUILayout.Height(__UPLOAD_ITEMS_SCROLL_HEIGHT));
 
-                foreach (BatchUploadService.BatchUploadItem item in _uploadItems)
+                for (int i = 0; i < _uploadItems.Count; i++)
                 {
+                    BatchUploadService.BatchUploadItem item = _uploadItems[i];
                     DrawUploadItem(item);
                 }
 
                 EditorGUILayout.EndScrollView();
-                EditorGUILayout.Space();
+                EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
                 // Batch actions
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Select All", GUILayout.Width(100)))
+                    if (GUILayout.Button("Select All", GUILayout.Width(__BUTTON_SELECT_WIDTH)))
                     {
-                        foreach (BatchUploadService.BatchUploadItem item in _uploadItems)
+                        for (int i = 0; i < _uploadItems.Count; i++)
                         {
+                            BatchUploadService.BatchUploadItem item = _uploadItems[i];
                             item.selected = true;
                         }
                     }
-                    if (GUILayout.Button("Deselect All", GUILayout.Width(100)))
+                    if (GUILayout.Button("Deselect All", GUILayout.Width(__BUTTON_SELECT_WIDTH)))
                     {
-                        foreach (BatchUploadService.BatchUploadItem item in _uploadItems)
+                        for (int i = 0; i < _uploadItems.Count; i++)
                         {
+                            BatchUploadService.BatchUploadItem item = _uploadItems[i];
                             item.selected = false;
                         }
                     }
                 }
 
-                EditorGUILayout.Space();
+                EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
                 // Upload button
                 int selectedCount = _uploadItems.Count(i => i.selected);
                 using (new EditorGUI.DisabledScope(selectedCount == 0 || _isUploading))
                 {
-                    if (GUILayout.Button($"Upload Selected ({selectedCount})", GUILayout.Height(35)))
+                    if (GUILayout.Button($"Upload Selected ({selectedCount})", GUILayout.Height(__UPLOAD_BUTTON_HEIGHT)))
                     {
                         _ = UploadSelectedAsync();
                     }
@@ -172,21 +181,21 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawUploadItem(BatchUploadService.BatchUploadItem item)
         {
-            using (new EditorGUILayout.VerticalScope("box"))
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     item.selected = EditorGUILayout.Toggle(item.selected, GUILayout.Width(20));
-                    EditorGUILayout.LabelField(item.modelName, EditorStyles.boldLabel);
+                    EditorGUILayout.LabelField(item.modelName, UIStyles.SectionHeader);
                 }
 
                 item.version = EditorGUILayout.TextField("Version", item.version);
                 // Constrain text area to available width and enable word wrapping for automatic line breaks
-                Rect textAreaRect = GUILayoutUtility.GetRect(0, 40, GUILayout.ExpandWidth(true));
+                Rect textAreaRect = GUILayoutUtility.GetRect(0, __UPLOAD_ITEM_TEXT_HEIGHT, GUILayout.ExpandWidth(true));
                 item.description = EditorGUI.TextArea(textAreaRect, item.description, GetWordWrappedTextAreaStyle());
 
                 // Tags
-                EditorGUILayout.LabelField("Tags (comma-separated):");
+                EditorGUILayout.LabelField("Tags (comma-separated):", UIStyles.MutedLabel);
                 string tagsText = string.Join(", ", item.tags);
                 tagsText = EditorGUILayout.TextField(tagsText);
                 item.tags = tagsText.Split(',')
@@ -194,7 +203,7 @@ namespace ModelLibrary.Editor.Windows
                     .Where(t => !string.IsNullOrEmpty(t))
                     .ToList();
 
-                EditorGUILayout.LabelField($"Path: {item.folderPath}", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField($"Path: {item.folderPath}", UIStyles.MutedLabel);
             }
         }
 

@@ -180,27 +180,35 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawConfigurationRequired()
         {
-            EditorGUILayout.HelpBox("Model Library needs to be configured before use.", MessageType.Warning);
-            EditorGUILayout.Space();
-
-            if (GUILayout.Button("Open Configuration Wizard", GUILayout.Height(30)))
+            UIStyles.DrawPageHeader("Configuration Required", "Set up user identity and repository access.");
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                NavigateToView(ViewType.FirstRunWizard);
-                InitializeWizardState();
-            }
+                EditorGUILayout.HelpBox("Model Library needs to be configured before use.", MessageType.Warning);
+                EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
-            EditorGUILayout.Space();
-            EditorGUILayout.HelpBox("The configuration wizard will help you set up:\n• Your user name\n• Repository location (local folder or server URL)", MessageType.Info);
+                if (GUILayout.Button("Open Configuration Wizard", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
+                {
+                    NavigateToView(ViewType.FirstRunWizard);
+                    InitializeWizardState();
+                }
+
+                EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
+                EditorGUILayout.HelpBox("The configuration wizard will help you set up:\n• Your user name\n• Repository location (local folder or server URL)", MessageType.Info);
+            }
         }
 
         private void DrawServicesNotInitialized()
         {
-            EditorGUILayout.HelpBox("Services are not initialized. This should not happen.", MessageType.Error);
-            EditorGUILayout.Space();
-
-            if (GUILayout.Button("Retry Initialization", GUILayout.Height(30)))
+            UIStyles.DrawPageHeader("Initialization Error", "Model Library services are not ready.");
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                InitializeServices();
+                EditorGUILayout.HelpBox("Services are not initialized. This should not happen.", MessageType.Error);
+                EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
+
+                if (GUILayout.Button("Retry Initialization", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
+                {
+                    InitializeServices();
+                }
             }
         }
 

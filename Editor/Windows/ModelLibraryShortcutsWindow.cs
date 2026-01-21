@@ -1,3 +1,4 @@
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -8,6 +9,7 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public class ModelLibraryShortcutsWindow : EditorWindow
     {
+        private const float __SHORTCUT_LABEL_WIDTH = 180f;
         private struct ShortcutEntry
         {
             public string Combination;
@@ -87,16 +89,15 @@ namespace ModelLibrary.Editor.Windows
 
         private void OnGUI()
         {
-            GUILayout.Space(8f);
-            EditorGUILayout.LabelField("Keyboard Shortcuts", EditorStyles.boldLabel);
+            UIStyles.DrawPageHeader("Keyboard Shortcuts", "Boost productivity with quick actions.");
             EditorGUILayout.HelpBox("Keep this window open while exploring the Model Library. Many shortcuts mirror familiar IDE bindings.", MessageType.Info);
 
-            GUILayout.Space(4f);
+            GUILayout.Space(UIConstants.SPACING_SMALL);
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
             for (int i = 0; i < __Sections.Length; i++)
             {
                 DrawSection(__Sections[i]);
-                GUILayout.Space(10f);
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
             }
             EditorGUILayout.EndScrollView();
 
@@ -104,28 +105,24 @@ namespace ModelLibrary.Editor.Windows
             EditorGUILayout.HelpBox("Tip: You can also open the in-app help center for deep dives into workflows and troubleshooting.", MessageType.None);
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Open Help Center", GUILayout.Width(160f), GUILayout.Height(24f)))
+            if (GUILayout.Button("Open Help Center", GUILayout.Width(UIConstants.BUTTON_WIDTH_LARGE), GUILayout.Height(UIConstants.BUTTON_HEIGHT_STANDARD)))
             {
                 ModelLibraryHelpWindow.OpenToSection(ModelLibraryHelpWindow.HelpSection.Shortcuts);
             }
             EditorGUILayout.EndHorizontal();
-            GUILayout.Space(6f);
+            GUILayout.Space(UIConstants.SPACING_STANDARD);
         }
 
         private void DrawSection(ShortcutSection section)
         {
-            GUIStyle headerStyle = new GUIStyle(EditorStyles.boldLabel)
-            {
-                fontSize = 14
-            };
-            EditorGUILayout.LabelField(section.Title, headerStyle);
+            UIStyles.DrawSectionHeader(section.Title);
 
             for (int i = 0; i < section.Entries.Length; i++)
             {
                 ShortcutEntry entry = section.Entries[i];
-                using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+                using (new EditorGUILayout.HorizontalScope(UIStyles.CardBox))
                 {
-                    GUILayout.Label(entry.Combination, EditorStyles.miniBoldLabel, GUILayout.Width(180f));
+                    GUILayout.Label(entry.Combination, UIStyles.MutedLabel, GUILayout.Width(__SHORTCUT_LABEL_WIDTH));
                     GUILayout.Label(entry.Description, EditorStyles.wordWrappedLabel);
                 }
             }

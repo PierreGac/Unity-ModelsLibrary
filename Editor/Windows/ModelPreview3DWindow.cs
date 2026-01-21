@@ -875,17 +875,19 @@ namespace ModelLibrary.Editor.Windows
             // Model info
             string modelName = _meta?.identity?.name ?? "Unknown Model";
             string version = _meta?.version ?? "Unknown";
-            EditorGUILayout.LabelField(modelName, EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"Version: {version}");
+            UIStyles.DrawPageHeader(modelName, $"Version: {version}");
             
             // Display asset paths
-            if (!string.IsNullOrEmpty(_meta.installPath))
+            using (EditorGUILayout.VerticalScope infoScope = UIStyles.BeginCard())
             {
-                EditorGUILayout.LabelField("Install Path:", _meta.installPath);
-            }
-            if (!string.IsNullOrEmpty(_meta.relativePath))
-            {
-                EditorGUILayout.LabelField("Relative Path:", _meta.relativePath);
+                if (!string.IsNullOrEmpty(_meta.installPath))
+                {
+                    EditorGUILayout.LabelField("Install Path:", _meta.installPath);
+                }
+                if (!string.IsNullOrEmpty(_meta.relativePath))
+                {
+                    EditorGUILayout.LabelField("Relative Path:", _meta.relativePath);
+                }
             }
 
             EditorGUILayout.Space(__UI_SPACING);

@@ -39,44 +39,12 @@ namespace ModelLibrary.Editor.Windows
         /// <param name="onSubmitModel">Callback invoked when Submit Model button is clicked (only shown for Artists).</param>
         public static void DrawEmptyState(string title, string message, Action onRefresh, Action onSubmitModel)
         {
-            EditorGUILayout.Space(20);
+            SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
+            bool canSubmit = identityProvider.GetUserRole() == UserRole.Artist;
+            string secondaryLabel = canSubmit ? "Submit Model" : null;
+            Action secondaryAction = canSubmit ? onSubmitModel : null;
 
-            using (new EditorGUILayout.VerticalScope())
-            {
-                GUILayout.FlexibleSpace();
-
-                // Title
-                EditorGUILayout.LabelField(title, EditorStyles.boldLabel, GUILayout.Height(24));
-                EditorGUILayout.Space(10);
-
-                // Message
-                EditorGUILayout.HelpBox(message, MessageType.Info);
-                EditorGUILayout.Space(10);
-
-                // Quick action buttons
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    GUILayout.FlexibleSpace();
-
-                    if (GUILayout.Button("Refresh", GUILayout.Width(100), GUILayout.Height(30)))
-                    {
-                        onRefresh?.Invoke();
-                    }
-
-                    SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-                    if (identityProvider.GetUserRole() == UserRole.Artist)
-                    {
-                        if (GUILayout.Button("Submit Model", GUILayout.Width(120), GUILayout.Height(30)))
-                        {
-                            onSubmitModel?.Invoke();
-                        }
-                    }
-
-                    GUILayout.FlexibleSpace();
-                }
-
-                GUILayout.FlexibleSpace();
-            }
+            UIStyles.DrawEmptyState(title, message, "Refresh", onRefresh, secondaryLabel, secondaryAction);
         }
 
         /// <summary>
@@ -116,18 +84,16 @@ namespace ModelLibrary.Editor.Windows
         {
             bool hasActiveFilters = !string.IsNullOrWhiteSpace(searchQuery) || (selectedTags != null && selectedTags.Count > 0);
 
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+            using (new EditorGUILayout.HorizontalScope(UIStyles.CardBox))
             {
-                GUILayout.Label($"{filteredCount} of {totalCount} models", EditorStyles.boldLabel);
-                GUILayout.Space(10);
+                GUILayout.Label($"{filteredCount} of {totalCount} models", UIStyles.SectionHeader);
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
 
                 // Search badge with color
                 if (!string.IsNullOrWhiteSpace(searchQuery))
                 {
-                    GUIStyle searchBadgeStyle = new GUIStyle(EditorStyles.miniLabel);
-                    searchBadgeStyle.normal.textColor = new Color(0.2f, 0.6f, 1f); // Blue
-                    searchBadgeStyle.fontStyle = FontStyle.Bold;
-                    searchBadgeStyle.padding = new RectOffset(6, 6, 2, 2);
+                    GUIStyle searchBadgeStyle = new GUIStyle(UIStyles.TagPill);
+                    searchBadgeStyle.normal.textColor = UIConstants.COLOR_LIGHT_BLUE;
                     
                     string searchText = searchQuery.Trim();
                     if (searchText.Length > 30)
@@ -136,19 +102,17 @@ namespace ModelLibrary.Editor.Windows
                     }
                     
                     Color originalColor = GUI.backgroundColor;
-                    GUI.backgroundColor = new Color(0.2f, 0.6f, 1f, 0.2f); // Light blue background
+                    GUI.backgroundColor = new Color(UIConstants.COLOR_LIGHT_BLUE.r, UIConstants.COLOR_LIGHT_BLUE.g, UIConstants.COLOR_LIGHT_BLUE.b, UIConstants.BADGE_BACKGROUND_ALPHA);
                     GUILayout.Label($"🔍 {searchText}", searchBadgeStyle);
                     GUI.backgroundColor = originalColor;
-                    GUILayout.Space(5);
+                    GUILayout.Space(UIConstants.SPACING_SMALL);
                 }
 
                 // Tags badge with color
                 if (selectedTags != null && selectedTags.Count > 0)
                 {
-                    GUIStyle tagBadgeStyle = new GUIStyle(EditorStyles.miniLabel);
-                    tagBadgeStyle.normal.textColor = new Color(0.4f, 0.8f, 0.4f); // Green
-                    tagBadgeStyle.fontStyle = FontStyle.Bold;
-                    tagBadgeStyle.padding = new RectOffset(6, 6, 2, 2);
+                    GUIStyle tagBadgeStyle = new GUIStyle(UIStyles.TagPill);
+                    tagBadgeStyle.normal.textColor = UIConstants.COLOR_GREEN;
                     
                     string tagPreview = string.Join(", ", selectedTags.Take(2));
                     if (selectedTags.Count > 2)
@@ -157,10 +121,10 @@ namespace ModelLibrary.Editor.Windows
                     }
                     
                     Color originalColor = GUI.backgroundColor;
-                    GUI.backgroundColor = new Color(0.4f, 0.8f, 0.4f, 0.2f); // Light green background
+                    GUI.backgroundColor = new Color(UIConstants.COLOR_GREEN.r, UIConstants.COLOR_GREEN.g, UIConstants.COLOR_GREEN.b, UIConstants.BADGE_BACKGROUND_ALPHA);
                     GUILayout.Label($"🏷️ {tagPreview}", tagBadgeStyle);
                     GUI.backgroundColor = originalColor;
-                    GUILayout.Space(5);
+                    GUILayout.Space(UIConstants.SPACING_SMALL);
                 }
 
                 GUIContent filterHelpContent = EditorGUIUtility.IconContent("_Help");
@@ -172,18 +136,18 @@ namespace ModelLibrary.Editor.Windows
                 {
                     filterHelpContent.tooltip = "Learn about filtering, tags, and presets";
                 }
-                float helpWidth = filterHelpContent.image != null ? 22f : 45f;
+                float helpWidth = filterHelpContent.image != null ? UIConstants.BUTTON_HEIGHT_STANDARD : UIConstants.BUTTON_WIDTH_STANDARD;
                 if (GUILayout.Button(filterHelpContent, EditorStyles.miniButton, GUILayout.Width(helpWidth)))
                 {
                     ModelLibraryHelpWindow.OpenToSection(ModelLibraryHelpWindow.HelpSection.Filtering);
                 }
 
-                GUILayout.Space(4f);
+                GUILayout.Space(UIConstants.SPACING_SMALL);
                 GUILayout.FlexibleSpace();
 
                 using (new EditorGUI.DisabledScope(!hasActiveFilters))
                 {
-                    if (GUILayout.Button("Clear Filters", GUILayout.Width(110)))
+                    if (GUILayout.Button("Clear Filters", GUILayout.Width(UIConstants.BUTTON_WIDTH_MEDIUM)))
                     {
                         onClearFilters?.Invoke();
                     }

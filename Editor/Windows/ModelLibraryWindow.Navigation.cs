@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Linq;
+using ModelLibrary.Data;
 using UnityEditor;
 using UnityEngine;
 
@@ -158,6 +160,43 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
+        /// Gets the model name for display in the window title.
+        /// Tries multiple sources: index cache, details window metadata, then falls back to null.
+        /// </summary>
+        /// <param name="modelId">The model ID to look up.</param>
+        /// <returns>The model name if found, null otherwise.</returns>
+        private string GetModelNameForTitle(string modelId)
+        {
+            if (string.IsNullOrEmpty(modelId))
+            {
+                return null;
+            }
+
+            // First, try to get from index cache (fast, synchronous)
+            if (_indexCache != null && _indexCache.entries != null)
+            {
+                ModelIndex.Entry entry = _indexCache.entries.FirstOrDefault(e => string.Equals(e.id, modelId, System.StringComparison.OrdinalIgnoreCase));
+                if (entry != null && !string.IsNullOrEmpty(entry.name))
+                {
+                    return entry.name;
+                }
+            }
+
+            // Second, try to get from details window instance metadata (may require async loading)
+            if (_detailsWindowInstance != null)
+            {
+                ModelMeta meta = GetPrivateField<ModelMeta>(_detailsWindowInstance, "_meta", null);
+                if (meta != null && meta.identity != null && !string.IsNullOrEmpty(meta.identity.name))
+                {
+                    return meta.identity.name;
+                }
+            }
+
+            // Fall back to null (caller will use modelId)
+            return null;
+        }
+
+        /// <summary>
         /// Updates the window title based on the current view.
         /// </summary>
         private void UpdateWindowTitleForView()
@@ -178,7 +217,8 @@ namespace ModelLibrary.Editor.Windows
                     string modelId = GetViewParameter<string>("modelId", string.Empty);
                     if (!string.IsNullOrEmpty(modelId))
                     {
-                        title = $"Model Library - {modelId}";
+                        string modelName = GetModelNameForTitle(modelId);
+                        title = !string.IsNullOrEmpty(modelName) ? $"Model Library - {modelName}" : $"Model Library - {modelId}";
                     }
                     else
                     {

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -41,75 +42,81 @@ namespace ModelLibrary.Editor.Windows
             string modelName = _meta?.identity?.name ?? "Unknown Model";
             string version = _meta?.version ?? "Unknown";
             string author = _meta?.author ?? "Unknown";
-            EditorGUILayout.LabelField(modelName, EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"v{version} by {author}");
+            EditorGUILayout.LabelField(modelName, UIStyles.TitleLabel);
+            EditorGUILayout.LabelField($"v{version} by {author}", UIStyles.MutedLabel);
 
             // Delete version button (with safety checks)
             DrawDeleteVersionButton();
 
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
             // Description
-            EditorGUILayout.LabelField("Description", EditorStyles.boldLabel);
-            SimpleUserIdentityProvider identityProviderForDesc = new SimpleUserIdentityProvider();
-            bool isArtistForDesc = identityProviderForDesc.GetUserRole() == UserRole.Artist;
-            bool isAdminForDesc = identityProviderForDesc.GetUserRole() == UserRole.Admin;
-            using (new EditorGUI.DisabledScope(!isArtistForDesc && !isAdminForDesc))
+            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox))
             {
-                // Constrain text area to available width and enable word wrapping for automatic line breaks
-                Rect textAreaRect = GUILayoutUtility.GetRect(0, 60, GUILayout.ExpandWidth(true));
-                _editedDescription = EditorGUI.TextArea(textAreaRect, _editedDescription ?? string.Empty, GetWordWrappedTextAreaStyle());
-            }
-            EditorGUILayout.Space();
-
-            // Tags section with editing
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField("Tags:", EditorStyles.boldLabel);
-                SimpleUserIdentityProvider identityProviderForTags = new SimpleUserIdentityProvider();
-                bool isArtistForTags = identityProviderForTags.GetUserRole() == UserRole.Artist;
-
-                if (isArtistForTags)
+                EditorGUILayout.LabelField("Description", UIStyles.SectionHeader);
+                SimpleUserIdentityProvider identityProviderForDesc = new SimpleUserIdentityProvider();
+                bool isArtistForDesc = identityProviderForDesc.GetUserRole() == UserRole.Artist;
+                bool isAdminForDesc = identityProviderForDesc.GetUserRole() == UserRole.Admin;
+                using (new EditorGUI.DisabledScope(!isArtistForDesc && !isAdminForDesc))
                 {
-                    string tagButtonLabel = _editingTags ? "Cancel" : "Edit";
-                    if (GUILayout.Button(tagButtonLabel, GUILayout.Width(60)))
-                    {
-                        _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
-                        _editingTags = !_editingTags;
-                    }
+                    // Constrain text area to available width and enable word wrapping for automatic line breaks
+                    Rect textAreaRect = GUILayoutUtility.GetRect(0, 60, GUILayout.ExpandWidth(true));
+                    _editedDescription = EditorGUI.TextArea(textAreaRect, _editedDescription ?? string.Empty, GetWordWrappedTextAreaStyle());
                 }
             }
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
-            if (_editingTags)
+            // Tags section with editing
+            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox))
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    _newTag = EditorGUILayout.TextField("Add Tag", _newTag);
-                    if (GUILayout.Button("Add", GUILayout.Width(50)) && !string.IsNullOrWhiteSpace(_newTag))
+                    EditorGUILayout.LabelField("Tags", UIStyles.SectionHeader);
+                    SimpleUserIdentityProvider identityProviderForTags = new SimpleUserIdentityProvider();
+                    bool isArtistForTags = identityProviderForTags.GetUserRole() == UserRole.Artist;
+
+                    if (isArtistForTags)
                     {
-                        _editableTags.Add(_newTag.Trim());
-                        _newTag = string.Empty;
-                    }
-                }
-                for (int i = _editableTags.Count - 1; i >= 0; i--)
-                {
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        EditorGUILayout.LabelField($"• {_editableTags[i]}");
-                        if (GUILayout.Button("x", GUILayout.Width(24)))
+                        string tagButtonLabel = _editingTags ? "Cancel" : "Edit";
+                        if (GUILayout.Button(tagButtonLabel, GUILayout.Width(60)))
                         {
-                            _editableTags.RemoveAt(i);
+                            _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
+                            _editingTags = !_editingTags;
                         }
                     }
                 }
+
+                if (_editingTags)
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        _newTag = EditorGUILayout.TextField("Add Tag", _newTag);
+                        if (GUILayout.Button("Add", GUILayout.Width(50)) && !string.IsNullOrWhiteSpace(_newTag))
+                        {
+                            _editableTags.Add(_newTag.Trim());
+                            _newTag = string.Empty;
+                        }
+                    }
+                    for (int i = _editableTags.Count - 1; i >= 0; i--)
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            EditorGUILayout.LabelField($"• {_editableTags[i]}");
+                            if (GUILayout.Button("x", GUILayout.Width(24)))
+                            {
+                                _editableTags.RemoveAt(i);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.LabelField(string.Join(", ", _meta.tags?.values.ToArray() ?? Array.Empty<string>()));
+                }
             }
-            else
-            {
-                EditorGUILayout.LabelField(string.Join(", ", _meta.tags?.values.ToArray() ?? Array.Empty<string>()));
-            }
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Only show Save Metadata Changes button for Artists
             SimpleUserIdentityProvider identityProviderForSave = new SimpleUserIdentityProvider();
@@ -133,68 +140,77 @@ namespace ModelLibrary.Editor.Windows
             {
                 EditorGUILayout.HelpBox("Metadata editing is only available for Artists. Switch to Artist role in User Settings to edit metadata.", MessageType.Info);
             }
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Model Structure
-            _showStructure = EditorGUILayout.Foldout(_showStructure, "Model Structure", true);
-            if (_showStructure)
+            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox))
             {
-                _structureScroll = EditorGUILayout.BeginScrollView(_structureScroll, GUILayout.Height(150));
-                DrawModelStructure();
-                EditorGUILayout.EndScrollView();
+                _showStructure = EditorGUILayout.Foldout(_showStructure, "Model Structure", true);
+                if (_showStructure)
+                {
+                    _structureScroll = EditorGUILayout.BeginScrollView(_structureScroll, GUILayout.Height(150));
+                    DrawModelStructure();
+                    EditorGUILayout.EndScrollView();
+                }
             }
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
-            _showChangelog = EditorGUILayout.Foldout(_showChangelog, "Changelog", true);
-            if (_showChangelog)
+            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox))
             {
-                DrawChangelog();
+                _showChangelog = EditorGUILayout.Foldout(_showChangelog, "Changelog", true);
+                if (_showChangelog)
+                {
+                    DrawChangelog();
+                }
             }
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Notes section
-            _showNotes = EditorGUILayout.Foldout(_showNotes, "Notes", true);
-            if (_showNotes)
+            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox))
             {
-                // Add new note
-                EditorGUILayout.LabelField("Add Note:", EditorStyles.boldLabel);
-                // Constrain text area to available width and enable word wrapping for automatic line breaks
-                Rect textAreaRect = GUILayoutUtility.GetRect(0, 60, GUILayout.ExpandWidth(true));
-                _newNoteMessage = EditorGUI.TextArea(textAreaRect, _newNoteMessage, GetWordWrappedTextAreaStyle());
-                int currentIndex = Array.IndexOf(_noteTags, _newNoteTag);
-                if (currentIndex == -1)
+                _showNotes = EditorGUILayout.Foldout(_showNotes, "Notes", true);
+                if (_showNotes)
                 {
-                    currentIndex = 0; // Default to first tag if not found
-                }
-
-                int selectedIndex = EditorGUILayout.Popup("Tag", currentIndex, _noteTags);
-                _newNoteTag = _noteTags[selectedIndex];
-
-                if (GUILayout.Button("Submit Note") && !string.IsNullOrWhiteSpace(_newNoteMessage))
-                {
-                    _ = SubmitNote();
-                    _newNoteMessage = string.Empty;
-                    GUI.FocusControl(null);
-                }
-                EditorGUILayout.Space();
-
-                // Display existing notes
-                if ((_meta.notes?.Count ?? 0) == 0)
-                {
-                    GUILayout.Label("(none)");
-                }
-                else
-                {
-                    foreach (ModelNote n in _meta.notes.OrderByDescending(n => n.createdTimeTicks))
+                    // Add new note
+                    EditorGUILayout.LabelField("Add Note:", UIStyles.SectionHeader);
+                    // Constrain text area to available width and enable word wrapping for automatic line breaks
+                    Rect textAreaRect = GUILayoutUtility.GetRect(0, 60, GUILayout.ExpandWidth(true));
+                    _newNoteMessage = EditorGUI.TextArea(textAreaRect, _newNoteMessage, GetWordWrappedTextAreaStyle());
+                    int currentIndex = Array.IndexOf(_noteTags, _newNoteTag);
+                    if (currentIndex == -1)
                     {
-                        using (new EditorGUILayout.VerticalScope("box"))
+                        currentIndex = 0; // Default to first tag if not found
+                    }
+
+                    int selectedIndex = EditorGUILayout.Popup("Tag", currentIndex, _noteTags);
+                    _newNoteTag = _noteTags[selectedIndex];
+
+                    if (GUILayout.Button("Submit Note") && !string.IsNullOrWhiteSpace(_newNoteMessage))
+                    {
+                        _ = SubmitNote();
+                        _newNoteMessage = string.Empty;
+                        GUI.FocusControl(null);
+                    }
+                    EditorGUILayout.Space();
+
+                    // Display existing notes
+                    if ((_meta.notes?.Count ?? 0) == 0)
+                    {
+                        GUILayout.Label("(none)");
+                    }
+                    else
+                    {
+                        foreach (ModelNote n in _meta.notes.OrderByDescending(n => n.createdTimeTicks))
                         {
-                            DateTime dateTime = new DateTime(n.createdTimeTicks);
-                            EditorGUILayout.LabelField($"{n.author} — {dateTime.ToString(CultureInfo.CurrentCulture)} [{n.tag}]", EditorStyles.miniBoldLabel);
-                            DrawMultilineText(n.message, EditorStyles.wordWrappedLabel);
-                            if (!string.IsNullOrEmpty(n.context))
+                            using (new EditorGUILayout.VerticalScope("box"))
                             {
-                                EditorGUILayout.LabelField("Context:", n.context);
+                                DateTime dateTime = new DateTime(n.createdTimeTicks);
+                                EditorGUILayout.LabelField($"{n.author} — {dateTime.ToString(CultureInfo.CurrentCulture)} [{n.tag}]", EditorStyles.miniBoldLabel);
+                                DrawMultilineText(n.message, EditorStyles.wordWrappedLabel);
+                                if (!string.IsNullOrEmpty(n.context))
+                                {
+                                    EditorGUILayout.LabelField("Context:", n.context);
+                                }
                             }
                         }
                     }

@@ -46,15 +46,15 @@ namespace ModelLibrary.Editor.Windows
             }
             else
             {
-                EditorGUILayout.LabelField("Model Name", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Model Name", UIStyles.SectionHeader);
                 EditorGUILayout.LabelField(_name, EditorStyles.wordWrappedLabel);
-                EditorGUILayout.Space(5);
+                EditorGUILayout.Space(UIConstants.SPACING_SMALL);
             }
 
             DrawVersionField();
 
-            EditorGUILayout.Space(5);
-            EditorGUILayout.LabelField("Description", EditorStyles.boldLabel);
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
+            EditorGUILayout.LabelField("Description", UIStyles.SectionHeader);
             // Constrain text area to available width and enable word wrapping for automatic line breaks
             Rect textAreaRect = GUILayoutUtility.GetRect(0, __TEXT_AREA_HEIGHT_DESCRIPTION, GUILayout.ExpandWidth(true));
             _description = EditorGUI.TextArea(textAreaRect, _description, GetWordWrappedTextAreaStyle());
@@ -65,8 +65,8 @@ namespace ModelLibrary.Editor.Windows
                 SaveDraft();
             }
 
-            EditorGUILayout.Space(10);
-            EditorGUILayout.LabelField("Tags", EditorStyles.boldLabel);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
+            EditorGUILayout.LabelField("Tags", UIStyles.SectionHeader);
             using (new EditorGUILayout.HorizontalScope())
             {
                 _newTag = EditorGUILayout.TextField("Add Tag", _newTag);
@@ -81,7 +81,7 @@ namespace ModelLibrary.Editor.Windows
             // Show tags list
             if (_tags.Count > 0)
             {
-                EditorGUILayout.Space(5);
+                EditorGUILayout.Space(UIConstants.SPACING_SMALL);
                 for (int i = _tags.Count - 1; i >= 0; i--)
                 {
                     using (new EditorGUILayout.HorizontalScope())
@@ -101,13 +101,13 @@ namespace ModelLibrary.Editor.Windows
             }
 
             // Advanced tag options (progressive disclosure)
-            EditorGUILayout.Space(5);
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
             _showAdvancedTagOptions = EditorGUILayout.Foldout(_showAdvancedTagOptions, "Advanced Tag Options", true);
             if (_showAdvancedTagOptions)
             {
                 EditorGUI.indentLevel++;
                 EditorGUILayout.HelpBox("Tag management options for power users.", MessageType.None);
-                if (GUILayout.Button("Clear All Tags", GUILayout.Width(120)))
+                if (GUILayout.Button("Clear All Tags", GUILayout.Width(UIConstants.BUTTON_WIDTH_MEDIUM)))
                 {
                     if (EditorUtility.DisplayDialog("Clear All Tags", "Are you sure you want to remove all tags?", "Yes", "No"))
                     {
@@ -127,7 +127,7 @@ namespace ModelLibrary.Editor.Windows
             EditorGUILayout.LabelField(new GUIContent("Install Path", 
                 "The absolute path where the model will be installed in YOUR Unity project.\n" +
                 "Example: Assets/Models/MyModel\n\n" +
-                "This is where users will find the model after importing it into their project."), EditorStyles.boldLabel);
+                "This is where users will find the model after importing it into their project."), UIStyles.SectionHeader);
             EditorGUILayout.HelpBox(
                 "Install Path: Where the model will be placed in YOUR Unity project.\n" +
                 "This is the full path starting with 'Assets/' that users will see in their Project window.\n" +
@@ -145,13 +145,13 @@ namespace ModelLibrary.Editor.Windows
                 SaveDraft(); // Auto-save when path changes
             }
 
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Relative Path with validation feedback
             EditorGUILayout.LabelField(new GUIContent("Relative Path", 
                 "The path relative to the Assets folder where model files are stored in the repository.\n" +
                 "Example: Models/MyModel\n\n" +
-                "This is used for organizing files in the repository, not in your project."), EditorStyles.boldLabel);
+                "This is used for organizing files in the repository, not in your project."), UIStyles.SectionHeader);
             EditorGUILayout.HelpBox(
                 "Relative Path: How files are organized in the REPOSITORY (not in your project).\n" +
                 "This is the path relative to the Assets folder, used for repository file organization.\n" +
@@ -161,14 +161,14 @@ namespace ModelLibrary.Editor.Windows
             DrawRelativePathField();
 
             // Advanced path options (progressive disclosure)
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
             _showAdvancedPathOptions = EditorGUILayout.Foldout(_showAdvancedPathOptions, "Advanced Path Options", true);
             if (_showAdvancedPathOptions)
             {
                 EditorGUI.indentLevel++;
                 EditorGUILayout.HelpBox("Advanced path configuration options.", MessageType.None);
 
-                if (GUILayout.Button("Reset to Default Path", GUILayout.Width(150)))
+                if (GUILayout.Button("Reset to Default Path", GUILayout.Width(UIConstants.BUTTON_WIDTH_LARGE)))
                 {
                     _installPath = DefaultInstallPath();
                     _relativePath = string.Empty;
@@ -187,15 +187,15 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawImagesTab()
         {
-            EditorGUILayout.LabelField("Preview Images", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Preview Images", UIStyles.SectionHeader);
             EditorGUILayout.HelpBox("Add preview images to showcase your model. Supported formats: PNG, JPG, TGA, PSD. Maximum file size: 50MB per image.", MessageType.Info);
 
-            EditorGUILayout.Space(5);
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
 
             // Drag and drop area for images
             DrawImageDropArea();
 
-            if (GUILayout.Button("Add Images...", GUILayout.Height(30)))
+            if (GUILayout.Button("Add Images...", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
             {
                 string chosen = EditorUtility.OpenFilePanelWithFilters("Choose images", Application.dataPath,
                     new string[] { "Image files", "png,jpg,jpeg,tga,psd", "All files", "*" });

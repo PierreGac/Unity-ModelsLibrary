@@ -1,3 +1,4 @@
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -83,8 +84,9 @@ namespace ModelLibrary.Editor.Windows
             // Validate parameters
             if (string.IsNullOrEmpty(modelId) || string.IsNullOrEmpty(version))
             {
+                UIStyles.DrawPageHeader("3D Preview", "Inspect model geometry and materials.");
                 EditorGUILayout.HelpBox("No model selected for preview. Please select a model from the browser.", MessageType.Warning);
-                if (GUILayout.Button("Back to Browser", GUILayout.Height(30)))
+                if (GUILayout.Button("Back to Browser", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
                 {
                     NavigateToView(ViewType.Browser);
                 }

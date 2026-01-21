@@ -15,6 +15,9 @@ namespace ModelLibrary.Editor.Windows
     public partial class ModelLibraryWindow
     {
         private const int __WIZARD_TOTAL_STEPS = 4;
+        private const float __WIZARD_BUTTON_HELP_WIDTH = 150f;
+        private const float __WIZARD_BUTTON_TEST_WIDTH = 140f;
+        private const float __WIZARD_BUTTON_BROWSE_WIDTH = 90f;
         private static readonly string[] __WizardStepTitles =
         {
             "Welcome",
@@ -46,9 +49,10 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawFirstRunWizardView()
         {
-            GUILayout.Space(8f);
+            UIStyles.DrawPageHeader("Configuration Wizard", "Let's set up your profile and repository.");
+            GUILayout.Space(UIConstants.SPACING_SMALL);
             DrawWizardStepHeader();
-            GUILayout.Space(8f);
+            GUILayout.Space(UIConstants.SPACING_STANDARD);
 
             switch (_wizardStep)
             {
@@ -75,24 +79,27 @@ namespace ModelLibrary.Editor.Windows
             int stepIndex = (int)_wizardStep;
             float progress = (stepIndex + 1f) / __WIZARD_TOTAL_STEPS;
 
-            EditorGUILayout.LabelField($"Step {stepIndex + 1} of {__WIZARD_TOTAL_STEPS}: {__WizardStepTitles[stepIndex]}", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Step {stepIndex + 1} of {__WIZARD_TOTAL_STEPS}: {__WizardStepTitles[stepIndex]}", UIStyles.SectionHeader);
             Rect rect = GUILayoutUtility.GetRect(18f, 18f, GUILayout.ExpandWidth(true));
             EditorGUI.ProgressBar(rect, progress, $"{Mathf.RoundToInt(progress * 100f)}% complete");
         }
 
         private void DrawWizardWelcomeStep()
         {
-            EditorGUILayout.HelpBox("Welcome! Let's configure the essentials so you can start browsing and importing models.", MessageType.Info);
-            GUILayout.Space(6f);
-            EditorGUILayout.LabelField("This quick setup will:", EditorStyles.boldLabel);
-            DrawWizardBullet("Capture who you are so notes and submissions display your name.");
-            DrawWizardBullet("Point the browser at your shared repository or HTTP endpoint.");
-            DrawWizardBullet("Offer a short tour of key features after configuration.");
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
+            {
+                EditorGUILayout.HelpBox("Welcome! Let's configure the essentials so you can start browsing and importing models.", MessageType.Info);
+                GUILayout.Space(UIConstants.SPACING_STANDARD);
+                UIStyles.DrawSectionHeader("This quick setup will");
+                DrawWizardBullet("Capture who you are so notes and submissions display your name.");
+                DrawWizardBullet("Point the browser at your shared repository or HTTP endpoint.");
+                DrawWizardBullet("Offer a short tour of key features after configuration.");
+            }
 
-            GUILayout.Space(8f);
+            GUILayout.Space(UIConstants.SPACING_STANDARD);
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Open Help Center", GUILayout.Width(150f), GUILayout.Height(24f)))
+            if (GUILayout.Button("Open Help Center", GUILayout.Width(__WIZARD_BUTTON_HELP_WIDTH), GUILayout.Height(UIConstants.BUTTON_HEIGHT_STANDARD)))
             {
                 Dictionary<string, object> parameters = new Dictionary<string, object>
                 {
@@ -105,99 +112,108 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawWizardIdentityStep()
         {
-            EditorGUILayout.LabelField("About You", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("We use this information to attribute notes, submissions, and review feedback.", MessageType.Info);
-            GUILayout.Space(4f);
-
-            _wizardUserName = EditorGUILayout.TextField("User Name", _wizardUserName);
-            if (string.IsNullOrWhiteSpace(_wizardUserName))
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                EditorGUILayout.HelpBox("User name is required.", MessageType.Warning);
-            }
+                UIStyles.DrawSectionHeader("About You");
+                EditorGUILayout.HelpBox("We use this information to attribute notes, submissions, and review feedback.", MessageType.Info);
+                GUILayout.Space(UIConstants.SPACING_SMALL);
 
-            UserRole newRole = (UserRole)EditorGUILayout.EnumPopup("Role", _wizardUserRole);
-            if (newRole != _wizardUserRole)
-            {
-                _wizardUserRole = newRole;
-            }
+                _wizardUserName = EditorGUILayout.TextField("User Name", _wizardUserName);
+                if (string.IsNullOrWhiteSpace(_wizardUserName))
+                {
+                    EditorGUILayout.HelpBox("User name is required.", MessageType.Warning);
+                }
 
-            GUILayout.Space(4f);
-            string roleDescription = GetWizardRoleDescription(_wizardUserRole);
-            EditorGUILayout.HelpBox(roleDescription, MessageType.None);
+                UserRole newRole = (UserRole)EditorGUILayout.EnumPopup("Role", _wizardUserRole);
+                if (newRole != _wizardUserRole)
+                {
+                    _wizardUserRole = newRole;
+                }
+
+                GUILayout.Space(UIConstants.SPACING_SMALL);
+                string roleDescription = GetWizardRoleDescription(_wizardUserRole);
+                EditorGUILayout.HelpBox(roleDescription, MessageType.None);
+            }
         }
 
         private void DrawWizardRepositoryStep()
         {
-            EditorGUILayout.LabelField("Repository Connection", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("Choose the storage type and location for shared models.", MessageType.Info);
-            GUILayout.Space(4f);
-
-            ModelLibrarySettings.RepositoryKind newKind = (ModelLibrarySettings.RepositoryKind)EditorGUILayout.EnumPopup("Repository Kind", _wizardRepoKind);
-            if (newKind != _wizardRepoKind)
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                _wizardRepoKind = newKind;
-                _wizardRepoTested = false;
-                _wizardRepoTestMessage = null;
-                _wizardRepoTestMessageType = MessageType.None;
-            }
+                UIStyles.DrawSectionHeader("Repository Connection");
+                EditorGUILayout.HelpBox("Choose the storage type and location for shared models.", MessageType.Info);
+                GUILayout.Space(UIConstants.SPACING_SMALL);
 
-            EditorGUILayout.BeginHorizontal();
-            _wizardRepoRoot = EditorGUILayout.TextField("Repository Root", _wizardRepoRoot);
-            if (_wizardRepoKind == ModelLibrarySettings.RepositoryKind.FileSystem)
-            {
-                if (GUILayout.Button("Browse...", GUILayout.Width(90f)))
+                ModelLibrarySettings.RepositoryKind newKind = (ModelLibrarySettings.RepositoryKind)EditorGUILayout.EnumPopup("Repository Kind", _wizardRepoKind);
+                if (newKind != _wizardRepoKind)
                 {
-                    string startPath = string.IsNullOrEmpty(_wizardRepoRoot) ? Application.dataPath : _wizardRepoRoot;
-                    string selectedPath = EditorUtility.OpenFolderPanel("Select Repository Root", startPath, string.Empty);
-                    if (!string.IsNullOrEmpty(selectedPath))
+                    _wizardRepoKind = newKind;
+                    _wizardRepoTested = false;
+                    _wizardRepoTestMessage = null;
+                    _wizardRepoTestMessageType = MessageType.None;
+                }
+
+                EditorGUILayout.BeginHorizontal();
+                _wizardRepoRoot = EditorGUILayout.TextField("Repository Root", _wizardRepoRoot);
+                if (_wizardRepoKind == ModelLibrarySettings.RepositoryKind.FileSystem)
+                {
+                    if (GUILayout.Button("Browse...", GUILayout.Width(__WIZARD_BUTTON_BROWSE_WIDTH)))
                     {
-                        _wizardRepoRoot = selectedPath;
-                        _wizardRepoTested = false;
-                        _wizardRepoTestMessage = null;
-                        _wizardRepoTestMessageType = MessageType.None;
+                        string startPath = string.IsNullOrEmpty(_wizardRepoRoot) ? Application.dataPath : _wizardRepoRoot;
+                        string selectedPath = EditorUtility.OpenFolderPanel("Select Repository Root", startPath, string.Empty);
+                        if (!string.IsNullOrEmpty(selectedPath))
+                        {
+                            _wizardRepoRoot = selectedPath;
+                            _wizardRepoTested = false;
+                            _wizardRepoTestMessage = null;
+                            _wizardRepoTestMessageType = MessageType.None;
+                        }
                     }
                 }
-            }
-            EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndHorizontal();
 
-            bool repoValid = ValidateWizardRepository(out _wizardRepoValidationMessage, out _wizardRepoValidationType);
-            if (!string.IsNullOrEmpty(_wizardRepoValidationMessage))
-            {
-                EditorGUILayout.HelpBox(_wizardRepoValidationMessage, _wizardRepoValidationType);
-            }
+                bool repoValid = ValidateWizardRepository(out _wizardRepoValidationMessage, out _wizardRepoValidationType);
+                if (!string.IsNullOrEmpty(_wizardRepoValidationMessage))
+                {
+                    EditorGUILayout.HelpBox(_wizardRepoValidationMessage, _wizardRepoValidationType);
+                }
 
-            GUILayout.Space(4f);
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Test Connection", GUILayout.Width(140f), GUILayout.Height(24f)))
-            {
-                RunWizardRepositoryTest();
-            }
-            EditorGUILayout.EndHorizontal();
+                GUILayout.Space(UIConstants.SPACING_SMALL);
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("Test Connection", GUILayout.Width(__WIZARD_BUTTON_TEST_WIDTH), GUILayout.Height(UIConstants.BUTTON_HEIGHT_STANDARD)))
+                {
+                    RunWizardRepositoryTest();
+                }
+                EditorGUILayout.EndHorizontal();
 
-            if (_wizardRepoTested && !string.IsNullOrEmpty(_wizardRepoTestMessage))
-            {
-                EditorGUILayout.HelpBox(_wizardRepoTestMessage, _wizardRepoTestMessageType);
-            }
+                if (_wizardRepoTested && !string.IsNullOrEmpty(_wizardRepoTestMessage))
+                {
+                    EditorGUILayout.HelpBox(_wizardRepoTestMessage, _wizardRepoTestMessageType);
+                }
 
-            GUILayout.Space(6f);
-            EditorGUILayout.HelpBox("Examples:\n• File System: C\\\\Models or \\\\server\\share\\ModelLibrary\n• HTTP: https://models.example.com/api", MessageType.None);
+                GUILayout.Space(UIConstants.SPACING_STANDARD);
+                EditorGUILayout.HelpBox("Examples:\n• File System: C\\\\Models or \\\\server\\share\\ModelLibrary\n• HTTP: https://models.example.com/api", MessageType.None);
+            }
         }
 
         private void DrawWizardSummaryStep()
         {
-            EditorGUILayout.LabelField("Review & Finish", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("If everything looks correct, choose Finish to apply your configuration.", MessageType.Info);
-            GUILayout.Space(4f);
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
+            {
+                UIStyles.DrawSectionHeader("Review & Finish");
+                EditorGUILayout.HelpBox("If everything looks correct, choose Finish to apply your configuration.", MessageType.Info);
+                GUILayout.Space(UIConstants.SPACING_SMALL);
 
-            EditorGUILayout.LabelField("User", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"Name: {_wizardUserName}");
-            EditorGUILayout.LabelField($"Role: {_wizardUserRole}");
+                UIStyles.DrawSectionHeader("User");
+                EditorGUILayout.LabelField($"Name: {_wizardUserName}");
+                EditorGUILayout.LabelField($"Role: {_wizardUserRole}");
 
-            GUILayout.Space(4f);
-            EditorGUILayout.LabelField("Repository", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"Type: {_wizardRepoKind}");
-            EditorGUILayout.LabelField($"Location: {_wizardRepoRoot}");
+                GUILayout.Space(UIConstants.SPACING_SMALL);
+                UIStyles.DrawSectionHeader("Repository");
+                EditorGUILayout.LabelField($"Type: {_wizardRepoKind}");
+                EditorGUILayout.LabelField($"Location: {_wizardRepoRoot}");
+            }
 
             GUILayout.Space(8f);
             _wizardOpenHelpAfterFinish = EditorGUILayout.ToggleLeft("Open a quick tour after finishing", _wizardOpenHelpAfterFinish);

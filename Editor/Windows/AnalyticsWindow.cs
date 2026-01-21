@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Services;
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -14,6 +15,16 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public class AnalyticsWindow : EditorWindow
     {
+        private const float __TOOLBAR_BUTTON_WIDTH_SMALL = 80f;
+        private const float __TOOLBAR_BUTTON_WIDTH_MEDIUM = 100f;
+        private const float __TOOLBAR_BUTTON_WIDTH_LARGE = 120f;
+        private const float __TOOLBAR_LABEL_WIDTH = 80f;
+        private const float __RANK_LABEL_WIDTH = 30f;
+        private const float __EVENT_LABEL_WIDTH = 150f;
+        private const float __EVENT_VALUE_WIDTH = 100f;
+        private const float __EVENT_PERCENT_WIDTH = 60f;
+        private const float __EVENT_VIEW_WIDTH = 150f;
+        private const float __EVENT_DATE_WIDTH = 200f;
         /// <summary>Scroll position for the analytics content.</summary>
         private Vector2 _scrollPosition;
         /// <summary>Currently selected tab in the analytics view.</summary>
@@ -84,12 +95,13 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void OnGUI()
         {
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
+            UIStyles.DrawPageHeader("Analytics", "Usage insights for imports, views, and activity.");
 
             // Toolbar
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
-                if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(80)))
+                if (GUILayout.Button("Refresh", UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_SMALL)))
                 {
                     RefreshAnalytics();
                 }
@@ -97,10 +109,10 @@ namespace ModelLibrary.Editor.Windows
                 GUILayout.FlexibleSpace();
 
                 // Time range filter
-                EditorGUILayout.LabelField("Time Range:", GUILayout.Width(80));
-                _timeRange = (TimeRange)EditorGUILayout.EnumPopup(_timeRange, EditorStyles.toolbarPopup, GUILayout.Width(120));
+                EditorGUILayout.LabelField("Time Range:", GUILayout.Width(__TOOLBAR_LABEL_WIDTH));
+                _timeRange = (TimeRange)EditorGUILayout.EnumPopup(_timeRange, UIStyles.ToolbarPopup, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_LARGE));
 
-                if (GUILayout.Button("Clear Data", EditorStyles.toolbarButton, GUILayout.Width(100)))
+                if (GUILayout.Button("Clear Data", UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_MEDIUM)))
                 {
                     if (EditorUtility.DisplayDialog("Clear Analytics", 
                         "Are you sure you want to clear all analytics data? This cannot be undone.", 
@@ -112,13 +124,13 @@ namespace ModelLibrary.Editor.Windows
                 }
             }
 
-            EditorGUILayout.Space(5);
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
 
             // Tab bar
             string[] tabs = { "Overview", "Most Imported", "Most Viewed", "Event Types" };
             _selectedTab = GUILayout.Toolbar(_selectedTab, tabs);
 
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Tab content
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
@@ -147,41 +159,43 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawOverview()
         {
-            EditorGUILayout.LabelField("Summary Statistics", EditorStyles.boldLabel);
-            EditorGUILayout.Space(5);
-
-            // Total events
-            int totalEvents = _eventCounts.Values.Sum();
-            EditorGUILayout.LabelField($"Total Events: {totalEvents:N0}");
-
-            // Event breakdown
-            if (_eventCounts.Count > 0)
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                EditorGUILayout.Space(10);
-                EditorGUILayout.LabelField("Events by Type:", EditorStyles.boldLabel);
-                foreach (KeyValuePair<string, int> kvp in _eventCounts.OrderByDescending(k => k.Value))
+                UIStyles.DrawSectionHeader("Summary Statistics");
+
+                // Total events
+                int totalEvents = _eventCounts.Values.Sum();
+                EditorGUILayout.LabelField($"Total Events: {totalEvents:N0}");
+
+                // Event breakdown
+                if (_eventCounts.Count > 0)
                 {
-                    using (new EditorGUILayout.HorizontalScope())
+                    EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
+                    UIStyles.DrawSectionHeader("Events by Type");
+                    foreach (KeyValuePair<string, int> kvp in _eventCounts.OrderByDescending(k => k.Value))
                     {
-                        EditorGUILayout.LabelField(kvp.Key, GUILayout.Width(150));
-                        EditorGUILayout.LabelField($"{kvp.Value:N0}", GUILayout.Width(100));
-                        EditorGUILayout.LabelField($"({(kvp.Value * 100f / totalEvents):F1}%)", GUILayout.Width(60));
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            EditorGUILayout.LabelField(kvp.Key, GUILayout.Width(__EVENT_LABEL_WIDTH));
+                            EditorGUILayout.LabelField($"{kvp.Value:N0}", GUILayout.Width(__EVENT_VALUE_WIDTH));
+                            EditorGUILayout.LabelField($"({(kvp.Value * 100f / totalEvents):F1}%)", GUILayout.Width(__EVENT_PERCENT_WIDTH));
+                        }
                     }
                 }
-            }
 
-            // Top models summary
-            EditorGUILayout.Space(10);
-            EditorGUILayout.LabelField("Top Models:", EditorStyles.boldLabel);
-            
-            if (_mostImported.Count > 0)
-            {
-                EditorGUILayout.LabelField($"Most Imported: {_mostImported[0].modelId} ({_mostImported[0].importCount} imports)");
-            }
-            
-            if (_mostViewed.Count > 0)
-            {
-                EditorGUILayout.LabelField($"Most Viewed: {_mostViewed[0].modelId} ({_mostViewed[0].viewCount} views)");
+                // Top models summary
+                EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
+                UIStyles.DrawSectionHeader("Top Models");
+
+                if (_mostImported.Count > 0)
+                {
+                    EditorGUILayout.LabelField($"Most Imported: {_mostImported[0].modelId} ({_mostImported[0].importCount} imports)");
+                }
+
+                if (_mostViewed.Count > 0)
+                {
+                    EditorGUILayout.LabelField($"Most Viewed: {_mostViewed[0].modelId} ({_mostViewed[0].viewCount} views)");
+                }
             }
         }
 
@@ -190,35 +204,37 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawMostImported()
         {
-            EditorGUILayout.LabelField("Most Imported Models", EditorStyles.boldLabel);
-            EditorGUILayout.Space(5);
-
-            if (_mostImported == null || _mostImported.Count == 0)
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                EditorGUILayout.HelpBox("No import data available.", MessageType.Info);
-                return;
-            }
+                UIStyles.DrawSectionHeader("Most Imported Models");
 
-            for (int i = 0; i < _mostImported.Count; i++)
-            {
-                ModelUsageStats stats = _mostImported[i];
-                using (new EditorGUILayout.VerticalScope("box"))
+                if (_mostImported == null || _mostImported.Count == 0)
                 {
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        EditorGUILayout.LabelField($"#{i + 1}", GUILayout.Width(30));
-                        EditorGUILayout.LabelField(stats.modelId, EditorStyles.boldLabel);
-                        GUILayout.FlexibleSpace();
-                        EditorGUILayout.LabelField($"{stats.importCount} imports", GUILayout.Width(100));
-                    }
-                    
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        EditorGUILayout.LabelField($"Views: {stats.viewCount}", GUILayout.Width(150));
-                        EditorGUILayout.LabelField($"Last accessed: {stats.lastAccessed:yyyy-MM-dd HH:mm}", GUILayout.Width(200));
-                    }
+                    EditorGUILayout.HelpBox("No import data available.", MessageType.Info);
+                    return;
                 }
-                EditorGUILayout.Space(5);
+
+                for (int i = 0; i < _mostImported.Count; i++)
+                {
+                    ModelUsageStats stats = _mostImported[i];
+                    using (EditorGUILayout.VerticalScope entryScope = UIStyles.BeginCard())
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            EditorGUILayout.LabelField($"#{i + 1}", GUILayout.Width(__RANK_LABEL_WIDTH));
+                            EditorGUILayout.LabelField(stats.modelId, UIStyles.SectionHeader);
+                            GUILayout.FlexibleSpace();
+                            EditorGUILayout.LabelField($"{stats.importCount} imports", GUILayout.Width(__EVENT_VALUE_WIDTH));
+                        }
+
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            EditorGUILayout.LabelField($"Views: {stats.viewCount}", GUILayout.Width(__EVENT_VIEW_WIDTH));
+                            EditorGUILayout.LabelField($"Last accessed: {stats.lastAccessed:yyyy-MM-dd HH:mm}", GUILayout.Width(__EVENT_DATE_WIDTH));
+                        }
+                    }
+                    EditorGUILayout.Space(UIConstants.SPACING_SMALL);
+                }
             }
         }
 
@@ -227,35 +243,37 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawMostViewed()
         {
-            EditorGUILayout.LabelField("Most Viewed Models", EditorStyles.boldLabel);
-            EditorGUILayout.Space(5);
-
-            if (_mostViewed == null || _mostViewed.Count == 0)
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                EditorGUILayout.HelpBox("No view data available.", MessageType.Info);
-                return;
-            }
+                UIStyles.DrawSectionHeader("Most Viewed Models");
 
-            for (int i = 0; i < _mostViewed.Count; i++)
-            {
-                ModelUsageStats stats = _mostViewed[i];
-                using (new EditorGUILayout.VerticalScope("box"))
+                if (_mostViewed == null || _mostViewed.Count == 0)
                 {
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        EditorGUILayout.LabelField($"#{i + 1}", GUILayout.Width(30));
-                        EditorGUILayout.LabelField(stats.modelId, EditorStyles.boldLabel);
-                        GUILayout.FlexibleSpace();
-                        EditorGUILayout.LabelField($"{stats.viewCount} views", GUILayout.Width(100));
-                    }
-                    
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        EditorGUILayout.LabelField($"Imports: {stats.importCount}", GUILayout.Width(150));
-                        EditorGUILayout.LabelField($"Last accessed: {stats.lastAccessed:yyyy-MM-dd HH:mm}", GUILayout.Width(200));
-                    }
+                    EditorGUILayout.HelpBox("No view data available.", MessageType.Info);
+                    return;
                 }
-                EditorGUILayout.Space(5);
+
+                for (int i = 0; i < _mostViewed.Count; i++)
+                {
+                    ModelUsageStats stats = _mostViewed[i];
+                    using (EditorGUILayout.VerticalScope entryScope = UIStyles.BeginCard())
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            EditorGUILayout.LabelField($"#{i + 1}", GUILayout.Width(__RANK_LABEL_WIDTH));
+                            EditorGUILayout.LabelField(stats.modelId, UIStyles.SectionHeader);
+                            GUILayout.FlexibleSpace();
+                            EditorGUILayout.LabelField($"{stats.viewCount} views", GUILayout.Width(__EVENT_VALUE_WIDTH));
+                        }
+
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            EditorGUILayout.LabelField($"Imports: {stats.importCount}", GUILayout.Width(__EVENT_VIEW_WIDTH));
+                            EditorGUILayout.LabelField($"Last accessed: {stats.lastAccessed:yyyy-MM-dd HH:mm}", GUILayout.Width(__EVENT_DATE_WIDTH));
+                        }
+                    }
+                    EditorGUILayout.Space(UIConstants.SPACING_SMALL);
+                }
             }
         }
 
@@ -264,35 +282,37 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawEventTypes()
         {
-            EditorGUILayout.LabelField("Event Types Distribution", EditorStyles.boldLabel);
-            EditorGUILayout.Space(5);
-
-            if (_eventCounts == null || _eventCounts.Count == 0)
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                EditorGUILayout.HelpBox("No event data available.", MessageType.Info);
-                return;
-            }
+                UIStyles.DrawSectionHeader("Event Types Distribution");
 
-            int totalEvents = _eventCounts.Values.Sum();
-
-            foreach (KeyValuePair<string, int> kvp in _eventCounts.OrderByDescending(k => k.Value))
-            {
-                using (new EditorGUILayout.VerticalScope("box"))
+                if (_eventCounts == null || _eventCounts.Count == 0)
                 {
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        EditorGUILayout.LabelField(kvp.Key, EditorStyles.boldLabel, GUILayout.Width(150));
-                        GUILayout.FlexibleSpace();
-                        EditorGUILayout.LabelField($"{kvp.Value:N0}", GUILayout.Width(100));
-                        EditorGUILayout.LabelField($"({(kvp.Value * 100f / totalEvents):F1}%)", GUILayout.Width(60));
-                    }
-
-                    // Simple progress bar
-                    Rect progressRect = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.Height(10));
-                    float progress = totalEvents > 0 ? (float)kvp.Value / totalEvents : 0f;
-                    EditorGUI.ProgressBar(progressRect, progress, "");
+                    EditorGUILayout.HelpBox("No event data available.", MessageType.Info);
+                    return;
                 }
-                EditorGUILayout.Space(5);
+
+                int totalEvents = _eventCounts.Values.Sum();
+
+                foreach (KeyValuePair<string, int> kvp in _eventCounts.OrderByDescending(k => k.Value))
+                {
+                    using (EditorGUILayout.VerticalScope entryScope = UIStyles.BeginCard())
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            EditorGUILayout.LabelField(kvp.Key, UIStyles.SectionHeader, GUILayout.Width(__EVENT_LABEL_WIDTH));
+                            GUILayout.FlexibleSpace();
+                            EditorGUILayout.LabelField($"{kvp.Value:N0}", GUILayout.Width(__EVENT_VALUE_WIDTH));
+                            EditorGUILayout.LabelField($"({(kvp.Value * 100f / totalEvents):F1}%)", GUILayout.Width(__EVENT_PERCENT_WIDTH));
+                        }
+
+                        // Simple progress bar
+                        Rect progressRect = GUILayoutUtility.GetRect(GUIContent.none, GUIStyle.none, GUILayout.Height(UIConstants.SPACING_DEFAULT));
+                        float progress = totalEvents > 0 ? (float)kvp.Value / totalEvents : 0f;
+                        EditorGUI.ProgressBar(progressRect, progress, string.Empty);
+                    }
+                    EditorGUILayout.Space(UIConstants.SPACING_SMALL);
+                }
             }
         }
     }

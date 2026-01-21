@@ -1,3 +1,4 @@
+using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -58,8 +59,9 @@ namespace ModelLibrary.Editor.Windows
             // Validate parameters
             if (string.IsNullOrEmpty(modelId))
             {
+                UIStyles.DrawPageHeader("Version Comparison", "Compare metadata across two versions.");
                 EditorGUILayout.HelpBox("No model selected for comparison. Please select a model from the browser.", MessageType.Warning);
-                if (GUILayout.Button("Back to Browser", GUILayout.Height(30)))
+                if (GUILayout.Button("Back to Browser", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
                 {
                     NavigateToView(ViewType.Browser);
                 }

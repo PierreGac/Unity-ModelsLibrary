@@ -13,6 +13,16 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public class ErrorLogViewerWindow : EditorWindow
     {
+        private const float __TOOLBAR_BUTTON_WIDTH_SMALL = 80f;
+        private const float __TOOLBAR_BUTTON_WIDTH_MEDIUM = 100f;
+        private const float __TOOLBAR_BUTTON_WIDTH_LARGE = 120f;
+        private const float __FILTER_LABEL_WIDTH_SMALL = 40f;
+        private const float __FILTER_LABEL_WIDTH_MEDIUM = 60f;
+        private const float __FILTER_LABEL_WIDTH_LARGE = 90f;
+        private const float __FILTER_SEARCH_WIDTH = 200f;
+        private const float __ENTRY_TIMESTAMP_WIDTH = 150f;
+        private const float __ENTRY_CATEGORY_WIDTH = 100f;
+        private const float __ENTRY_CONTEXT_LABEL_WIDTH = 60f;
         private List<ErrorLogEntry> _allEntries = new List<ErrorLogEntry>();
         private List<ErrorLogEntry> _filteredEntries = new List<ErrorLogEntry>();
         private Vector2 _scrollPosition = Vector2.zero;
@@ -46,10 +56,11 @@ namespace ModelLibrary.Editor.Windows
                 RefreshLog();
             }
 
+            UIStyles.DrawPageHeader("Error Log", "Review recent issues and clear suppressions.");
             DrawToolbar();
-            EditorGUILayout.Space(5);
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
             DrawFilterBar();
-            EditorGUILayout.Space(5);
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
             DrawLogEntries();
         }
 
@@ -57,18 +68,18 @@ namespace ModelLibrary.Editor.Windows
         {
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
-                if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(80)))
+                if (GUILayout.Button("Refresh", UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_SMALL)))
                 {
                     RefreshLog();
                 }
 
-                GUILayout.Space(10);
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
 
-                _autoRefresh = GUILayout.Toggle(_autoRefresh, "Auto-refresh", EditorStyles.toolbarButton, GUILayout.Width(100));
+                _autoRefresh = GUILayout.Toggle(_autoRefresh, "Auto-refresh", UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_MEDIUM));
 
                 GUILayout.FlexibleSpace();
 
-                if (GUILayout.Button("Clear Log", EditorStyles.toolbarButton, GUILayout.Width(80)))
+                if (GUILayout.Button("Clear Log", UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_SMALL)))
                 {
                     if (EditorUtility.DisplayDialog("Clear Error Log", 
                         "Are you sure you want to clear all error log entries? This cannot be undone.", 
@@ -79,9 +90,9 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
-                GUILayout.Space(10);
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
 
-                if (GUILayout.Button("Clear Suppressions", EditorStyles.toolbarButton, GUILayout.Width(120)))
+                if (GUILayout.Button("Clear Suppressions", UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_LARGE)))
                 {
                     if (EditorUtility.DisplayDialog("Clear Suppressed Errors", 
                         "This will re-enable all error dialogs that were previously suppressed. Continue?", 
@@ -93,9 +104,9 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
-                GUILayout.Space(10);
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
 
-                if (GUILayout.Button("Open Log File", EditorStyles.toolbarButton, GUILayout.Width(100)))
+                if (GUILayout.Button("Open Log File", UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_MEDIUM)))
                 {
                     string logPath = ErrorLogger.GetLogFilePathForDisplay();
                     if (File.Exists(logPath))
@@ -109,31 +120,31 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
-                GUILayout.Label($"Entries: {_filteredEntries.Count}", EditorStyles.miniLabel, GUILayout.Width(80));
+                GUILayout.Label($"Entries: {_filteredEntries.Count}", UIStyles.MutedLabel, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_SMALL));
             }
         }
 
         private void DrawFilterBar()
         {
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+            using (new EditorGUILayout.HorizontalScope(UIStyles.CardBox))
             {
-                GUILayout.Label("Filter:", EditorStyles.miniLabel, GUILayout.Width(40));
+                GUILayout.Label("Filter:", UIStyles.MutedLabel, GUILayout.Width(__FILTER_LABEL_WIDTH_SMALL));
 
                 // Category filter
-                GUILayout.Label("Category:", EditorStyles.miniLabel, GUILayout.Width(60));
+                GUILayout.Label("Category:", UIStyles.MutedLabel, GUILayout.Width(__FILTER_LABEL_WIDTH_MEDIUM));
                 ErrorHandler.ErrorCategory newCategory = (ErrorHandler.ErrorCategory)EditorGUILayout.EnumPopup(
-                    _filterCategory, EditorStyles.miniButton, GUILayout.Width(120));
+                    _filterCategory, EditorStyles.miniButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_LARGE));
                 if (newCategory != _filterCategory)
                 {
                     _filterCategory = newCategory;
                     ApplyFilters();
                 }
 
-                GUILayout.Space(10);
+                GUILayout.Space(UIConstants.SPACING_DEFAULT);
 
                 // Search filter
-                GUILayout.Label("Search:", EditorStyles.miniLabel, GUILayout.Width(50));
-                string newSearch = EditorGUILayout.TextField(_searchText, EditorStyles.toolbarSearchField, GUILayout.Width(200));
+                GUILayout.Label("Search:", UIStyles.MutedLabel, GUILayout.Width(__FILTER_LABEL_WIDTH_MEDIUM));
+                string newSearch = EditorGUILayout.TextField(_searchText, EditorStyles.toolbarSearchField, GUILayout.Width(__FILTER_SEARCH_WIDTH));
                 if (newSearch != _searchText)
                 {
                     _searchText = newSearch;
@@ -143,7 +154,7 @@ namespace ModelLibrary.Editor.Windows
                 GUILayout.FlexibleSpace();
 
                 // Clear filters button
-                if (GUILayout.Button("Clear Filters", EditorStyles.miniButton, GUILayout.Width(90)))
+                if (GUILayout.Button("Clear Filters", EditorStyles.miniButton, GUILayout.Width(__FILTER_LABEL_WIDTH_LARGE)))
                 {
                     _filterCategory = ErrorHandler.ErrorCategory.Unknown;
                     _searchText = "";
@@ -166,8 +177,9 @@ namespace ModelLibrary.Editor.Windows
 
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
 
-            foreach (ErrorLogEntry entry in _filteredEntries)
+            for (int i = 0; i < _filteredEntries.Count; i++)
             {
+                ErrorLogEntry entry = _filteredEntries[i];
                 DrawLogEntry(entry);
             }
 
@@ -176,30 +188,29 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawLogEntry(ErrorLogEntry entry)
         {
-            using (new EditorGUILayout.VerticalScope("box"))
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
                 // Header with timestamp and category
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    GUIStyle headerStyle = new GUIStyle(EditorStyles.boldLabel);
-                    headerStyle.fontSize = 11;
-                    GUILayout.Label($"{entry.Timestamp:yyyy-MM-dd HH:mm:ss}", headerStyle, GUILayout.Width(150));
+                    GUIStyle headerStyle = new GUIStyle(UIStyles.MutedLabel);
+                    headerStyle.fontStyle = FontStyle.Bold;
+                    GUILayout.Label($"{entry.Timestamp:yyyy-MM-dd HH:mm:ss}", headerStyle, GUILayout.Width(__ENTRY_TIMESTAMP_WIDTH));
 
                     // Category badge
                     Color categoryColor = GetCategoryColor(entry.Category);
                     Color originalColor = GUI.color;
                     GUI.color = categoryColor;
-                    GUILayout.Label($"[{entry.Category}]", EditorStyles.miniLabel, GUILayout.Width(100));
+                    GUILayout.Label($"[{entry.Category}]", UIStyles.MutedLabel, GUILayout.Width(__ENTRY_CATEGORY_WIDTH));
                     GUI.color = originalColor;
 
                     GUILayout.FlexibleSpace();
                 }
 
-                EditorGUILayout.Space(2);
+                EditorGUILayout.Space(UIConstants.SPACING_EXTRA_SMALL);
 
                 // Title
-                GUIStyle titleStyle = new GUIStyle(EditorStyles.label);
-                titleStyle.fontStyle = FontStyle.Bold;
+                GUIStyle titleStyle = new GUIStyle(UIStyles.SectionHeader);
                 titleStyle.wordWrap = true;
                 EditorGUILayout.LabelField(entry.Title, titleStyle);
 
@@ -212,10 +223,10 @@ namespace ModelLibrary.Editor.Windows
                 // Context
                 if (!string.IsNullOrEmpty(entry.Context))
                 {
-                    EditorGUILayout.Space(2);
+                    EditorGUILayout.Space(UIConstants.SPACING_EXTRA_SMALL);
                     using (new EditorGUILayout.HorizontalScope())
                     {
-                        GUILayout.Label("Context:", EditorStyles.miniLabel, GUILayout.Width(60));
+                        GUILayout.Label("Context:", UIStyles.MutedLabel, GUILayout.Width(__ENTRY_CONTEXT_LABEL_WIDTH));
                         EditorGUILayout.LabelField(entry.Context, EditorStyles.wordWrappedMiniLabel);
                     }
                 }

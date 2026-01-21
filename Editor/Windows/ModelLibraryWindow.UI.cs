@@ -13,6 +13,59 @@ namespace ModelLibrary.Editor.Windows
     public partial class ModelLibraryWindow
     {
         private bool _isExiting = false;
+        private const float __TOOLBAR_SEARCH_MIN_WIDTH = 200f;
+        private const float __TOOLBAR_HELP_BUTTON_WIDTH = 24f;
+        private const float __TOOLBAR_HISTORY_BUTTON_WIDTH = 20f;
+        private const float __TOOLBAR_CLEAR_BUTTON_WIDTH = 60f;
+        private const float __TOOLBAR_ACTIONS_BUTTON_WIDTH = 80f;
+        private const float __TOOLBAR_UPDATE_BUTTON_WIDTH = 130f;
+        private const float __TOOLBAR_UPDATE_BUTTON_HEIGHT = 20f;
+        private const float __TOOLBAR_BULK_BUTTON_WIDTH = 70f;
+        private const float __TOOLBAR_SETTINGS_BUTTON_WIDTH = 80f;
+        private const float __TOOLBAR_HELP_ICON_WIDTH = 28f;
+        private const float __TOOLBAR_HELP_TEXT_WIDTH = 50f;
+        private const float __TOOLBAR_ROLE_BUTTON_WIDTH = 90f;
+        private const float __TOOLBAR_SORT_LABEL_WIDTH = 35f;
+        private const float __TOOLBAR_SORT_POPUP_WIDTH = 80f;
+        private const float __TOOLBAR_VIEWMODE_WIDTH = 105f;
+
+        private const float __TAG_FILTER_PRESET_WIDTH = 80f;
+        private const float __TAG_FILTER_SAVE_WIDTH = 90f;
+        private const float __TAG_FILTER_CLEAR_WIDTH = 90f;
+        private const float __TAG_FILTER_SEARCH_LABEL_WIDTH = 80f;
+        private const float __TAG_FILTER_SEARCH_CLEAR_WIDTH = 50f;
+        private const float __TAG_FILTER_SCROLL_HEIGHT = 140f;
+
+        private const float __LIST_BUTTON_STAR_WIDTH = 20f;
+        private const float __LIST_BUTTON_DETAILS_WIDTH = 70f;
+        private const float __LIST_BUTTON_DOWNLOAD_WIDTH = 90f;
+        private const float __LIST_BUTTON_IMPORT_WIDTH = 80f;
+
+        private const float __GRID_CARD_SPACING = UIConstants.SPACING_STANDARD;
+        private const float __GRID_CARD_PADDING = UIConstants.PADDING_SMALL;
+        private const float __GRID_CARD_EXTRA_HEIGHT = 80f;
+        private const float __IMAGE_CARD_SPACING = UIConstants.SPACING_DEFAULT;
+
+        private const float __LOADING_OVERLAY_ALPHA = 0.5f;
+        private const float __LOADING_BOX_WIDTH = 300f;
+        private const float __LOADING_BOX_HEIGHT = 100f;
+        private const float __LOADING_TITLE_OFFSET_Y = 20f;
+        private const float __LOADING_PROGRESS_OFFSET_Y = 50f;
+
+        private const float __NOTIFICATION_HEIGHT = 30f;
+        private const float __NOTIFICATION_CLOSE_WIDTH = 20f;
+        private const float __NOTIFICATION_CLOSE_HEIGHT = 20f;
+        private const float __NOTIFICATION_PADDING = 10f;
+        private const float __NOTIFICATION_ALPHA = 0.9f;
+
+        private const float __THUMBNAIL_PLACEHOLDER_BORDER_SIZE = 1f;
+        private const float __THUMBNAIL_PLACEHOLDER_PADDING = 4f;
+
+        private const float __THUMBNAIL_SLIDER_WIDTH = 100f;
+        private const float __THUMBNAIL_SLIDER_HEIGHT = 18f;
+        private const float __THUMBNAIL_SLIDER_MARGIN = 8f;
+        private const float __THUMBNAIL_LABEL_WIDTH = 45f;
+        private const float __THUMBNAIL_LABEL_OFFSET = 50f;
 
         private void OnGUI()
         {
@@ -274,11 +327,15 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawBulkTagView()
         {
-            EditorGUILayout.HelpBox("Bulk Tag view is being integrated. For now, please use the separate Bulk Tag window.", MessageType.Info);
-            EditorGUILayout.Space();
-            if (GUILayout.Button("Open Bulk Tag Window", GUILayout.Height(30)))
+            UIStyles.DrawPageHeader("Bulk Tag Editor", "Apply tag changes across selected models.");
+            using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                // Bulk tag window requires service and entries - handled in Operations
+                EditorGUILayout.HelpBox("Bulk Tag view is being integrated. For now, please use the separate Bulk Tag window.", MessageType.Info);
+                EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
+                if (GUILayout.Button("Open Bulk Tag Window", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
+                {
+                    // Bulk tag window requires service and entries - handled in Operations
+                }
             }
         }
 
@@ -295,7 +352,7 @@ namespace ModelLibrary.Editor.Windows
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
                 GUI.SetNextControlName("SearchField");
-                string newSearch = GUILayout.TextField(_search, EditorStyles.toolbarSearchField, GUILayout.ExpandWidth(true), GUILayout.MinWidth(200));
+                string newSearch = GUILayout.TextField(_search, EditorStyles.toolbarSearchField, GUILayout.ExpandWidth(true), GUILayout.MinWidth(__TOOLBAR_SEARCH_MIN_WIDTH));
                 _search = newSearch;
 
                 GUIContent searchHelpIcon = EditorGUIUtility.IconContent("_Help");
@@ -307,7 +364,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     searchHelpIcon.tooltip = "Search help and advanced operators";
                 }
-                if (GUILayout.Button(searchHelpIcon, EditorStyles.toolbarButton, GUILayout.Width(24)))
+                if (GUILayout.Button(searchHelpIcon, UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_HELP_BUTTON_WIDTH)))
                 {
                     ShowSearchHelpDialog();
                 }
@@ -317,9 +374,9 @@ namespace ModelLibrary.Editor.Windows
                 Color originalColor = GUI.color;
                 if (hasHistory)
                 {
-                    GUI.color = new Color(0.7f, 0.9f, 1f);
+                    GUI.color = UIConstants.COLOR_SEARCH_HISTORY_ACTIVE;
                 }
-                if (GUILayout.Button(historyButtonContent, EditorStyles.toolbarButton, GUILayout.Width(20)))
+                if (GUILayout.Button(historyButtonContent, UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_HISTORY_BUTTON_WIDTH)))
                 {
                     _searchHistoryManager.ShowSearchHistoryMenu(item =>
                     {
@@ -333,7 +390,7 @@ namespace ModelLibrary.Editor.Windows
                 using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(_search)))
                 {
                     GUIContent clearSearchContent = new GUIContent("Clear", "Clear the current search text");
-                    if (GUILayout.Button(clearSearchContent, EditorStyles.toolbarButton, GUILayout.Width(60)))
+                    if (GUILayout.Button(clearSearchContent, UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_CLEAR_BUTTON_WIDTH)))
                     {
                         _search = string.Empty;
                         GUI.FocusControl(null);
@@ -341,7 +398,7 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 GUIContent actionsMenuContent = new GUIContent("Actions ▼", "Refresh repository data, check for updates, or submit new models");
-                if (GUILayout.Button(actionsMenuContent, EditorStyles.toolbarButton, GUILayout.Width(80)))
+                if (GUILayout.Button(actionsMenuContent, UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_ACTIONS_BUTTON_WIDTH)))
                 {
                     GenericMenu actionsMenu = new GenericMenu();
                     using (new EditorGUI.DisabledScope(_refreshingManifest || _loadingIndex))
@@ -398,7 +455,7 @@ namespace ModelLibrary.Editor.Windows
                     }
 
                     GUIContent updateContent = new GUIContent($"🔄 Updates ({_updateCount})", tooltipText);
-                    if (GUILayout.Button(updateContent, updateBadgeStyle, GUILayout.Width(130), GUILayout.Height(20)))
+                    if (GUILayout.Button(updateContent, updateBadgeStyle, GUILayout.Width(__TOOLBAR_UPDATE_BUTTON_WIDTH), GUILayout.Height(__TOOLBAR_UPDATE_BUTTON_HEIGHT)))
                     {
                         _search = "has:update";
                         GUI.FocusControl(null);
@@ -408,8 +465,13 @@ namespace ModelLibrary.Editor.Windows
                     GUI.color = savedColor;
                 }
 
-                GUIContent bulkMenuContent = new GUIContent("Bulk ▼", "Enable selection mode and run batch import/update operations");
-                if (GUILayout.Button(bulkMenuContent, EditorStyles.toolbarButton, GUILayout.Width(70)))
+                GUIContent bulkMenuContent = new GUIContent("Bulk ▼", _bulkSelectionMode ? $"Selection mode active ({_selectedModels.Count} selected)" : "Enable selection mode and run batch import/update operations");
+                Color originalBulkColor = GUI.color;
+                if (_bulkSelectionMode)
+                {
+                    GUI.color = UIConstants.COLOR_BULK_SELECTION_ACTIVE;
+                }
+                if (GUILayout.Button(bulkMenuContent, UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BULK_BUTTON_WIDTH)))
                 {
                     GenericMenu bulkMenu = new GenericMenu();
                     bulkMenu.AddItem(new GUIContent("Select Mode"), _bulkSelectionMode, () =>
@@ -451,11 +513,12 @@ namespace ModelLibrary.Editor.Windows
 
                     bulkMenu.ShowAsContext();
                 }
+                GUI.color = originalBulkColor;
                 SimpleUserIdentityProvider roleProvider = new SimpleUserIdentityProvider();
                 UserRole currentRole = roleProvider.GetUserRole();
 
                 GUIContent settingsMenuContent = new GUIContent("Settings ▼", "Open unified settings, error logs, or the configuration wizard");
-                if (GUILayout.Button(settingsMenuContent, EditorStyles.toolbarButton, GUILayout.Width(80)))
+                if (GUILayout.Button(settingsMenuContent, UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_SETTINGS_BUTTON_WIDTH)))
                 {
                     GenericMenu settingsMenu = new GenericMenu();
                     settingsMenu.AddItem(new GUIContent("Help / Documentation", "Open the Model Library help center"), false, () => NavigateToView(ViewType.Help));
@@ -487,8 +550,8 @@ namespace ModelLibrary.Editor.Windows
                 {
                     generalHelpContent.tooltip = "Open the Model Library help center";
                 }
-                float helpButtonWidth = generalHelpContent.image != null ? 28f : 50f;
-                if (GUILayout.Button(generalHelpContent, EditorStyles.toolbarButton, GUILayout.Width(helpButtonWidth)))
+                float helpButtonWidth = generalHelpContent.image != null ? __TOOLBAR_HELP_ICON_WIDTH : __TOOLBAR_HELP_TEXT_WIDTH;
+                if (GUILayout.Button(generalHelpContent, UIStyles.ToolbarButton, GUILayout.Width(helpButtonWidth)))
                 {
                     NavigateToView(ViewType.Help);
                 }
@@ -505,13 +568,13 @@ namespace ModelLibrary.Editor.Windows
                     fontStyle = FontStyle.Bold
                 };
 
-                if (GUILayout.Button(new GUIContent($"👤 {roleLabel}", roleTooltip), roleStyle, GUILayout.Width(90)))
+                if (GUILayout.Button(new GUIContent($"👤 {roleLabel}", roleTooltip), roleStyle, GUILayout.Width(__TOOLBAR_ROLE_BUTTON_WIDTH)))
                 {
                     NavigateToView(ViewType.Settings);
                 }
 
-                GUILayout.Label("Sort:", EditorStyles.miniLabel, GUILayout.Width(35));
-                ModelSortMode newSortMode = (ModelSortMode)EditorGUILayout.EnumPopup(_sortMode, EditorStyles.toolbarPopup, GUILayout.Width(80));
+                GUILayout.Label("Sort:", UIStyles.MutedLabel, GUILayout.Width(__TOOLBAR_SORT_LABEL_WIDTH));
+                ModelSortMode newSortMode = (ModelSortMode)EditorGUILayout.EnumPopup(_sortMode, UIStyles.ToolbarPopup, GUILayout.Width(__TOOLBAR_SORT_POPUP_WIDTH));
                 if (newSortMode != _sortMode)
                 {
                     _sortMode = newSortMode;
@@ -550,7 +613,7 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 GUIContent[] viewModeIcons = { listIcon, gridIcon, imageIcon };
-                int newViewMode = GUILayout.Toolbar((int)_viewMode, viewModeIcons, EditorStyles.toolbarButton, GUILayout.Width(105));
+                int newViewMode = GUILayout.Toolbar((int)_viewMode, viewModeIcons, UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_VIEWMODE_WIDTH));
                 if (newViewMode != (int)_viewMode)
                 {
                     _viewMode = (ViewMode)newViewMode;
@@ -568,34 +631,31 @@ namespace ModelLibrary.Editor.Windows
             
             // Draw semi-transparent background
             Color originalColor = GUI.color;
-            GUI.color = new Color(0, 0, 0, 0.5f);
+            GUI.color = new Color(0f, 0f, 0f, __LOADING_OVERLAY_ALPHA);
             GUI.DrawTexture(overlayRect, Texture2D.whiteTexture);
             GUI.color = originalColor;
 
             // Draw loading message box in center
-            float boxWidth = 300f;
-            float boxHeight = 100f;
             Rect boxRect = new Rect(
-                (position.width - boxWidth) * 0.5f,
-                (position.height - boxHeight) * 0.5f,
-                boxWidth,
-                boxHeight
+                (position.width - __LOADING_BOX_WIDTH) * 0.5f,
+                (position.height - __LOADING_BOX_HEIGHT) * 0.5f,
+                __LOADING_BOX_WIDTH,
+                __LOADING_BOX_HEIGHT
             );
 
-            GUI.Box(boxRect, "", EditorStyles.helpBox);
+            GUI.Box(boxRect, string.Empty, UIStyles.CardBox);
 
             // Draw loading text
-            GUIStyle labelStyle = new GUIStyle(EditorStyles.boldLabel)
+            GUIStyle labelStyle = new GUIStyle(UIStyles.SectionHeader)
             {
-                alignment = TextAnchor.MiddleCenter,
-                fontSize = 14
+                alignment = TextAnchor.MiddleCenter
             };
 
             string loadingText = _refreshingManifest 
                 ? "Refreshing model library..." 
                 : "Loading model index...";
 
-            Rect labelRect = new Rect(boxRect.x, boxRect.y + 20f, boxWidth, 30f);
+            Rect labelRect = new Rect(boxRect.x, boxRect.y + __LOADING_TITLE_OFFSET_Y, __LOADING_BOX_WIDTH, 30f);
             GUI.Label(labelRect, loadingText, labelStyle);
 
             // Draw progress indicator (animated dots)
@@ -606,8 +666,8 @@ namespace ModelLibrary.Editor.Windows
                 progressDots += ".";
             }
 
-            Rect progressRect = new Rect(boxRect.x, boxRect.y + 50f, boxWidth, 20f);
-            GUIStyle progressStyle = new GUIStyle(EditorStyles.label)
+            Rect progressRect = new Rect(boxRect.x, boxRect.y + __LOADING_PROGRESS_OFFSET_Y, __LOADING_BOX_WIDTH, 20f);
+            GUIStyle progressStyle = new GUIStyle(UIStyles.MutedLabel)
             {
                 alignment = TextAnchor.MiddleCenter
             };
@@ -636,22 +696,22 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            Rect notificationRect = new Rect(0, 0, position.width, 30f);
-            GUI.Box(notificationRect, string.Empty, EditorStyles.helpBox);
+            Rect notificationRect = new Rect(0, 0, position.width, __NOTIFICATION_HEIGHT);
+            GUI.Box(notificationRect, string.Empty, UIStyles.CardBox);
 
             Color originalColor = GUI.color;
-            GUI.color = new Color(0.3f, 0.8f, 0.3f, 0.9f);
+            GUI.color = new Color(0.3f, 0.8f, 0.3f, __NOTIFICATION_ALPHA);
 
             using (new EditorGUILayout.HorizontalScope())
             {
-                GUILayout.Space(10f);
-                EditorGUILayout.LabelField(_notificationMessage, EditorStyles.boldLabel);
+                GUILayout.Space(__NOTIFICATION_PADDING);
+                EditorGUILayout.LabelField(_notificationMessage, UIStyles.SectionHeader);
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button("×", GUILayout.Width(20f), GUILayout.Height(20f)))
+                if (GUILayout.Button("×", GUILayout.Width(__NOTIFICATION_CLOSE_WIDTH), GUILayout.Height(__NOTIFICATION_CLOSE_HEIGHT)))
                 {
                     _notificationMessage = null;
                 }
-                GUILayout.Space(10f);
+                GUILayout.Space(__NOTIFICATION_PADDING);
             }
 
             GUI.color = originalColor;
@@ -669,7 +729,7 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawTagFilter(ModelIndex index)
         {
-            using (new EditorGUILayout.VerticalScope("box"))
+            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox))
             {
                 _showTagFilter = EditorGUILayout.Foldout(_showTagFilter, "Filter by Tags", true);
                 if (!_showTagFilter)
@@ -679,7 +739,7 @@ namespace ModelLibrary.Editor.Windows
 
                 if (index == null)
                 {
-                    EditorGUILayout.LabelField("Loading tags...", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField("Loading tags...", UIStyles.MutedLabel);
                     return;
                 }
 
@@ -691,7 +751,7 @@ namespace ModelLibrary.Editor.Windows
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Presets ▼", EditorStyles.toolbarButton, GUILayout.Width(80f)))
+                    if (GUILayout.Button("Presets ▼", UIStyles.ToolbarButton, GUILayout.Width(__TAG_FILTER_PRESET_WIDTH)))
                     {
                         _filterPresetManager.ShowFilterPresetsMenu((searchQuery, tags) =>
                         {
@@ -709,7 +769,7 @@ namespace ModelLibrary.Editor.Windows
                     bool hasActiveFilters = !string.IsNullOrWhiteSpace(_search) || _selectedTags.Count > 0;
                     using (new EditorGUI.DisabledScope(!hasActiveFilters))
                     {
-                        if (GUILayout.Button("Save Search", EditorStyles.toolbarButton, GUILayout.Width(90f)))
+                        if (GUILayout.Button("Save Search", UIStyles.ToolbarButton, GUILayout.Width(__TAG_FILTER_SAVE_WIDTH)))
                         {
                             _filterPresetManager.ShowSavePresetDialog(_search, _selectedTags);
                         }
@@ -717,7 +777,7 @@ namespace ModelLibrary.Editor.Windows
 
                     using (new EditorGUI.DisabledScope(_selectedTags.Count == 0))
                     {
-                        if (GUILayout.Button("Clear Tags", GUILayout.Width(90f)))
+                        if (GUILayout.Button("Clear Tags", UIStyles.ToolbarButton, GUILayout.Width(__TAG_FILTER_CLEAR_WIDTH)))
                         {
                             _selectedTags.Clear();
                             GUI.FocusControl(null);
@@ -729,13 +789,13 @@ namespace ModelLibrary.Editor.Windows
 
                 if (_tagCacheManager.SortedTags.Count == 0)
                 {
-                    EditorGUILayout.LabelField("No tags available.", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField("No tags available.", UIStyles.MutedLabel);
                     return;
                 }
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    EditorGUILayout.LabelField("Search tags:", GUILayout.Width(80f));
+                    EditorGUILayout.LabelField("Search tags:", UIStyles.MutedLabel, GUILayout.Width(__TAG_FILTER_SEARCH_LABEL_WIDTH));
                     GUI.SetNextControlName("TagSearchField");
                     string newTagFilter = EditorGUILayout.TextField(_tagSearchFilter, EditorStyles.toolbarSearchField);
                     if (!string.Equals(newTagFilter, _tagSearchFilter, StringComparison.Ordinal))
@@ -743,7 +803,7 @@ namespace ModelLibrary.Editor.Windows
                         _tagSearchFilter = newTagFilter;
                         Repaint();
                     }
-                    if (GUILayout.Button("Clear", EditorStyles.toolbarButton, GUILayout.Width(50f)))
+                    if (GUILayout.Button("Clear", UIStyles.ToolbarButton, GUILayout.Width(__TAG_FILTER_SEARCH_CLEAR_WIDTH)))
                     {
                         _tagSearchFilter = string.Empty;
                         GUI.FocusControl(null);
@@ -770,11 +830,11 @@ namespace ModelLibrary.Editor.Windows
 
                 if (filteredTags.Count == 0)
                 {
-                    EditorGUILayout.LabelField($"No tags match \"{_tagSearchFilter}\".", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField($"No tags match \"{_tagSearchFilter}\".", UIStyles.MutedLabel);
                     return;
                 }
 
-                _tagScroll = EditorGUILayout.BeginScrollView(_tagScroll, GUILayout.MaxHeight(140f));
+                _tagScroll = EditorGUILayout.BeginScrollView(_tagScroll, GUILayout.MaxHeight(__TAG_FILTER_SCROLL_HEIGHT));
                 for (int i = 0; i < filteredTags.Count; i++)
                 {
                     string tag = filteredTags[i];
@@ -842,10 +902,10 @@ namespace ModelLibrary.Editor.Windows
         private void DrawGridView(List<ModelIndex.Entry> entries)
         {
             float thumbnailSize = _thumbnailSize;
-            const float spacing = 8f;
-            const float cardPadding = 4f;
+            float spacing = __GRID_CARD_SPACING;
+            float cardPadding = __GRID_CARD_PADDING;
             float minCardWidth = thumbnailSize + (cardPadding * 2f);
-            float minCardHeight = thumbnailSize + 80f;
+            float minCardHeight = thumbnailSize + __GRID_CARD_EXTRA_HEIGHT;
 
             float availableWidth = EditorGUIUtility.currentViewWidth - 20f;
             int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / (minCardWidth + spacing)));
@@ -901,7 +961,7 @@ namespace ModelLibrary.Editor.Windows
         private void DrawImageOnlyView(List<ModelIndex.Entry> entries)
         {
             float thumbnailSize = _thumbnailSize;
-            const float spacing = 10f;
+            float spacing = __IMAGE_CARD_SPACING;
             float minCardWidth = thumbnailSize + spacing;
 
             float availableWidth = EditorGUIUtility.currentViewWidth - 20f;
@@ -969,10 +1029,10 @@ namespace ModelLibrary.Editor.Windows
             Color originalBackground = GUI.backgroundColor;
             if (highlight)
             {
-                GUI.backgroundColor = new Color(0.2f, 0.35f, 0.55f, 0.35f);
+                GUI.backgroundColor = UIConstants.COLOR_SELECTION_BACKGROUND;
             }
 
-            using (new EditorGUILayout.VerticalScope("box"))
+            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox))
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -983,7 +1043,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         GUI.color = Color.yellow;
                     }
-                    if (GUILayout.Button(starText, EditorStyles.label, GUILayout.Width(20f)))
+                    if (GUILayout.Button(starText, EditorStyles.label, GUILayout.Width(__LIST_BUTTON_STAR_WIDTH)))
                     {
                         _favoritesManager.ToggleFavorite(entry.id);
                         Repaint();
@@ -992,9 +1052,9 @@ namespace ModelLibrary.Editor.Windows
 
                     DrawNotificationBadges(entry);
 
-                    GUILayout.Label(entry.name, EditorStyles.boldLabel);
+                    GUILayout.Label(entry.name, UIStyles.SectionHeader);
                     GUILayout.FlexibleSpace();
-                    GUILayout.Label($"v{entry.latestVersion}");
+                    GUILayout.Label($"v{entry.latestVersion}", UIStyles.MutedLabel);
 
                     bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
                     string localVersion = installed ? localMeta.version : null;
@@ -1005,14 +1065,14 @@ namespace ModelLibrary.Editor.Windows
                     if (properlyInstalled)
                     {
                         string label = needsUpgrade ? $"Local v{localVersion} (update available)" : $"Local v{localVersion}";
-                        GUILayout.Label(label, EditorStyles.miniLabel);
+                        GUILayout.Label(label, UIStyles.MutedLabel);
                     }
                     else if (installed && (string.IsNullOrEmpty(localVersion) || localVersion == "(unknown)"))
                     {
-                        GUILayout.Label("Local (version unknown)", EditorStyles.miniLabel);
+                        GUILayout.Label("Local (version unknown)", UIStyles.MutedLabel);
                     }
 
-                    if (GUILayout.Button("Details", GUILayout.Width(70f)))
+                    if (UIStyles.DrawSecondaryButton("Details", GUILayout.Width(__LIST_BUTTON_DETAILS_WIDTH)))
                     {
                         Dictionary<string, object> parameters = new Dictionary<string, object>
                         {
@@ -1025,7 +1085,7 @@ namespace ModelLibrary.Editor.Windows
                     bool downloaded = IsDownloaded(entry.id, entry.latestVersion);
                     using (new EditorGUI.DisabledScope(downloaded || isBusy))
                     {
-                        if (GUILayout.Button("Download", GUILayout.Width(90f)))
+                        if (GUILayout.Button("Download", GUILayout.Width(__LIST_BUTTON_DOWNLOAD_WIDTH)))
                         {
                             _ = Download(entry.id, entry.latestVersion);
                         }
@@ -1034,7 +1094,7 @@ namespace ModelLibrary.Editor.Windows
                     using (new EditorGUI.DisabledScope(isBusy || (properlyInstalled && !needsUpgrade)))
                     {
                         string actionLabel = needsUpgrade ? "Update" : "Import";
-                        if (GUILayout.Button(actionLabel, GUILayout.Width(80f)))
+                        if (GUILayout.Button(actionLabel, GUILayout.Width(__LIST_BUTTON_IMPORT_WIDTH)))
                         {
                             string previousVersion = properlyInstalled ? localVersion : null;
                             _ = Import(entry.id, entry.latestVersion, needsUpgrade, previousVersion);
@@ -1042,7 +1102,7 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
-                EditorGUILayout.LabelField(entry.description);
+                EditorGUILayout.LabelField(entry.description, EditorStyles.wordWrappedLabel);
                 EditorGUILayout.LabelField("Tags:", string.Join(", ", entry.tags));
                 EditorGUILayout.LabelField("Updated:", new DateTime(entry.updatedTimeTicks).ToString(CultureInfo.CurrentCulture));
                 EditorGUILayout.LabelField("Release:", entry.releaseTimeTicks <= 0 ? string.Empty : new DateTime(entry.releaseTimeTicks).ToString(CultureInfo.CurrentCulture));
@@ -1106,10 +1166,10 @@ namespace ModelLibrary.Editor.Windows
             Color originalBackground = GUI.backgroundColor;
             if (highlight)
             {
-                GUI.backgroundColor = new Color(0.2f, 0.4f, 0.6f, 0.35f);
+                GUI.backgroundColor = UIConstants.COLOR_SELECTION_BACKGROUND;
             }
 
-            using (new EditorGUILayout.VerticalScope("box", GUILayout.Width(thumbnailSize + (padding * 2f)), GUILayout.MinHeight(minHeight), GUILayout.ExpandWidth(false)))
+            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox, GUILayout.Width(thumbnailSize + (padding * 2f)), GUILayout.MinHeight(minHeight), GUILayout.ExpandWidth(false)))
             {
                 if (_bulkSelectionMode)
                 {
@@ -1198,7 +1258,7 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
-                GUILayout.Space(2f);
+                GUILayout.Space(UIConstants.SPACING_EXTRA_SMALL);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -1254,50 +1314,14 @@ namespace ModelLibrary.Editor.Windows
 
                 if (properlyInstalled)
                 {
-                    // Draw colored "Installed" label with box background
-                    GUIStyle installedLabelStyle = new GUIStyle(EditorStyles.miniLabel)
-                    {
-                        alignment = TextAnchor.MiddleCenter,
-                        padding = new RectOffset(6, 6, 2, 2),
-                        normal = { textColor = new Color(0.1f, 0.7f, 0.2f) }, // Green text
-                        fontStyle = FontStyle.Bold
-                    };
-
-                    Color originalBgColor = GUI.backgroundColor;
-                    // Green background with transparency for better visibility
-                    GUI.backgroundColor = new Color(0.2f, 0.8f, 0.3f, 0.3f);
-
                     string statusText = hasUpdate ? "Update Available" : "Installed";
-                    using (new EditorGUILayout.HorizontalScope("box", GUILayout.ExpandWidth(false)))
-                    {
-                        GUILayout.FlexibleSpace();
-                        GUILayout.Label(statusText, installedLabelStyle);
-                        GUILayout.FlexibleSpace();
-                    }
-
-                    GUI.backgroundColor = originalBgColor;
+                    Color textColor = hasUpdate ? UIConstants.COLOR_STATUS_UPDATE : UIConstants.COLOR_STATUS_INSTALLED;
+                    Color bgColor = hasUpdate ? UIConstants.COLOR_STATUS_UPDATE_BG : UIConstants.COLOR_STATUS_INSTALLED_BG;
+                    UIStyles.DrawStatusBadge(statusText, textColor, bgColor);
                 }
                 else if (installed && (string.IsNullOrEmpty(localVersion) || localVersion == "(unknown)"))
                 {
-                    // Draw colored label for installed but unknown version
-                    GUIStyle installedLabelStyle = new GUIStyle(EditorStyles.miniLabel)
-                    {
-                        alignment = TextAnchor.MiddleCenter,
-                        padding = new RectOffset(6, 6, 2, 2),
-                        normal = { textColor = new Color(0.5f, 0.5f, 0.5f) } // Grey text
-                    };
-
-                    Color originalBgColor = GUI.backgroundColor;
-                    GUI.backgroundColor = new Color(0.6f, 0.6f, 0.6f, 0.2f);
-
-                    using (new EditorGUILayout.HorizontalScope("box"))
-                    {
-                        GUILayout.FlexibleSpace();
-                        GUILayout.Label("Installed", installedLabelStyle);
-                        GUILayout.FlexibleSpace();
-                    }
-
-                    GUI.backgroundColor = originalBgColor;
+                    UIStyles.DrawStatusBadge("Installed", UIConstants.COLOR_STATUS_UNKNOWN, UIConstants.COLOR_STATUS_UNKNOWN_BG);
                 }
 
                 GUI.backgroundColor = originalBackground;
@@ -1322,7 +1346,7 @@ namespace ModelLibrary.Editor.Windows
             if (highlight)
             {
                 Rect outline = new Rect(thumbRect.x - 3f, thumbRect.y - 3f, thumbRect.width + 6f, thumbRect.height + 6f);
-                EditorGUI.DrawRect(outline, new Color(0.25f, 0.45f, 0.7f, 0.3f));
+                EditorGUI.DrawRect(outline, UIConstants.COLOR_SELECTION_OUTLINE);
             }
 
             string tooltip = BuildModelTooltip(entry, key);
@@ -1487,20 +1511,18 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawThumbnailPlaceholder(Rect rect, string modelName, bool isLoading, Action onClick)
         {
-            Color backgroundColor = new Color(0.25f, 0.25f, 0.3f, 1f);
-            EditorGUI.DrawRect(rect, backgroundColor);
+            EditorGUI.DrawRect(rect, UIConstants.COLOR_THUMBNAIL_PLACEHOLDER_BG);
 
-            Color borderColor = new Color(0.4f, 0.4f, 0.45f, 1f);
-            EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width, 1f), borderColor);
-            EditorGUI.DrawRect(new Rect(rect.x, rect.y + rect.height - 1f, rect.width, 1f), borderColor);
-            EditorGUI.DrawRect(new Rect(rect.x, rect.y, 1f, rect.height), borderColor);
-            EditorGUI.DrawRect(new Rect(rect.x + rect.width - 1f, rect.y, 1f, rect.height), borderColor);
+            EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width, __THUMBNAIL_PLACEHOLDER_BORDER_SIZE), UIConstants.COLOR_THUMBNAIL_PLACEHOLDER_BORDER);
+            EditorGUI.DrawRect(new Rect(rect.x, rect.y + rect.height - __THUMBNAIL_PLACEHOLDER_BORDER_SIZE, rect.width, __THUMBNAIL_PLACEHOLDER_BORDER_SIZE), UIConstants.COLOR_THUMBNAIL_PLACEHOLDER_BORDER);
+            EditorGUI.DrawRect(new Rect(rect.x, rect.y, __THUMBNAIL_PLACEHOLDER_BORDER_SIZE, rect.height), UIConstants.COLOR_THUMBNAIL_PLACEHOLDER_BORDER);
+            EditorGUI.DrawRect(new Rect(rect.x + rect.width - __THUMBNAIL_PLACEHOLDER_BORDER_SIZE, rect.y, __THUMBNAIL_PLACEHOLDER_BORDER_SIZE, rect.height), UIConstants.COLOR_THUMBNAIL_PLACEHOLDER_BORDER);
 
             GUIStyle centeredStyle = new GUIStyle(EditorStyles.label)
             {
                 alignment = TextAnchor.MiddleCenter,
                 wordWrap = true,
-                padding = new RectOffset(4, 4, 4, 4)
+                padding = new RectOffset((int)__THUMBNAIL_PLACEHOLDER_PADDING, (int)__THUMBNAIL_PLACEHOLDER_PADDING, (int)__THUMBNAIL_PLACEHOLDER_PADDING, (int)__THUMBNAIL_PLACEHOLDER_PADDING)
             };
 
             if (isLoading)
@@ -1510,12 +1532,12 @@ namespace ModelLibrary.Editor.Windows
                 string[] loadingFrames = { "◐", "◓", "◑", "◒" };
                 string loadingText = string.Concat(loadingFrames[frame], " Loading...");
 
-                centeredStyle.normal.textColor = new Color(0.7f, 0.7f, 0.8f, 1f);
+                centeredStyle.normal.textColor = UIConstants.COLOR_THUMBNAIL_PLACEHOLDER_TEXT_LOADING;
                 GUI.Label(rect, loadingText, centeredStyle);
             }
             else
             {
-                centeredStyle.normal.textColor = new Color(0.5f, 0.5f, 0.6f, 1f);
+                centeredStyle.normal.textColor = UIConstants.COLOR_THUMBNAIL_PLACEHOLDER_TEXT;
                 string displayText = string.IsNullOrEmpty(modelName) ? "No Preview" : modelName;
                 if (displayText.Length > 20)
                 {
@@ -1931,17 +1953,13 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void DrawThumbnailSizeSlider()
         {
-            const float sliderWidth = 100f;
-            const float sliderHeight = 18f;
-            const float margin = 8f;
-
             // Get window position and size
             Rect windowRect = position;
-            float sliderX = windowRect.width - sliderWidth - margin;
-            float sliderY = windowRect.height - sliderHeight - margin;
+            float sliderX = windowRect.width - __THUMBNAIL_SLIDER_WIDTH - __THUMBNAIL_SLIDER_MARGIN;
+            float sliderY = windowRect.height - __THUMBNAIL_SLIDER_HEIGHT - __THUMBNAIL_SLIDER_MARGIN;
 
             // Create slider rect in lower right corner
-            Rect sliderRect = new Rect(sliderX, sliderY, sliderWidth, sliderHeight);
+            Rect sliderRect = new Rect(sliderX, sliderY, __THUMBNAIL_SLIDER_WIDTH, __THUMBNAIL_SLIDER_HEIGHT);
 
             // Draw slider
             float newSize = GUI.HorizontalSlider(sliderRect, _thumbnailSize, __MIN_THUMBNAIL_SIZE, __MAX_THUMBNAIL_SIZE);
@@ -1953,8 +1971,8 @@ namespace ModelLibrary.Editor.Windows
             }
 
             // Draw size label next to slider (optional, for user feedback)
-            Rect labelRect = new Rect(sliderX - 50f, sliderY, 45f, sliderHeight);
-            GUIStyle labelStyle = new GUIStyle(EditorStyles.miniLabel)
+            Rect labelRect = new Rect(sliderX - __THUMBNAIL_LABEL_OFFSET, sliderY, __THUMBNAIL_LABEL_WIDTH, __THUMBNAIL_SLIDER_HEIGHT);
+            GUIStyle labelStyle = new GUIStyle(UIStyles.MutedLabel)
             {
                 alignment = TextAnchor.MiddleRight,
                 normal = { textColor = EditorStyles.miniLabel.normal.textColor }
