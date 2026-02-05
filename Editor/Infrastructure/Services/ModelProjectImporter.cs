@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -235,7 +235,11 @@ namespace ModelLibrary.Editor.Services
                                 }
                                 AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
                             }
-                            catch { /* keep default if API mismatch */ }
+                            catch (Exception ex)
+                            {
+                                // Keep default if API mismatch - log but don't fail
+                                Debug.LogWarning($"[ModelProjectImporter] Failed to set asset labels: {ex.Message}");
+                            }
                         }
                     }
                 }
@@ -537,8 +541,9 @@ namespace ModelLibrary.Editor.Services
                 // Find all .meta files in the destination directory
                 string[] metaFiles = Directory.GetFiles(destAbs, "*.meta", SearchOption.AllDirectories);
 
-                foreach (string metaFile in metaFiles)
+                for (int i = 0; i < metaFiles.Length; i++)
                 {
+                    string metaFile = metaFiles[i];
                     string content = await File.ReadAllTextAsync(metaFile);
                     if (content.Contains("guid:"))
                     {

@@ -141,8 +141,9 @@ namespace ModelLibrary.Editor.Services
 
                 // Process each model
                 Dictionary<string, ModelUpdateInfo> newCache = new Dictionary<string, ModelUpdateInfo>();
-                foreach ((ModelIndex.Entry entry, bool hasUpdate, string localVersion) in scanResults)
+                for (int i = 0; i < scanResults.Count; i++)
                 {
+                    (ModelIndex.Entry entry, bool hasUpdate, string localVersion) = scanResults[i];
                     // Only show updates for models that are actually installed locally
                     if (!string.IsNullOrEmpty(localVersion))
                     {
@@ -154,8 +155,7 @@ namespace ModelLibrary.Editor.Services
                             remoteVersion = entry.latestVersion,
                             hasUpdate = hasUpdate,
                             lastChecked = DateTime.Now,
-                            updateDescription = await GetUpdateDescriptionAsync(entry.id, localVersion, entry.latestVersion)
-                        };
+                            updateDescription = await GetUpdateDescriptionAsync(entry.id, localVersion, entry.latestVersion)                        };
 
                         newCache[entry.id] = updateInfo;
                     }

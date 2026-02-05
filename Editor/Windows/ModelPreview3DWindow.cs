@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -130,6 +130,25 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void OnEnable()
         {
+            // Clean up existing preview utility before creating a new one
+            // This prevents leaks when OnEnable is called multiple times (e.g., when reusing the instance)
+            if (_previewUtil != null)
+            {
+                try
+                {
+                    _previewUtil.ForceCleanup();
+                    _previewUtil.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[ModelPreview3DWindow] Error cleaning up existing preview utility in OnEnable: {ex.Message}");
+                }
+                finally
+                {
+                    _previewUtil = null;
+                }
+            }
+
             _previewUtil = new PreviewUtility3D();
             _hadFocus = focusedWindow == this;
             
@@ -195,34 +214,72 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Cleans up all preview resources including meshes, materials, preview utility, and temporary assets.
+        /// Ensures PreviewRenderUtility is always cleaned up, even if other cleanup operations fail.
         /// </summary>
         private void CleanupPreviewResources()
         {
-            // Clean up preview utility
+            // CRITICAL: Clean up preview utility FIRST to prevent PreviewRenderUtility leaks
+            // This must happen even if other cleanup fails
             if (_previewUtil != null)
             {
-                _previewUtil.Dispose();
-                _previewUtil = null;
+                try
+                {
+                    // First, try to force cleanup explicitly
+                    _previewUtil.ForceCleanup();
+                    // Then dispose properly
+                    _previewUtil.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[ModelPreview3DWindow] Error disposing preview utility: {ex.Message}\n{ex.StackTrace}");
+                    // Try one more time with just Cleanup() if Dispose failed
+                    try
+                    {
+                        _previewUtil.ForceCleanup();
+                    }
+                    catch
+                    {
+                        // Ignore second attempt failures
+                    }
+                }
+                finally
+                {
+                    _previewUtil = null;
+                }
             }
 
             // Clean up mesh copies (materials are assets, so they'll be cleaned up with asset deletion)
-            for (int i = 0; i < _meshes.Count; i++)
+            try
             {
-                MeshInfo meshInfo = _meshes[i];
-                if (meshInfo.mesh != null)
+                for (int i = 0; i < _meshes.Count; i++)
                 {
-                    DestroyImmediate(meshInfo.mesh);
-                    meshInfo.mesh = null;
+                    MeshInfo meshInfo = _meshes[i];
+                    if (meshInfo.mesh != null)
+                    {
+                        DestroyImmediate(meshInfo.mesh);
+                        meshInfo.mesh = null;
+                    }
+                    if (meshInfo.material != null)
+                    {
+                        DestroyImmediate(meshInfo.material);
+                        meshInfo.material = null;
+                    }
                 }
-                if (meshInfo.material != null)
-                {
-                    DestroyImmediate(meshInfo.material);
-                    meshInfo.material = null;
-                }
+                _meshes.Clear();
             }
-            _meshes.Clear();
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ModelPreview3DWindow] Error cleaning up meshes: {ex.Message}");
+            }
 
-            CleanupTempAssets();
+            try
+            {
+                CleanupTempAssets();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ModelPreview3DWindow] Error cleaning up temp assets: {ex.Message}");
+            }
 
             // Clear texture path mappings
             _texturePaths.Clear();
@@ -232,7 +289,14 @@ namespace ModelLibrary.Editor.Windows
             _cacheRoot = null;
 
             // Refresh asset database to ensure cleanup is complete
-            AssetDatabase.Refresh();
+            try
+            {
+                AssetDatabase.Refresh();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ModelPreview3DWindow] Error refreshing AssetDatabase: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -278,7 +342,7 @@ namespace ModelLibrary.Editor.Windows
         /// This helps recover from access denied errors during preview.
         /// </summary>
         /// <param name="cacheRoot">The cache root path to clean up.</param>
-        private void TryCleanupCacheFolder(string cacheRoot)
+        private async Task TryCleanupCacheFolderAsync(string cacheRoot)
         {
             if (string.IsNullOrEmpty(cacheRoot) || !Directory.Exists(cacheRoot))
             {
@@ -287,8 +351,8 @@ namespace ModelLibrary.Editor.Windows
 
             try
             {
-                // Wait a bit for any file handles to be released
-                System.Threading.Thread.Sleep(500);
+                // Wait a bit for any file handles to be released (non-blocking)
+                await Task.Delay(500);
 
                 // Try to delete any temporary files that might be locked
                 string[] tempFiles = Directory.GetFiles(cacheRoot, "*", SearchOption.AllDirectories);
@@ -300,9 +364,10 @@ namespace ModelLibrary.Editor.Windows
                         // Try to remove read-only attributes
                         File.SetAttributes(file, FileAttributes.Normal);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Ignore errors setting attributes
+                        // Log but don't fail on attribute setting errors
+                        Debug.LogWarning($"[ModelPreview3DWindow] Failed to set attributes on {file}: {ex.Message}");
                     }
                 }
 
@@ -802,7 +867,7 @@ namespace ModelLibrary.Editor.Windows
                 // Attempt to clean up cache if it's in a bad state
                 if (_cacheRoot != null)
                 {
-                    TryCleanupCacheFolder(_cacheRoot);
+                    _ = TryCleanupCacheFolderAsync(_cacheRoot);
                 }
             }
             catch (IOException ex) when (ex.Message.IndexOf("access denied", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -821,7 +886,7 @@ namespace ModelLibrary.Editor.Windows
                 // Attempt to clean up cache if it's in a bad state
                 if (_cacheRoot != null)
                 {
-                    TryCleanupCacheFolder(_cacheRoot);
+                    _ = TryCleanupCacheFolderAsync(_cacheRoot);
                 }
             }
             catch (Exception ex)
@@ -831,7 +896,7 @@ namespace ModelLibrary.Editor.Windows
                 // Attempt to clean up cache on any error to prevent locked state
                 if (_cacheRoot != null)
                 {
-                    TryCleanupCacheFolder(_cacheRoot);
+                    _ = TryCleanupCacheFolderAsync(_cacheRoot);
                 }
             }
             finally

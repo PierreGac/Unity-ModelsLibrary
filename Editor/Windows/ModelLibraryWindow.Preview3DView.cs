@@ -30,6 +30,24 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
+            // Clean up existing preview instance before creating/using a new one
+            if (_preview3DInstance != null)
+            {
+                try
+                {
+                    // Call OnDisable to ensure proper cleanup of PreviewRenderUtility
+                    System.Reflection.MethodInfo onDisableMethod = _preview3DInstance.GetType().GetMethod("OnDisable", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (onDisableMethod != null)
+                    {
+                        onDisableMethod.Invoke(_preview3DInstance, null);
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogWarning($"[ModelLibraryWindow] Error cleaning up existing preview instance: {ex.Message}");
+                }
+            }
+
             // Create hidden preview 3D instance if needed
             if (_preview3DInstance == null)
             {

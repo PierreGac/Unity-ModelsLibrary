@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -638,16 +638,21 @@ namespace ModelLibrary.Editor.Repository
                 _directoryCacheTimestamps.TryRemove(normalizedModelDir, out _);
 
                 // Also invalidate any cached entries that start with the model directory path
-                var keysToRemove = new List<string>();
-                foreach (string key in _directoryExistsCache.Keys)
+                List<string> keysToRemove = new List<string>();
+                ICollection<string> cacheKeys = _directoryExistsCache.Keys;
+                string[] keysArray = new string[cacheKeys.Count];
+                cacheKeys.CopyTo(keysArray, 0);
+                for (int i = 0; i < keysArray.Length; i++)
                 {
+                    string key = keysArray[i];
                     if (key.StartsWith(normalizedModelDir, StringComparison.OrdinalIgnoreCase))
                     {
                         keysToRemove.Add(key);
                     }
                 }
-                foreach (string key in keysToRemove)
+                for (int i = 0; i < keysToRemove.Count; i++)
                 {
+                    string key = keysToRemove[i];
                     _directoryExistsCache.TryRemove(key, out _);
                     _directoryContentsCache.TryRemove(key, out _);
                     _directoryCacheTimestamps.TryRemove(key, out _);

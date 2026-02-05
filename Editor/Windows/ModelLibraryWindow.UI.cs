@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -771,7 +771,13 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (GUILayout.Button("Save Search", UIStyles.ToolbarButton, GUILayout.Width(__TAG_FILTER_SAVE_WIDTH)))
                         {
-                            _filterPresetManager.ShowSavePresetDialog(_search, _selectedTags);
+                            // Defer dialog to next frame to avoid breaking the layout stack (modal clears parent's GUI state)
+                            string searchSnapshot = _search ?? string.Empty;
+                            HashSet<string> tagsSnapshot = new HashSet<string>(_selectedTags);
+                            EditorApplication.delayCall += () =>
+                            {
+                                _filterPresetManager.ShowSavePresetDialog(searchSnapshot, tagsSnapshot);
+                            };
                         }
                     }
 

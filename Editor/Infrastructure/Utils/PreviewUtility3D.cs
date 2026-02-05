@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEditor;
 using UnityEngine;
 
@@ -113,19 +113,85 @@ namespace ModelLibrary.Editor.Utils
         }
 
         /// <summary>
+        /// Track whether this instance has been disposed to prevent double cleanup.
+        /// </summary>
+        private bool _disposed = false;
+
+        /// <summary>
         /// Disposes of the preview utility and cleans up all resources.
         /// Cleans up the preview render utility which will destroy all GameObjects in the preview scene.
+        /// This method is safe to call multiple times and handles exceptions gracefully.
         /// </summary>
         public void Dispose()
         {
-            // Cleanup will destroy all GameObjects in the preview scene, including the light and probe
-            // We don't need to manually destroy them
-            if (_root)
+            if (_disposed)
             {
-                UnityEngine.Object.DestroyImmediate(_root);
+                return;
             }
 
-            _preview.Cleanup();
+            try
+            {
+                // Cleanup will destroy all GameObjects in the preview scene, including the light and probe
+                // We don't need to manually destroy them
+                if (_root != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(_root);
+                }
+
+                if (_preview != null)
+                {
+                    _preview.Cleanup();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log but don't throw - we want cleanup to complete even if there's an error
+                Debug.LogError($"[PreviewUtility3D] Error during cleanup: {ex.Message}\n{ex.StackTrace}");
+            }
+            finally
+            {
+                _disposed = true;
+            }
+        }
+
+        /// <summary>
+        /// Explicitly calls Cleanup() on the PreviewRenderUtility.
+        /// This can be called directly if needed, but Dispose() should be preferred.
+        /// </summary>
+        public void ForceCleanup()
+        {
+            if (_preview != null && !_disposed)
+            {
+                try
+                {
+                    _preview.Cleanup();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[PreviewUtility3D] Error in ForceCleanup: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Finalizer to ensure cleanup happens even if Dispose() is not called.
+        /// This is a safety net for cases where the object is not properly disposed.
+        /// Note: Finalizers run on a separate thread, so we must be careful with Unity API calls.
+        /// </summary>
+        ~PreviewUtility3D()
+        {
+            if (!_disposed && _preview != null)
+            {
+                try
+                {
+                    // Call Cleanup() directly - this is safe from finalizer
+                    _preview.Cleanup();
+                }
+                catch
+                {
+                    // Ignore exceptions in finalizer
+                }
+            }
         }
 
         /// <summary>

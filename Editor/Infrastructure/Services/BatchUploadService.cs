@@ -149,7 +149,15 @@ namespace ModelLibrary.Editor.Services
                     finally
                     {
                         // Cleanup temp folder
-                        try { Directory.Delete(tempRoot, true); } catch { }
+                        try 
+                        { 
+                            Directory.Delete(tempRoot, true); 
+                        } 
+                        catch (Exception cleanupEx)
+                        {
+                            // Log cleanup failure but don't throw - upload may have succeeded
+                            Debug.LogWarning($"[BatchUploadService] Failed to clean up temporary directory {tempRoot}: {cleanupEx.Message}");
+                        }
                     }
                 }
                 catch (Exception ex)

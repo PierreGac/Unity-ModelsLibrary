@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -30,36 +31,41 @@ namespace ModelLibrary.Editor.Services
         /// </summary>
         public async Task<List<(ModelIndex.Entry entry, bool hasUpdate, string localVersion)>> ScanProjectForKnownModelsAsync()
         {
-            ModelIndex index = await _indexService.GetIndexAsync();
-            // Gather all asset GUIDs present in project
+            // Gather all asset GUIDs present in project - must be called on main thread before async operations
             string[] allGuids = AssetDatabase.FindAssets(string.Empty);
             HashSet<string> guidSet = new HashSet<string>(allGuids);
+            
+            ModelIndex index = await _indexService.GetIndexAsync();
 
             List<(ModelIndex.Entry, bool, string)> results = new List<(ModelIndex.Entry, bool, string)>();
 
-            foreach (ModelIndex.Entry e in index.entries)
+            if (index?.entries != null)
             {
-                // All models are visible (no project restrictions)
-
-                // Try to find the actual local version by looking for .modelLibrary.meta.json files
-                string foundLocalVersion = await FindLocalVersionAsync(e.id);
-
-                // If no local version found via manifest files, try GUID-based detection as fallback
-                if (string.IsNullOrEmpty(foundLocalVersion))
+                for (int i = 0; i < index.entries.Count; i++)
                 {
-                    foundLocalVersion = await FindLocalVersionByGuidsAsync(e.id, guidSet);
-                }
+                    ModelIndex.Entry e = index.entries[i];
+                    // All models are visible (no project restrictions)
 
-                bool hasUpdate = false;
-                if (!string.IsNullOrEmpty(foundLocalVersion))
-                {
-                    if (SemVer.TryParse(foundLocalVersion, out SemVer local) && SemVer.TryParse(e.latestVersion, out SemVer remote))
+                    // Try to find the actual local version by looking for .modelLibrary.meta.json files
+                    string foundLocalVersion = await FindLocalVersionAsync(e.id);
+
+                    // If no local version found via manifest files, try GUID-based detection as fallback
+                    if (string.IsNullOrEmpty(foundLocalVersion))
                     {
-                        hasUpdate = remote.CompareTo(local) > 0;
+                        foundLocalVersion = await FindLocalVersionByGuidsAsync(e.id, guidSet);
                     }
-                }
 
-                results.Add((e, hasUpdate, foundLocalVersion));
+                    bool hasUpdate = false;
+                    if (!string.IsNullOrEmpty(foundLocalVersion))
+                    {
+                        if (SemVer.TryParse(foundLocalVersion, out SemVer local) && SemVer.TryParse(e.latestVersion, out SemVer remote))
+                        {
+                            hasUpdate = remote.CompareTo(local) > 0;
+                        }
+                    }
+
+                    results.Add((e, hasUpdate, foundLocalVersion));
+                }
             }
 
             return results;
@@ -109,9 +115,10 @@ namespace ModelLibrary.Editor.Services
                         return meta.version;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore errors reading manifest files
+                    // Ignore errors reading manifest files - log for debugging
+                    Debug.LogWarning($"[ModelScanService] Failed to read manifest file {manifestPath}: {ex.Message}");
                 }
             }
 
@@ -135,8 +142,9 @@ namespace ModelLibrary.Editor.Services
                 List<string> versions = await _indexService.GetAvailableVersionsAsync(modelId);
 
                 // Try versions in descending order (latest first)
-                foreach (string version in versions)
+                for (int i = 0; i < versions.Count; i++)
                 {
+                    string version = versions[i];
                     try
                     {
                         ModelMeta meta = await _repo.LoadMetaAsync(modelId, version);
@@ -145,15 +153,17 @@ namespace ModelLibrary.Editor.Services
                             return version;
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Ignore errors loading metadata
+                        // Ignore errors loading metadata - log for debugging
+                        Debug.LogWarning($"[ModelScanService] Failed to load metadata for {modelId} version {version}: {ex.Message}");
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore errors
+                // Ignore errors - log for debugging
+                Debug.LogWarning($"[ModelScanService] Error finding local version by GUIDs for {modelId}: {ex.Message}");
             }
 
             return null;

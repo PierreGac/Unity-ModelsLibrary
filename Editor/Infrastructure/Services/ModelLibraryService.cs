@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -266,8 +266,10 @@ namespace ModelLibrary.Editor.Services
 
             string versionRootRel = PathUtils.SanitizePathSeparator(Path.Combine(meta.identity.id, meta.version));
             await _repo.EnsureDirectoryAsync(versionRootRel);
-            foreach (string file in Directory.GetFiles(localVersionRoot, "*", SearchOption.AllDirectories))
+            string[] files = Directory.GetFiles(localVersionRoot, "*", SearchOption.AllDirectories);
+            for (int i = 0; i < files.Length; i++)
             {
+                string file = files[i];
                 string rel = PathUtils.SanitizePathSeparator(file[localVersionRoot.Length..].TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                 if (string.Equals(rel, ModelMeta.MODEL_JSON, StringComparison.OrdinalIgnoreCase))
                 {

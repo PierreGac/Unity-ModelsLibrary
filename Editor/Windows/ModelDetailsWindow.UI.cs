@@ -80,7 +80,7 @@ namespace ModelLibrary.Editor.Windows
                     if (isArtistForTags)
                     {
                         string tagButtonLabel = _editingTags ? "Cancel" : "Edit";
-                        if (GUILayout.Button(tagButtonLabel, GUILayout.Width(60)))
+                        if (UIStyles.DrawSecondaryButton(tagButtonLabel, GUILayout.Width(60)))
                         {
                             _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
                             _editingTags = !_editingTags;
@@ -93,7 +93,7 @@ namespace ModelLibrary.Editor.Windows
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         _newTag = EditorGUILayout.TextField("Add Tag", _newTag);
-                        if (GUILayout.Button("Add", GUILayout.Width(50)) && !string.IsNullOrWhiteSpace(_newTag))
+                        if (UIStyles.DrawSecondaryButton("Add", GUILayout.Width(50)) && !string.IsNullOrWhiteSpace(_newTag))
                         {
                             _editableTags.Add(_newTag.Trim());
                             _newTag = string.Empty;
@@ -104,7 +104,7 @@ namespace ModelLibrary.Editor.Windows
                         using (new EditorGUILayout.HorizontalScope())
                         {
                             EditorGUILayout.LabelField($"• {_editableTags[i]}");
-                            if (GUILayout.Button("x", GUILayout.Width(24)))
+                            if (UIStyles.DrawDangerButton("x", GUILayout.Width(24)))
                             {
                                 _editableTags.RemoveAt(i);
                             }
@@ -129,7 +129,7 @@ namespace ModelLibrary.Editor.Windows
                     GUILayout.FlexibleSpace();
                     using (new EditorGUI.DisabledScope(_isSavingMetadata))
                     {
-                        if (GUILayout.Button("Save Metadata Changes", GUILayout.Width(180)))
+                        if (UIStyles.DrawSuccessButton("Save Metadata Changes", GUILayout.Width(180)))
                         {
                             _ = SaveMetadataChangesAsync();
                         }
@@ -185,7 +185,7 @@ namespace ModelLibrary.Editor.Windows
                     int selectedIndex = EditorGUILayout.Popup("Tag", currentIndex, _noteTags);
                     _newNoteTag = _noteTags[selectedIndex];
 
-                    if (GUILayout.Button("Submit Note") && !string.IsNullOrWhiteSpace(_newNoteMessage))
+                    if (UIStyles.DrawPrimaryButton("Submit Note") && !string.IsNullOrWhiteSpace(_newNoteMessage))
                     {
                         _ = SubmitNote();
                         _newNoteMessage = string.Empty;
@@ -225,7 +225,7 @@ namespace ModelLibrary.Editor.Windows
                 GUILayout.FlexibleSpace();
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Compare Versions", GUILayout.Width(150)))
+                    if (UIStyles.DrawSecondaryButton("Compare Versions", GUILayout.Width(150)))
                     {
                         // Navigate to VersionComparison view in ModelLibraryWindow
                         ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
@@ -249,14 +249,14 @@ namespace ModelLibrary.Editor.Windows
 
                     using (new EditorGUI.DisabledScope(shouldDisableButton))
                     {
-                        if (GUILayout.Button(buttonLabel, GUILayout.Width(160)))
+                        if (UIStyles.DrawPrimaryButton(buttonLabel, GUILayout.Width(160)))
                         {
                             _ = ImportToProject();
                         }
                     }
 
 
-                    if (GUILayout.Button("3D Preview", GUILayout.Width(120)))
+                    if (UIStyles.DrawSecondaryButton("3D Preview", GUILayout.Width(120)))
                     {
                         // Navigate to Preview3D view in ModelLibraryWindow
                         ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");

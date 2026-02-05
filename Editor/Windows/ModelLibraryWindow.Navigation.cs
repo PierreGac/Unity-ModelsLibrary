@@ -22,6 +22,24 @@ namespace ModelLibrary.Editor.Windows
             // Store current view as previous if not already navigating
             if (_currentView != viewType)
             {
+                // Clean up preview 3D instance when leaving Preview3D view
+                if (_currentView == ViewType.Preview3D && _preview3DInstance != null)
+                {
+                    try
+                    {
+                        // Call OnDisable to ensure proper cleanup of PreviewRenderUtility
+                        System.Reflection.MethodInfo onDisableMethod = _preview3DInstance.GetType().GetMethod("OnDisable", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (onDisableMethod != null)
+                        {
+                            onDisableMethod.Invoke(_preview3DInstance, null);
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogWarning($"[ModelLibraryWindow] Error cleaning up preview instance: {ex.Message}");
+                    }
+                }
+
                 _previousView = _currentView;
                 // Store a copy of current view parameters
                 _previousViewParameters.Clear();

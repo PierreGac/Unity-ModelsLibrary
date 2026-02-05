@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -435,17 +435,26 @@ namespace ModelLibrary.Editor.Windows
                 // File.WriteAllText() may not immediately flush to disk, and AssetDatabase.Refresh()
                 // may need time to process the new files
                 await Task.Delay(250); // 250ms delay to allow file system and AssetDatabase to settle
+                
+                // Yield to main thread before Unity API calls
+                await Task.Yield();
 
                 EditorUtility.DisplayProgressBar("Refreshing Manifest Cache", "Scanning for model manifests...", 0.1f);
 
                 // Move file enumeration to background thread to avoid blocking
                 List<string> manifestPaths = await ManifestDiscoveryUtility.DiscoverAllManifestFilesAsync("Assets");
+                
+                // Yield to main thread before Unity API calls
+                await Task.Yield();
 
                 int total = manifestPaths.Count;
                 int processed = 0;
 
                 // Load index once to match old manifests by name
                 ModelIndex index = await _service.GetIndexAsync();
+                
+                // Yield to main thread before Unity API calls
+                await Task.Yield();
 
                 // Check again after async operation
                 if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -469,7 +478,10 @@ namespace ModelLibrary.Editor.Windows
                     string manifestPath = manifestPaths[i];
                     processed++;
 
-                    // Update progress bar
+                    // Yield to main thread before Unity API calls (DisplayProgressBar)
+                    await Task.Yield();
+
+                    // Update progress bar - must be on main thread
                     float progress = (float)processed / total;
                     EditorUtility.DisplayProgressBar("Refreshing Manifest Cache",
                         $"Processing manifest {processed} of {total}...", progress);
@@ -477,6 +489,7 @@ namespace ModelLibrary.Editor.Windows
                     try
                     {
                         string json = await File.ReadAllTextAsync(manifestPath);
+                        
                         ModelMeta parsed = JsonUtil.FromJson<ModelMeta>(json);
                         if (parsed == null)
                         {
@@ -559,12 +572,6 @@ namespace ModelLibrary.Editor.Windows
                     catch (Exception ex)
                     {
                         Debug.LogWarning($"[ModelLibraryWindow] Failed to process manifest {manifestPath}: {ex.Message}");
-                    }
-
-                    // Yield periodically to keep UI responsive
-                    if (i % 10 == 0)
-                    {
-                        await Task.Yield();
                     }
                 }
 

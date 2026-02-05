@@ -115,8 +115,9 @@ namespace ModelLibrary.Editor.Services
             string tempRoot = Path.Combine(Path.GetTempPath(), "ModelClone_" + Guid.NewGuid().ToString("N"));
             try
             {
-                foreach (string repoRel in files)
+                for (int i = 0; i < files.Count; i++)
                 {
+                    string repoRel = files[i];
                     string normalized = PathUtils.SanitizePathSeparator(repoRel);
                     if (!normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                     {

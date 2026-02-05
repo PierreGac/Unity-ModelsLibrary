@@ -66,16 +66,13 @@ namespace ModelLibrary.Editor.Windows
                     GUILayout.FlexibleSpace();
                     using (new EditorGUI.DisabledScope(!canDeleteVersion))
                     {
-                        Color originalColor = GUI.color;
-                        GUI.color = Color.red;
-                        if (GUILayout.Button("Delete this version and restore previous", GUILayout.Width(250), GUILayout.Height(26)))
+                        if (UIStyles.DrawDangerButton("Delete this version and restore previous", GUILayout.Width(250), GUILayout.Height(26)))
                         {
                             if (ConfirmVersionDeletion())
                             {
                                 _ = DeleteVersionAsync();
                             }
                         }
-                        GUI.color = originalColor;
                     }
                 }
 
@@ -92,16 +89,13 @@ namespace ModelLibrary.Editor.Windows
                     GUILayout.FlexibleSpace();
                     using (new EditorGUI.DisabledScope(_deletingModel))
                     {
-                        Color originalColor = GUI.color;
-                        GUI.color = new Color(1f, 0.6f, 0.2f); // Orange for removal from project
-                        if (GUILayout.Button("Remove from project", GUILayout.Width(200), GUILayout.Height(26)))
+                        if (UIStyles.DrawSecondaryButton("Remove from project", GUILayout.Width(200), GUILayout.Height(26)))
                         {
                             if (ConfirmRemoveFromProject())
                             {
                                 _ = RemoveFromProjectAsync();
                             }
                         }
-                        GUI.color = originalColor;
                     }
                 }
             }
@@ -114,16 +108,13 @@ namespace ModelLibrary.Editor.Windows
                     GUILayout.FlexibleSpace();
                     using (new EditorGUI.DisabledScope(!canDeleteModel))
                     {
-                        Color originalColor = GUI.color;
-                        GUI.color = new Color(1f, 0.3f, 0.3f); // Darker red for model deletion
-                        if (GUILayout.Button("Delete this model", GUILayout.Width(200), GUILayout.Height(26)))
+                        if (UIStyles.DrawDangerButton("Delete this model", GUILayout.Width(200), GUILayout.Height(26)))
                         {
                             if (ConfirmModelDeletion())
                             {
                                 _ = DeleteModelAsync();
                             }
                         }
-                        GUI.color = originalColor;
                     }
                 }
             }
