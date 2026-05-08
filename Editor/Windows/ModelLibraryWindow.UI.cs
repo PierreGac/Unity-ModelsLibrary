@@ -268,7 +268,7 @@ namespace ModelLibrary.Editor.Windows
                     }
 
                     SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-                    if (identityProvider.GetUserRole() == UserRole.Artist)
+                    if (identityProvider.GetUserRole() == UserRole.Artist || identityProvider.GetUserRole() == UserRole.Admin)
                     {
                         if (GUILayout.Button("Submit Model", GUILayout.Width(120), GUILayout.Height(30)))
                         {
