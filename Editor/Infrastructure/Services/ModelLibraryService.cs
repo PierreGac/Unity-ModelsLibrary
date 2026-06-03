@@ -24,6 +24,7 @@ namespace ModelLibrary.Editor.Services
         private readonly ModelMetadataService _metadataService;
         private readonly ModelPreviewService _previewService;
         private readonly ModelScanService _scanService;
+        private readonly ModelIndexRebuildService _indexRebuildService;
         private ModelUpdateDetector _updateDetector;
 
         public ModelLibraryService(IModelRepository repo)
@@ -33,6 +34,7 @@ namespace ModelLibrary.Editor.Services
             _metadataService = new ModelMetadataService(repo);
             _previewService = new ModelPreviewService(repo);
             _scanService = new ModelScanService(_indexService, repo);
+            _indexRebuildService = new ModelIndexRebuildService();
             _updateDetector = new ModelUpdateDetector(this);
         }
 
@@ -45,6 +47,43 @@ namespace ModelLibrary.Editor.Services
         /// Force refresh of the index cache from the repository.
         /// </summary>
         public async Task RefreshIndexAsync() => await _indexService.RefreshIndexAsync();
+
+        /// <summary>
+        /// Invalidates the in-memory index cache so the next load reads from disk.
+        /// </summary>
+        public void InvalidateIndexCache() => _indexService.InvalidateCache();
+
+        /// <summary>
+        /// Scans the file system repository and previews how many models would appear in a rebuilt index.
+        /// </summary>
+        /// <returns>Preview report; no files are written.</returns>
+        /// <exception cref="InvalidOperationException">When the repository is not a file system repository.</exception>
+        public Task<ModelIndexRebuildReport> PreviewIndexRebuildAsync()
+            => _indexRebuildService.PreviewAsync(RequireFileSystemRepository());
+
+        /// <summary>
+        /// Rebuilds models_index.json from on-disk model.json files under each modelId/version folder.
+        /// </summary>
+        /// <param name="createBackup">When true, copies the existing index before overwriting.</param>
+        /// <returns>Report describing the rebuild outcome.</returns>
+        /// <exception cref="InvalidOperationException">When the repository is not a file system repository.</exception>
+        public async Task<ModelIndexRebuildReport> RebuildIndexFromRepositoryAsync(bool createBackup = true)
+        {
+            ModelIndexRebuildReport report = await _indexRebuildService.RebuildAsync(RequireFileSystemRepository(), createBackup);
+            _indexService.InvalidateCache();
+            return report;
+        }
+
+        private FileSystemRepository RequireFileSystemRepository()
+        {
+            if (_repo is FileSystemRepository fileSystemRepository)
+            {
+                return fileSystemRepository;
+            }
+
+            throw new InvalidOperationException(
+                "Index rebuild is only available for file system repositories. HTTP repositories are not supported.");
+        }
 
         public async Task<ModelMeta> GetMetaAsync(string id, string version)
             => await _metadataService.GetMetaAsync(id, version);

@@ -189,6 +189,12 @@ namespace ModelLibrary.Editor.Windows
         private int _settingsLastModelCount = 0;
         /// <summary>Whether settings have unsaved changes.</summary>
         private bool _settingsHasUnsavedChanges = false;
+        /// <summary>Whether index rebuild is in progress.</summary>
+        private bool _settingsRebuildingIndex = false;
+        /// <summary>Last index rebuild result message.</summary>
+        private string _settingsRebuildResult = null;
+        /// <summary>Whether last index rebuild succeeded.</summary>
+        private bool _settingsRebuildSuccess = false;
 
         // ModelVersionComparisonWindow state (for view mode)
         /// <summary>Model ID for version comparison.</summary>

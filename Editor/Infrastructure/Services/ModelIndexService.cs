@@ -165,19 +165,15 @@ namespace ModelLibrary.Editor.Services
                 _indexCache = index;
             }
 
+            if (index.entries == null)
+            {
+                index.entries = new List<ModelIndex.Entry>();
+            }
+
             ModelIndex.Entry entry = index.Get(meta.identity.id);
             if (entry == null)
             {
-                entry = new ModelIndex.Entry
-                {
-                    id = meta.identity.id,
-                    name = meta.identity.name ?? string.Empty,
-                    latestVersion = meta.version ?? string.Empty,
-                    description = meta.description ?? string.Empty,
-                    tags = meta.tags?.values != null ? new List<string>(meta.tags.values) : new List<string>(),
-                    updatedTimeTicks = meta.updatedTimeTicks > 0 ? meta.updatedTimeTicks : DateTime.Now.Ticks,
-                    releaseTimeTicks = meta.uploadTimeTicks > 0 ? meta.uploadTimeTicks : meta.createdTimeTicks > 0 ? meta.createdTimeTicks : DateTime.Now.Ticks
-                };
+                entry = ModelIndexEntryFactory.FromMeta(meta);
                 index.entries.Add(entry);
             }
             else
@@ -196,14 +192,12 @@ namespace ModelLibrary.Editor.Services
 
                 if (shouldUpdate)
                 {
-                    entry.latestVersion = meta.version ?? entry.latestVersion;
-                    entry.name = meta.identity.name ?? entry.name;
-                    entry.description = meta.description ?? entry.description;
-                    entry.updatedTimeTicks = meta.updatedTimeTicks > 0 ? meta.updatedTimeTicks : DateTime.Now.Ticks;
-                    if (meta.tags?.values != null)
-                    {
-                        entry.tags = new List<string>(meta.tags.values);
-                    }
+                    ModelIndex.Entry updated = ModelIndexEntryFactory.FromMeta(meta);
+                    entry.latestVersion = updated.latestVersion;
+                    entry.name = updated.name;
+                    entry.description = updated.description;
+                    entry.updatedTimeTicks = updated.updatedTimeTicks;
+                    entry.tags = updated.tags;
                 }
             }
 

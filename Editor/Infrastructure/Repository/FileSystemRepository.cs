@@ -50,7 +50,7 @@ namespace ModelLibrary.Editor.Repository
         /// Normalizes path separators to match the current operating system.
         /// </summary>
         /// <param name="root">The root directory path (local or UNC)</param>
-        public FileSystemRepository(string root) => Root = root.Replace('/', Path.DirectorySeparatorChar);
+        public FileSystemRepository(string root) => Root = (root ?? string.Empty).Trim().Replace('/', Path.DirectorySeparatorChar);
 
         /// <summary>
         /// Helper method to safely join path segments and normalize separators.
