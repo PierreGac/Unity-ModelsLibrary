@@ -56,7 +56,7 @@ namespace ModelLibrary.Editor.Services
             HashSet<string> processedGuids = new HashSet<string>(); // Track processed GUIDs to avoid duplicates
             int totalVertices = 0;
             int totalTriangles = 0;
-            HashSet<int> processedMeshIds = new HashSet<int>();
+            HashSet<EntityId> processedMeshIds = new HashSet<EntityId>();
 
             // First, expand folders to get all files recursively
             List<string> allAssetGuids = new List<string>();
@@ -531,7 +531,7 @@ namespace ModelLibrary.Editor.Services
         /// <param name="processedMeshIds">Set of already processed mesh instance IDs to avoid duplicates.</param>
         /// <param name="vertexCount">Running total of vertices (incremented by this method).</param>
         /// <param name="triangleCount">Running total of triangles (incremented by this method).</param>
-        private static void AccumulateMeshStats(string assetPath, HashSet<int> processedMeshIds, ref int vertexCount, ref int triangleCount)
+        private static void AccumulateMeshStats(string assetPath, HashSet<EntityId> processedMeshIds, ref int vertexCount, ref int triangleCount)
         {
             if (string.IsNullOrEmpty(assetPath))
             {
@@ -564,14 +564,14 @@ namespace ModelLibrary.Editor.Services
         /// <param name="processedMeshIds">Set of processed mesh instance IDs.</param>
         /// <param name="vertexCount">Running total of vertices (incremented by this method).</param>
         /// <param name="triangleCount">Running total of triangles (incremented by this method).</param>
-        private static void AddMesh(Mesh mesh, HashSet<int> processedMeshIds, ref int vertexCount, ref int triangleCount)
+        private static void AddMesh(Mesh mesh, HashSet<EntityId> processedMeshIds, ref int vertexCount, ref int triangleCount)
         {
             if (mesh == null)
             {
                 return;
             }
 
-            if (!processedMeshIds.Add(mesh.GetInstanceID()))
+            if (!processedMeshIds.Add(mesh.GetEntityId()))
             {
                 return;
             }
