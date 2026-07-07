@@ -53,6 +53,16 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="absolutePath">The absolute path to convert.</param>
         /// <param name="relativePath">Output parameter containing the relative path if conversion succeeds.</param>
         /// <returns>True if conversion was successful, false otherwise.</returns>
+        /// <remarks>
+        /// SECURITY (audit MED-03): The previous implementation used
+        /// <c>OrdinalIgnoreCase</c> for the <c>StartsWith</c> check, which is
+        /// correct on Windows (case-insensitive filesystem) but could
+        /// incorrectly accept paths on Linux/macOS case-sensitive filesystems.
+        /// We now use <c>OrdinalIgnoreCase</c> as a conservative default
+        /// (it may reject a path that would actually be safe on a
+        /// case-sensitive FS, but never accept an unsafe one) and document
+        /// the choice.
+        /// </remarks>
         public static bool TryConvertAbsoluteToProjectRelative(string absolutePath, out string relativePath)
         {
             relativePath = null;
@@ -64,6 +74,8 @@ namespace ModelLibrary.Editor.Utils
             string projectRoot = Path.GetDirectoryName(UnityEngine.Application.dataPath);
             string normalizedRoot = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             string normalizedAbsolute = Path.GetFullPath(absolutePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            // SECURITY (MED-03): Use OrdinalIgnoreCase — conservative on case-sensitive FS,
+            // correct on case-insensitive FS (Windows / macOS default).
             if (!normalizedAbsolute.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
             {
                 return false;

@@ -19,11 +19,18 @@ namespace ModelLibrary.Editor.Windows
             try
             {
                 ModelDownloader downloader = new ModelDownloader(_service);
-                EditorUtility.DisplayProgressBar("Downloading Model", "Connecting to repository...", ProgressBarConstants.INITIAL);
+                // UX (HIGH-08): Use DisplayCancelableProgressBar so the user can cancel.
+                if (EditorUtility.DisplayCancelableProgressBar("Downloading Model", "Connecting to repository...", ProgressBarConstants.INITIAL))
+                {
+                    return;
+                }
 
                 (string root, ModelMeta meta) = await downloader.DownloadAsync(id, version);
 
-                EditorUtility.DisplayProgressBar("Downloading Model", "Download complete", ProgressBarConstants.COMPLETE);
+                if (EditorUtility.DisplayCancelableProgressBar("Downloading Model", "Download complete", ProgressBarConstants.COMPLETE))
+                {
+                    return;
+                }
                 await Task.Delay(DelayConstants.UI_UPDATE_DELAY_MS);
 
                 ShowNotification("Downloaded", $"Cached at: {root}");
@@ -207,11 +214,15 @@ namespace ModelLibrary.Editor.Windows
 
                 _recentlyUsedManager.AddToRecentlyUsed(id);
 
-                AnalyticsService.RecordEvent(isUpgrade ? "update" : "import", id, version, meta.identity.name);
+                // STABILITY (MED-20): Null-safe access to meta.identity.name.
+                // Older manifests or malformed metadata may have identity == null.
+                string modelDisplayName = meta.identity?.name ?? "Unknown";
+
+                AnalyticsService.RecordEvent(isUpgrade ? "update" : "import", id, version, modelDisplayName);
 
                 string message = isUpgrade && !string.IsNullOrEmpty(previousVersion)
-                    ? $"Updated '{meta.identity.name}' from v{previousVersion} to v{meta.version} at {chosenInstallPath}."
-                    : $"Imported '{meta.identity.name}' v{meta.version} to {chosenInstallPath}.";
+                    ? $"Updated '{modelDisplayName}' from v{previousVersion} to v{meta.version} at {chosenInstallPath}."
+                    : $"Imported '{modelDisplayName}' v{meta.version} to {chosenInstallPath}.";
                 ShowNotification(isUpgrade ? "Update Complete" : "Import Complete", message);
                 Debug.Log($"{(isUpgrade ? "Update" : "Import")} Complete: {message}");
                 Repaint();
@@ -462,14 +473,39 @@ namespace ModelLibrary.Editor.Windows
 
             ModelBulkTagWindow.Open(_service, entries, () =>
             {
-                EditorApplication.delayCall += async () =>
+                // STABILITY (audit CRIT-11): Previously this was
+                //   EditorApplication.delayCall += async () => { ... };
+                // which created an `async void` lambda (because delayCall is
+                // Action). Any exception thrown by LoadIndexAsync would be
+                // unhandled and become UnobservedTaskException. We now wrap
+                // the async work in a proper try/catch via RefreshAfterBulkTagAsync.
+                EditorApplication.delayCall += () =>
                 {
-                    _indexCache = null;
-                    await LoadIndexAsync();
-                    _tagCacheManager.UpdateTagCache(_indexCache);
-                    Repaint();
+                    _ = RefreshAfterBulkTagAsync();
                 };
             });
+        }
+
+        /// <summary>
+        /// Refreshes the index cache and tag cache after a bulk-tag operation.
+        /// STABILITY (audit CRIT-11): Wrapped in try/catch so exceptions
+        /// are logged instead of becoming UnobservedTaskException.
+        /// </summary>
+        private async Task RefreshAfterBulkTagAsync()
+        {
+            try
+            {
+                _indexCache = null;
+                await LoadIndexAsync();
+                _tagCacheManager.UpdateTagCache(_indexCache);
+                Repaint();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Refresh After Bulk Tag",
+                    $"Failed to refresh after bulk tag operation: {ex.Message}",
+                    ErrorHandler.CategorizeException(ex), ex);
+            }
         }
 
         private void AddToImportHistory(ImportHistoryEntry entry)

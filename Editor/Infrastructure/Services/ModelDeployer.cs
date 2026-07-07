@@ -71,13 +71,33 @@ namespace ModelLibrary.Editor.Services
                 // If it's a folder, recursively collect all files within it
                 if (AssetDatabase.IsValidFolder(path))
                 {
+                    // SECURITY (HIGH-03): Previously used FindAssets(string.Empty)
+                    // which returns GUIDs for ALL assets in the folder including
+                    // .cs, .shader, .dll. Filter by extension immediately so we
+                    // don't leak code/script GUIDs into meta.assetGuids.
                     string[] folderGuids = AssetDatabase.FindAssets(string.Empty, new[] { path });
-                    allAssetGuids.AddRange(folderGuids);
+                    foreach (string fg in folderGuids)
+                    {
+                        string p = AssetDatabase.GUIDToAssetPath(fg);
+                        if (string.IsNullOrEmpty(p) || AssetDatabase.IsValidFolder(p))
+                        {
+                            continue;
+                        }
+                        string ext = Path.GetExtension(p).ToLowerInvariant();
+                        if (FileExtensions.IsAcceptablePayloadExtension(ext))
+                        {
+                            allAssetGuids.Add(fg);
+                        }
+                    }
                 }
                 else
                 {
-                    // It's a file, add it directly
-                    allAssetGuids.Add(guid);
+                    // It's a file, add it directly (after same extension check)
+                    string ext = Path.GetExtension(path).ToLowerInvariant();
+                    if (FileExtensions.IsAcceptablePayloadExtension(ext))
+                    {
+                        allAssetGuids.Add(guid);
+                    }
                 }
             }
 
@@ -291,9 +311,19 @@ namespace ModelLibrary.Editor.Services
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // ignore preview failures
+                // STABILITY (MED-11): Previously this was a silent `catch { }`
+                // which masked preview-generation failures completely — the
+                // artist got no indication that the preview failed, and the
+                // model was submitted without a preview. We now log at least
+                // a warning so the failure is visible in the console.
+                // Re-throw critical exceptions.
+                if (ex is OutOfMemoryException || ex is StackOverflowException)
+                {
+                    throw;
+                }
+                Debug.LogWarning($"[ModelDeployer] Preview generation failed for asset GUID(s): {ex.Message}");
             }
         }
 

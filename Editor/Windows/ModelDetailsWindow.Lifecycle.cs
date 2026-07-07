@@ -176,6 +176,16 @@ namespace ModelLibrary.Editor.Windows
 
                 string foundLocalVersion = null;
 
+                // PERF (HIGH-12): Hoist GetIndexAsync out of the manifest loop.
+                // Previously this was called inside the loop body for every
+                // old-format manifest, re-fetching and re-parsing the entire
+                // index (potentially 1MB+ of JSON) per manifest. Now we fetch
+                // once and cache; the catch below handles the rare case where
+                // the index fetch itself fails.
+                ModelIndex cachedIndex = null;
+                ModelIndex.Entry cachedEntry = null;
+                bool indexFetchAttempted = false;
+
                 for (int i = 0; i < manifestPaths.Count; i++)
                 {
                     string manifestPath = manifestPaths[i];
@@ -244,31 +254,35 @@ namespace ModelLibrary.Editor.Windows
                                 fbxNameFromFolder = System.IO.Path.GetFileNameWithoutExtension(folderName);
                             }
 
-                            // Try to get model name from the index to match
-
-                            try
+                            // PERF (HIGH-12): Fetch the index once and reuse.
+                            if (!indexFetchAttempted)
                             {
-                                ModelIndex index = await _service.GetIndexAsync();
-                                ModelIndex.Entry entry = index?.entries?.FirstOrDefault(e => string.Equals(e.id, _modelId, StringComparison.OrdinalIgnoreCase));
-
-
-                                if (entry != null && !string.IsNullOrEmpty(entry.name))
+                                indexFetchAttempted = true;
+                                try
                                 {
-                                    // Match by FBX name (sanitized model name)
-                                    string sanitizedName = InstallPathUtils.SanitizeFolderName(entry.name);
-                                    Debug.Log($"[ModelDetailsWindow] Sanitized name {sanitizedName} / entry name {entry.name} for {_modelId}");
-                                    matchesModel = string.Equals(fbxNameFromFolder, sanitizedName, StringComparison.OrdinalIgnoreCase) ||
-                                                  string.Equals(fbxNameFromFolder, entry.name, StringComparison.OrdinalIgnoreCase);
-
-
-                                    Debug.Log($"[ModelDetailsWindow] Old manifest format detected at {manifestPath}: folder={folderName}, fbxName={fbxNameFromFolder}, version={meta.version}, modelName={entry.name}, sanitized={sanitizedName}, matches={matchesModel}");
+                                    cachedIndex = await _service.GetIndexAsync();
+                                    cachedEntry = cachedIndex?.entries?.FirstOrDefault(e => string.Equals(e.id, _modelId, StringComparison.OrdinalIgnoreCase));
+                                }
+                                catch (Exception ex)
+                                {
+                                    ErrorLogger.LogError("Match Old Manifest Failed",
+                                        $"Failed to load index for old-format manifest matching: {ex.Message}",
+                                        ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}");
+                                    cachedIndex = null;
+                                    cachedEntry = null;
                                 }
                             }
-                            catch (Exception ex)
+
+                            if (cachedEntry != null && !string.IsNullOrEmpty(cachedEntry.name))
                             {
-                                ErrorLogger.LogError("Match Old Manifest Failed", 
-                                    $"Failed to match old manifest: {ex.Message}", 
-                                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}, ManifestPath: {manifestPath}");
+                                // Match by FBX name (sanitized model name)
+                                string sanitizedName = InstallPathUtils.SanitizeFolderName(cachedEntry.name);
+                                Debug.Log($"[ModelDetailsWindow] Sanitized name {sanitizedName} / entry name {cachedEntry.name} for {_modelId}");
+                                matchesModel = string.Equals(fbxNameFromFolder, sanitizedName, StringComparison.OrdinalIgnoreCase) ||
+                                              string.Equals(fbxNameFromFolder, cachedEntry.name, StringComparison.OrdinalIgnoreCase);
+
+
+                                Debug.Log($"[ModelDetailsWindow] Old manifest format detected at {manifestPath}: folder={folderName}, fbxName={fbxNameFromFolder}, version={meta.version}, modelName={cachedEntry.name}, sanitized={sanitizedName}, matches={matchesModel}");
                             }
                         }
 
@@ -284,8 +298,8 @@ namespace ModelLibrary.Editor.Windows
                     }
                     catch (Exception ex)
                     {
-                        ErrorLogger.LogError("Read Manifest File Failed", 
-                            $"Error reading manifest file {manifestPath}: {ex.Message}", 
+                        ErrorLogger.LogError("Read Manifest File Failed",
+                            $"Error reading manifest file {manifestPath}: {ex.Message}",
                             ErrorHandler.CategorizeException(ex), ex, $"ManifestPath: {manifestPath}, ModelId: {_modelId}");
                         // Continue to next manifest file
                     }

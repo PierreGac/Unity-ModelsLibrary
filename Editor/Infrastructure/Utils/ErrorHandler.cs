@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
@@ -337,6 +338,47 @@ namespace ModelLibrary.Editor.Utils
         {
             ErrorCategory category = exception != null ? CategorizeException(exception) : ErrorCategory.Unknown;
             return ShowErrorDialog(title, message, category, exception, true, retryAction);
+        }
+
+        /// <summary>
+        /// Shows an error with an async retry option.
+        /// STABILITY (audit CRIT-11 + HIGH-17): The previous pattern of
+        /// <c>ShowErrorWithRetry(title, msg, async () => await Submit(), ex)</c>
+        /// created an <c>async void</c> lambda because <see cref="ShowErrorWithRetry(string, string, Action, Exception)"/>
+        /// accepts <see cref="Action"/>. Any exception thrown by the async
+        /// lambda became <c>UnobservedTaskException</c>. This overload accepts
+        /// <see cref="Func{Task}"/> and wraps it in a synchronous wrapper that
+        /// observes the task and routes failures back through ShowErrorWithRetry.
+        /// </summary>
+        public static bool ShowErrorWithRetry(string title, string message, Func<Task> retryAction, Exception exception = null)
+        {
+            ErrorCategory category = exception != null ? CategorizeException(exception) : ErrorCategory.Unknown;
+            // Wrap the async retry in a sync Action that fire-and-forgets with observation.
+            Action wrappedRetry = retryAction == null ? null : () =>
+            {
+                FireAndForgetRetry(retryAction, title, message);
+            };
+            return ShowErrorDialog(title, message, category, exception, true, wrappedRetry);
+        }
+
+        /// <summary>
+        /// Awaits an async retry action and routes any failure back through
+        /// ShowErrorWithRetry (with the same title) so the user can retry again.
+        /// STABILITY (audit CRIT-11 + HIGH-17).
+        /// </summary>
+        private static async void FireAndForgetRetry(Func<Task> retryAction, string title, string originalMessage)
+        {
+            try
+            {
+                await retryAction();
+            }
+            catch (Exception retryEx)
+            {
+                // Recurse via the synchronous overload — note that if retryEx
+                // is itself wrapped in another async lambda, the cycle continues.
+                // For non-async retries this terminates after one iteration.
+                ShowErrorWithRetry(title, $"Retry failed: {retryEx.Message}", retryAction, retryEx);
+            }
         }
     }
 }

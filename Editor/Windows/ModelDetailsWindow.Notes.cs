@@ -1,9 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Utils;
-using UnityEditor;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
@@ -19,12 +19,16 @@ namespace ModelLibrary.Editor.Windows
             {
                 ModelNote note = new ModelNote
                 {
-                    author = new Identity.SimpleUserIdentityProvider().GetUserName(),
+                    author = new SimpleUserIdentityProvider().GetUserName(),
                     message = _newNoteMessage,
                     createdTimeTicks = DateTime.Now.Ticks,
                     tag = _newNoteTag
                 };
 
+                // STABILITY (MED-13): Old manifests may have notes == null.
+                // Previously this would NRE and surface as a confusing
+                // "Object reference not set" error.
+                _meta.notes ??= new List<ModelNote>();
                 _meta.notes.Add(note);
                 await SaveMeta();
 

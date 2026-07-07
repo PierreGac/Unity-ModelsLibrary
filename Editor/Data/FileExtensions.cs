@@ -69,6 +69,12 @@ namespace ModelLibrary.Editor
         /// This method normalizes the input via <see cref="string.Trim"/> and
         /// <see cref="string.ToLowerInvariant"/> before comparison. Empty or
         /// whitespace-only input returns <see langword="false"/>.
+        ///
+        /// SECURITY (audit HIGH-06): This is a DENYLIST and is NOT sufficient
+        /// as a security boundary. It misses .dll, .asmdef, .asmref, .rsp,
+        /// .boo, .js, .unity, and many others. Always combine with
+        /// <see cref="IsAllowedPayloadExtension"/> (an ALLOWLIST) when
+        /// accepting files from untrusted sources (submit, deploy, import).
         /// </remarks>
         public static bool IsNotAllowedFileExtension(string fileExtension)
         {
@@ -90,6 +96,65 @@ namespace ModelLibrary.Editor
                 CS => true,
                 _ => false
             };
+        }
+
+        // =====================================================================
+        // SECURITY (CRIT-05 + HIGH-06): EXPLICIT ALLOWLIST
+        // =====================================================================
+        //
+        // The allowlist is the primary defense against RCE via malicious
+        // payload files (.cs EditorScripts, .dll managed assemblies, etc.).
+        //
+        // The denylist above is kept as defense-in-depth but MUST NOT be the
+        // only filter. Always use IsAllowedPayloadExtension when accepting
+        // files from untrusted sources.
+        // =====================================================================
+
+        /// <summary>
+        /// Extensions permitted in model payloads (3D model formats, textures,
+        /// materials, prefabs). Any file with an extension NOT in this set
+        /// must be rejected at submit, deploy, and import time.
+        /// </summary>
+        public static readonly System.Collections.Generic.HashSet<string> AllowedPayloadExtensions =
+            new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase)
+            {
+                FBX,
+                OBJ,
+                PNG,
+                TGA,
+                JPG,
+                JPEG,
+                PSD,
+                MAT,
+                PREFAB,
+            };
+
+        /// <summary>
+        /// Returns <see langword="true"/> if the given extension is on the
+        /// explicit allowlist for model payload files. Use this as the
+        /// PRIMARY filter when accepting files from untrusted sources.
+        /// </summary>
+        /// <param name="fileExtension">File extension including the leading dot (case-insensitive).</param>
+        /// <returns><see langword="true"/> if allowed; <see langword="false"/> otherwise.</returns>
+        public static bool IsAllowedPayloadExtension(string fileExtension)
+        {
+            if (string.IsNullOrWhiteSpace(fileExtension))
+            {
+                return false;
+            }
+            return AllowedPayloadExtensions.Contains(fileExtension.Trim().ToLowerInvariant());
+        }
+
+        /// <summary>
+        /// Combined check: returns <see langword="true"/> if the extension is
+        /// on the allowlist AND not on the denylist. Use this anywhere a file
+        /// from an untrusted source is being considered for inclusion in a
+        /// model payload.
+        /// </summary>
+        public static bool IsAcceptablePayloadExtension(string fileExtension)
+        {
+            return IsAllowedPayloadExtension(fileExtension)
+                   && !IsNotAllowedFileExtension(fileExtension);
         }
     }
 }

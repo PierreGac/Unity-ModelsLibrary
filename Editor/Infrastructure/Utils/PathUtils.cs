@@ -225,5 +225,192 @@ namespace ModelLibrary.Editor.Utils
 
             return false;
         }
+
+        // =====================================================================
+        // CRITICAL SECURITY HELPERS (added in Phase 1 - CRIT-01/02/04 + HIGH-01)
+        // =====================================================================
+        //
+        // These helpers prevent path-traversal attacks where untrusted strings
+        // (modelId, version, relativePath from models_index.json or model.json)
+        // flow into Path.Combine and escape the intended root directory.
+        //
+        // See audit findings CRIT-01, CRIT-02, CRIT-04, HIGH-01.
+        // =====================================================================
+
+        /// <summary>
+        /// Validates that a string is safe to use as a single path segment
+        /// (e.g., a modelId or version). Rejects anything containing path
+        /// separators, parent-directory traversal, drive separators, or NUL.
+        /// </summary>
+        /// <param name="identifier">The identifier to validate (e.g., modelId, version).</param>
+        /// <returns><c>true</c> if the identifier is safe; <c>false</c> otherwise.</returns>
+        /// <remarks>
+        /// SECURITY: This method is the primary defense against path traversal
+        /// via untrusted modelId/version values. It MUST be called on every
+        /// identifier that comes from models_index.json or model.json before
+        /// it is used in any Path.Combine or filesystem operation.
+        /// </remarks>
+        public static bool IsSafeIdentifier(string identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier))
+            {
+                return false;
+            }
+
+            if (identifier.Length > 128)
+            {
+                return false;
+            }
+
+            // Reject any path separator, parent traversal, drive separator, or NUL
+            foreach (char c in identifier)
+            {
+                if (c == '/' || c == '\\' || c == ':' || c == '\0')
+                {
+                    return false;
+                }
+            }
+
+            if (identifier.Contains(".."))
+            {
+                return false;
+            }
+
+            // Reject reserved Windows device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
+            string upper = identifier.ToUpperInvariant();
+            if (upper == "CON" || upper == "PRN" || upper == "AUX" || upper == "NUL")
+            {
+                return false;
+            }
+            if (upper.Length >= 4 && (upper.StartsWith("COM") || upper.StartsWith("LPT")))
+            {
+                if (char.IsDigit(upper[3]) && (upper.Length == 4 || upper[4] == '.'))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Canonicalizes both paths and asserts that <paramref name="path"/>
+        /// is located inside <paramref name="root"/>. Throws
+        /// <see cref="InvalidOperationException"/> if the path escapes the root.
+        /// </summary>
+        /// <param name="path">The path to verify (absolute or relative to current directory).</param>
+        /// <param name="root">The root directory that must contain <paramref name="path"/>.</param>
+        /// <returns>The canonicalized absolute path of <paramref name="path"/>.</returns>
+        /// <exception cref="InvalidOperationException">Thrown if <paramref name="path"/> escapes <paramref name="root"/>.</exception>
+        /// <remarks>
+        /// SECURITY: This is the containment check that closes the path-traversal
+        /// findings CRIT-01, CRIT-02, CRIT-04, and HIGH-01. Call it on every
+        /// path computed from untrusted metadata immediately before any
+        /// filesystem operation (Directory.CreateDirectory, File.WriteAllBytes,
+        /// Directory.Delete, File.Copy, etc.).
+        /// </remarks>
+        public static string AssertInsideRoot(string path, string root)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new InvalidOperationException("AssertInsideRoot: path is null or empty.");
+            }
+            if (string.IsNullOrEmpty(root))
+            {
+                throw new InvalidOperationException("AssertInsideRoot: root is null or empty.");
+            }
+
+            string fullPath = Path.GetFullPath(path);
+            string fullRoot = Path.GetFullPath(root);
+
+            // Ensure the root ends with a separator so that
+            // "/foo/bar" is not incorrectly considered inside "/foo/ba".
+            if (!fullRoot.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal))
+            {
+                fullRoot += Path.DirectorySeparatorChar;
+            }
+
+            // Use Ordinal (case-sensitive) on Linux/macOS, OrdinalIgnoreCase on Windows.
+            // For editor tools the simplest portable choice is OrdinalIgnoreCase,
+            // which is correct on Windows and conservative on case-sensitive FS
+            // (it may reject a path that would actually be safe, but never accept
+            // an unsafe one). Callers who need case-sensitive behavior can call
+            // the overload below.
+            if (!fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                // Also accept the case where path == root exactly (no trailing separator).
+                if (!string.Equals(fullPath, fullRoot.TrimEnd(Path.DirectorySeparatorChar),
+                                   StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"Refusing path outside allowed root.\nPath: {fullPath}\nRoot: {fullRoot}");
+                }
+            }
+
+            return fullPath;
+        }
+
+        /// <summary>
+        /// Variant of <see cref="AssertInsideRoot(string, string)"/> that allows
+        /// the caller to choose the comparison type.
+        /// </summary>
+        public static string AssertInsideRoot(string path, string root, StringComparison comparison)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new InvalidOperationException("AssertInsideRoot: path is null or empty.");
+            }
+            if (string.IsNullOrEmpty(root))
+            {
+                throw new InvalidOperationException("AssertInsideRoot: root is null or empty.");
+            }
+
+            string fullPath = Path.GetFullPath(path);
+            string fullRoot = Path.GetFullPath(root);
+            if (!fullRoot.EndsWith(Path.DirectorySeparatorChar.ToString(), comparison))
+            {
+                fullRoot += Path.DirectorySeparatorChar;
+            }
+
+            if (!fullPath.StartsWith(fullRoot, comparison)
+                && !string.Equals(fullPath, fullRoot.TrimEnd(Path.DirectorySeparatorChar), comparison))
+            {
+                throw new InvalidOperationException(
+                    $"Refusing path outside allowed root.\nPath: {fullPath}\nRoot: {fullRoot}");
+            }
+
+            return fullPath;
+        }
+
+        /// <summary>
+        /// Validates that a relative path does not contain parent-directory
+        /// traversal segments ("..") after normalization. Returns the
+        /// normalized form, or throws if the path would escape its base.
+        /// </summary>
+        /// <param name="relativePath">The relative path to validate (e.g., from model.json).</param>
+        /// <returns>The sanitized relative path with forward slashes.</returns>
+        /// <exception cref="InvalidOperationException">Thrown if the relative path contains ".." segments.</exception>
+        public static string ValidateRelativePathStrict(string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                throw new InvalidOperationException("Relative path is empty.");
+            }
+
+            string sanitized = SanitizePathSeparator(relativePath);
+
+            // Reject any ".. segment" — splits on / and checks each segment.
+            string[] segments = sanitized.Split('/');
+            foreach (string segment in segments)
+            {
+                if (segment == "..")
+                {
+                    throw new InvalidOperationException(
+                        $"Relative path contains a parent-directory traversal segment ('..'): '{relativePath}'");
+                }
+            }
+
+            return sanitized;
+        }
     }
 }

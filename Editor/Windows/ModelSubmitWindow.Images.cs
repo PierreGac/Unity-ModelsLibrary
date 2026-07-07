@@ -295,6 +295,14 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         /// <param name="filePath">Path to the image file</param>
         /// <returns>Texture2D preview or null if loading fails</returns>
+        /// <remarks>
+        /// STABILITY (audit HIGH-09): Previously this method allocated a new
+        /// <see cref="Texture2D"/> every call (every OnGUI repaint, per image)
+        /// and never released it. After 100 frames with 10 images, the editor
+        /// had 1000+ leaked textures and ran out of memory. We now cache
+        /// runtime textures in <see cref="_previewTextureCache"/> keyed by
+        /// file path. The cache is cleared in <c>OnDisable</c>.
+        /// </remarks>
         private Texture2D LoadImagePreview(string filePath)
         {
             try
@@ -302,6 +310,12 @@ namespace ModelLibrary.Editor.Windows
                 if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
                 {
                     return null;
+                }
+
+                // STABILITY (HIGH-09): Return cached texture if we already loaded it.
+                if (_previewTextureCache.TryGetValue(filePath, out Texture2D cached) && cached != null)
+                {
+                    return cached;
                 }
 
                 // Try to load as Unity asset first
@@ -312,6 +326,7 @@ namespace ModelLibrary.Editor.Windows
                     Texture2D assetTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
                     if (assetTexture != null)
                     {
+                        // Unity owns this texture — don't cache it (we don't own its lifetime).
                         return assetTexture;
                     }
                 }
@@ -324,16 +339,38 @@ namespace ModelLibrary.Editor.Windows
                     Texture2D texture = new Texture2D(2, 2);
                     if (texture.LoadImage(fileData))
                     {
+                        texture.hideFlags = HideFlags.HideAndDontSave;
+                        _previewTextureCache[filePath] = texture;
                         return texture;
                     }
+                    // LoadImage failed — destroy the empty Texture2D to avoid leak.
+                    UnityEngine.Object.DestroyImmediate(texture);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore errors loading preview
+                // Log instead of silently swallowing (audit INFO-07).
+                Debug.LogWarning($"[ModelSubmitWindow] Failed to load preview for '{filePath}': {ex.Message}");
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Clears the preview texture cache and destroys all cached textures.
+        /// Called from <c>OnDisable</c> to prevent leaks.
+        /// STABILITY (HIGH-09).
+        /// </summary>
+        private void ClearPreviewTextureCache()
+        {
+            foreach (var kvp in _previewTextureCache)
+            {
+                if (kvp.Value != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(kvp.Value);
+                }
+            }
+            _previewTextureCache.Clear();
         }
 
         /// <summary>

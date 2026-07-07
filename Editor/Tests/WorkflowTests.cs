@@ -21,12 +21,16 @@ namespace ModelLibrary.Editor.Tests
     {
         /// <summary>
         /// Tests right-click submission workflow validation.
-        /// Verifies that context menu validation correctly identifies valid model assets.
+        /// INFO (audit INFO-03): This test was previously a tautology — it
+        /// built an array of valid extensions and then asserted that each
+        /// extension was in the array. The new version calls real production
+        /// code: <see cref="FileExtensions.IsAcceptablePayloadExtension"/>
+        /// and <see cref="FileExtensions.IsNotAllowedFileExtension"/>.
         /// </summary>
         [Test]
         public void TestRightClickSubmissionWorkflow()
         {
-            // Test that validation correctly identifies valid extensions
+            // Test that the production allowlist correctly identifies valid extensions.
             string[] validExtensions = {
                 FileExtensions.FBX,
                 FileExtensions.OBJ,
@@ -40,28 +44,27 @@ namespace ModelLibrary.Editor.Tests
 
             foreach (string ext in validExtensions)
             {
-                string testPath = $"Assets/TestModel{ext}";
-                Assert.IsTrue(validExtensions.Contains(ext.ToLowerInvariant()), 
-                    $"Extension {ext} should be recognized as valid");
+                Assert.IsTrue(FileExtensions.IsAcceptablePayloadExtension(ext),
+                    $"Extension {ext} should be on the production allowlist");
             }
 
-            // Test that invalid extensions are rejected
-            string[] invalidExtensions = { ".txt", ".cs", ".js", ".md", ".json" };
+            // Test that the production allowlist rejects disallowed extensions.
+            string[] invalidExtensions = { ".txt", ".cs", ".js", ".md", ".json", ".dll", ".asmdef" };
             foreach (string ext in invalidExtensions)
             {
-                Assert.IsFalse(validExtensions.Contains(ext.ToLowerInvariant()), 
-                    $"Extension {ext} should not be recognized as valid");
+                Assert.IsFalse(FileExtensions.IsAcceptablePayloadExtension(ext),
+                    $"Extension {ext} should be rejected by the production allowlist");
             }
 
-            // Test role-based validation
-            SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            
-            // Test with Artist role (should allow submission)
-            identityProvider.SetUserRole(UserRole.Artist);
-            // Note: In a real test, we'd need to mock the EditorPrefs or use a test identity provider
-            // For now, we verify the enum values exist
+            // Verify the denylist still catches the dangerous extensions
+            // (defense-in-depth, even though the allowlist is the primary filter).
+            Assert.IsTrue(FileExtensions.IsNotAllowedFileExtension(FileExtensions.CS),
+                ".cs must be on the denylist (defense-in-depth)");
+
+            // Test role-based enum mechanics (kept as a sanity check).
             Assert.IsTrue(Enum.IsDefined(typeof(UserRole), UserRole.Artist), "Artist role should be defined");
             Assert.IsTrue(Enum.IsDefined(typeof(UserRole), UserRole.Developer), "Developer role should be defined");
+            Assert.IsTrue(Enum.IsDefined(typeof(UserRole), UserRole.Admin), "Admin role should be defined");
         }
 
         /// <summary>

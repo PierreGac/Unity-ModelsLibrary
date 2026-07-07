@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -40,24 +40,57 @@ namespace ModelLibrary.Editor.Utils
         /// <summary>
         /// Loads favorites from EditorPrefs.
         /// </summary>
+        /// <remarks>
+        /// STABILITY (audit CRIT-10): Unity's <c>JsonUtility</c> cannot
+        /// serialize/deserialize a top-level <c>string[]</c>. The previous
+        /// implementation called <c>JsonUtility.FromJson&lt;string[]&gt;</c>
+        /// which silently returned null, causing favorites to be lost on
+        /// every editor restart. We now wrap the array in a
+        /// <c>[Serializable]</c> wrapper that <c>JsonUtility</c> supports.
+        /// </remarks>
         public void LoadFavorites()
         {
             _favorites.Clear();
-            string favoritesJson = EditorPrefs.GetString(_prefsKey, "[]");
+            string favoritesJson = EditorPrefs.GetString(_prefsKey, "");
+            if (string.IsNullOrWhiteSpace(favoritesJson) || favoritesJson == "[]")
+            {
+                return;
+            }
+
             try
             {
-                string[] favorites = JsonUtility.FromJson<string[]>(favoritesJson);
-                if (favorites != null)
+                // Try the new wrapper format first.
+                StringArrayWrapper wrapper = JsonUtility.FromJson<StringArrayWrapper>(favoritesJson);
+                if (wrapper?.values != null)
                 {
-                    for (int i = 0; i < favorites.Length; i++)
+                    for (int i = 0; i < wrapper.values.Length; i++)
                     {
-                        _favorites.Add(favorites[i]);
+                        if (!string.IsNullOrEmpty(wrapper.values[i]))
+                        {
+                            _favorites.Add(wrapper.values[i]);
+                        }
+                    }
+                    return;
+                }
+
+                // Fallback: legacy newline-delimited format (for data written
+                // before this fix). The previous JsonUtility call wrote "[]"
+                // so this is only relevant if a future regression breaks the
+                // wrapper format.
+                if (favoritesJson.Contains("\n"))
+                {
+                    string[] parts = favoritesJson.Split('\n');
+                    foreach (string p in parts)
+                    {
+                        if (!string.IsNullOrWhiteSpace(p)) _favorites.Add(p.Trim());
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // If parsing fails, start with empty favorites
+                // If parsing fails, start with empty favorites but log so the
+                // user knows their data was lost (audit LOW-07/INFO-07).
+                Debug.LogWarning($"[FavoritesManager] Failed to parse favorites from EditorPrefs: {ex.Message}");
             }
         }
 
@@ -68,12 +101,14 @@ namespace ModelLibrary.Editor.Utils
         {
             try
             {
-                string favoritesJson = JsonUtility.ToJson(_favorites.ToArray());
+                StringArrayWrapper wrapper = new StringArrayWrapper { values = _favorites.ToArray() };
+                string favoritesJson = JsonUtility.ToJson(wrapper);
                 EditorPrefs.SetString(_prefsKey, favoritesJson);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore save errors
+                // Log instead of silently swallowing (audit INFO-07).
+                Debug.LogWarning($"[FavoritesManager] Failed to save favorites: {ex.Message}");
             }
         }
 
@@ -104,4 +139,3 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-

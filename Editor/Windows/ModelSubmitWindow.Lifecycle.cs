@@ -72,6 +72,15 @@ namespace ModelLibrary.Editor.Windows
             _ = LoadIndexAsync();
         }
 
+        /// <summary>
+        /// Called by Unity when the window is disabled or destroyed.
+        /// STABILITY (HIGH-09): Releases cached preview textures to prevent leaks.
+        /// </summary>
+        private void OnDisable()
+        {
+            ClearPreviewTextureCache();
+        }
+
         private void OnGUI()
         {
             // Draw notification if present

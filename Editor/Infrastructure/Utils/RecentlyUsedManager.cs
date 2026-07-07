@@ -35,21 +35,30 @@ namespace ModelLibrary.Editor.Utils
         /// <summary>
         /// Loads recently used models from EditorPrefs.
         /// </summary>
+        /// <remarks>
+        /// STABILITY (audit CRIT-10): see <see cref="FavoritesManager.LoadFavorites"/>
+        /// for the rationale on the <c>StringArrayWrapper</c> approach.
+        /// </remarks>
         public void LoadRecentlyUsed()
         {
             _recentlyUsed.Clear();
-            string recentlyUsedJson = EditorPrefs.GetString(_prefsKey, "[]");
+            string recentlyUsedJson = EditorPrefs.GetString(_prefsKey, "");
+            if (string.IsNullOrWhiteSpace(recentlyUsedJson) || recentlyUsedJson == "[]")
+            {
+                return;
+            }
+
             try
             {
-                string[] recentlyUsed = JsonUtility.FromJson<string[]>(recentlyUsedJson);
-                if (recentlyUsed != null)
+                StringArrayWrapper wrapper = JsonUtility.FromJson<StringArrayWrapper>(recentlyUsedJson);
+                if (wrapper?.values != null)
                 {
-                    _recentlyUsed.AddRange(recentlyUsed);
+                    _recentlyUsed.AddRange(wrapper.values);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // If parsing fails, start with empty list
+                Debug.LogWarning($"[RecentlyUsedManager] Failed to parse recently used list: {ex.Message}");
             }
         }
 
@@ -60,12 +69,13 @@ namespace ModelLibrary.Editor.Utils
         {
             try
             {
-                string recentlyUsedJson = JsonUtility.ToJson(_recentlyUsed.ToArray());
+                StringArrayWrapper wrapper = new StringArrayWrapper { values = _recentlyUsed.ToArray() };
+                string recentlyUsedJson = JsonUtility.ToJson(wrapper);
                 EditorPrefs.SetString(_prefsKey, recentlyUsedJson);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore save errors
+                Debug.LogWarning($"[RecentlyUsedManager] Failed to save recently used list: {ex.Message}");
             }
         }
 
@@ -96,4 +106,3 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-

@@ -113,6 +113,12 @@ namespace ModelLibrary.Editor.Windows
         private string _notificationMessage = null;
         /// <summary>Timestamp when notification was shown.</summary>
         private DateTime _notificationTime = DateTime.MinValue;
+
+        // STABILITY (HIGH-09): Preview texture cache to prevent per-frame
+        // Texture2D allocation in LoadImagePreview. Previously, every OnGUI
+        // repaint allocated a new Texture2D per image and never released it,
+        // causing rapid OOM in the Images tab.
+        private readonly Dictionary<string, Texture2D> _previewTextureCache = new Dictionary<string, Texture2D>();
     }
 }
 

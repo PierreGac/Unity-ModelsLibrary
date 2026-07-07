@@ -16,15 +16,59 @@ namespace ModelLibrary.Editor.Services
     public class ModelMetadataService
     {
         private readonly IModelRepository _repo;
+        private readonly object _inFlightLock = new object();
+        private readonly Dictionary<string, Task<ModelMeta>> _inFlightLoads =
+            new Dictionary<string, Task<ModelMeta>>(StringComparer.OrdinalIgnoreCase);
 
         public ModelMetadataService(IModelRepository repo)
         {
             _repo = repo;
         }
 
-        public async Task<ModelMeta> GetMetaAsync(string id, string version)
+        public Task<ModelMeta> GetMetaAsync(string id, string version)
         {
-            return await AsyncProfiler.MeasureAsync("Service.GetMeta", () => _repo.LoadMetaAsync(id, version));
+            string key = id + "@" + version;
+            lock (_inFlightLock)
+            {
+                if (_inFlightLoads.TryGetValue(key, out Task<ModelMeta> existing))
+                {
+                    return existing;
+                }
+
+                Task<ModelMeta> loadTask =
+                    AsyncProfiler.MeasureAsync("Service.GetMeta", () => _repo.LoadMetaAsync(id, version));
+                _inFlightLoads[key] = loadTask;
+                _ = RemoveInFlightWhenCompleteAsync(key, loadTask);
+                return loadTask;
+            }
+        }
+
+        /// <summary>
+        /// Removes only the exact task registered for the key. This deduplicates
+        /// concurrent reads without turning the service into a stale long-lived cache.
+        /// </summary>
+        private async Task RemoveInFlightWhenCompleteAsync(string key, Task<ModelMeta> task)
+        {
+            try
+            {
+                await task;
+            }
+            catch
+            {
+                // The original caller observes the exception. This cleanup continuation
+                // must not create a second unobserved faulted task.
+            }
+            finally
+            {
+                lock (_inFlightLock)
+                {
+                    if (_inFlightLoads.TryGetValue(key, out Task<ModelMeta> current)
+                        && ReferenceEquals(current, task))
+                    {
+                        _inFlightLoads.Remove(key);
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -100,6 +144,20 @@ namespace ModelLibrary.Editor.Services
                 return;
             }
 
+            // SECURITY (CRIT-04): Validate identifiers before any operation.
+            if (!PathUtils.IsSafeIdentifier(modelId))
+            {
+                throw new ArgumentException($"Unsafe model id: '{modelId}'", nameof(modelId));
+            }
+            if (!PathUtils.IsSafeIdentifier(sourceVersion))
+            {
+                throw new ArgumentException($"Unsafe source version: '{sourceVersion}'", nameof(sourceVersion));
+            }
+            if (!PathUtils.IsSafeIdentifier(targetVersion))
+            {
+                throw new ArgumentException($"Unsafe target version: '{targetVersion}'", nameof(targetVersion));
+            }
+
             string sourceRootRel = $"{modelId}/{sourceVersion}".Replace('\\', '/');
             string targetRootRel = $"{modelId}/{targetVersion}".Replace('\\', '/');
 
@@ -125,12 +183,29 @@ namespace ModelLibrary.Editor.Services
                     }
 
                     string subRel = normalized[prefix.Length..];
+
+                    // SECURITY (CRIT-04): Reject subRel containing traversal segments.
+                    // A poisoned repository could return paths like
+                    // "abc/1.0.0/payload/../../2.0.0/payload/evil.fbx" which pass
+                    // StartsWith(prefix) but write outside targetRootRel.
+                    if (string.IsNullOrEmpty(subRel)
+                        || subRel.Contains("..")
+                        || subRel.Contains('\\')
+                        || subRel.Contains(':'))
+                    {
+                        continue;
+                    }
+
                     if (string.Equals(subRel, ModelMeta.MODEL_JSON, StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
 
                     string tempPath = Path.Combine(tempRoot, subRel.Replace('/', Path.DirectorySeparatorChar));
+
+                    // SECURITY (CRIT-04): Assert tempPath is inside tempRoot.
+                    PathUtils.AssertInsideRoot(tempPath, tempRoot);
+
                     Directory.CreateDirectory(Path.GetDirectoryName(tempPath) ?? tempRoot);
                     await _repo.DownloadFileAsync(normalized, tempPath);
                     await _repo.UploadFileAsync($"{targetRootRel}/{subRel}", tempPath);
@@ -145,9 +220,10 @@ namespace ModelLibrary.Editor.Services
                         Directory.Delete(tempRoot, true);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Best effort cleanup
+                    // Best effort cleanup — but log so leaks are visible (audit MED-12).
+                    UnityEngine.Debug.LogWarning($"[ModelMetadataService] Failed to clean temp clone dir '{tempRoot}': {ex.Message}");
                 }
             }
         }

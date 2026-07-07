@@ -33,7 +33,7 @@ namespace ModelLibrary.Editor.Services
             _indexService = new ModelIndexService(repo);
             _metadataService = new ModelMetadataService(repo);
             _previewService = new ModelPreviewService(repo);
-            _scanService = new ModelScanService(_indexService, repo);
+            _scanService = new ModelScanService(_indexService, _metadataService);
             _indexRebuildService = new ModelIndexRebuildService();
             _updateDetector = new ModelUpdateDetector(this);
         }
@@ -41,12 +41,12 @@ namespace ModelLibrary.Editor.Services
         /// <summary>
         /// Get the cached index, loading it from repository if needed.
         /// </summary>
-        public async Task<ModelIndex> GetIndexAsync() => await _indexService.GetIndexAsync();
+        public Task<ModelIndex> GetIndexAsync() => _indexService.GetIndexAsync();
 
         /// <summary>
         /// Force refresh of the index cache from the repository.
         /// </summary>
-        public async Task RefreshIndexAsync() => await _indexService.RefreshIndexAsync();
+        public Task RefreshIndexAsync() => _indexService.RefreshIndexAsync();
 
         /// <summary>
         /// Invalidates the in-memory index cache so the next load reads from disk.
@@ -85,47 +85,54 @@ namespace ModelLibrary.Editor.Services
                 "Index rebuild is only available for file system repositories. HTTP repositories are not supported.");
         }
 
-        public async Task<ModelMeta> GetMetaAsync(string id, string version)
-            => await _metadataService.GetMetaAsync(id, version);
+        public Task<ModelMeta> GetMetaAsync(string id, string version)
+            => _metadataService.GetMetaAsync(id, version);
 
-        public async Task<Texture2D> GetPreviewTextureAsync(string id, string version, string relativePath)
-            => await _previewService.GetPreviewTextureAsync(id, version, relativePath);
+        public Task<Texture2D> GetPreviewTextureAsync(string id, string version, string relativePath)
+            => _previewService.GetPreviewTextureAsync(id, version, relativePath);
 
         /// <summary>
         /// Scan current project assets by GUIDs to detect presence of models and possible updates.
         /// </summary>
-        public async Task<List<(ModelIndex.Entry entry, bool hasUpdate, string localVersion)>> ScanProjectForKnownModelsAsync()
-            => await _scanService.ScanProjectForKnownModelsAsync();
+        public Task<List<(ModelIndex.Entry entry, bool hasUpdate, string localVersion)>> ScanProjectForKnownModelsAsync()
+            => _scanService.ScanProjectForKnownModelsAsync();
 
         /// <summary>
         /// Get all models with available updates.
         /// </summary>
-        public async Task<List<ModelUpdateDetector.ModelUpdateInfo>> GetAvailableUpdatesAsync()
-            => await _updateDetector.GetAvailableUpdatesAsync();
+        public Task<List<ModelUpdateDetector.ModelUpdateInfo>> GetAvailableUpdatesAsync()
+            => _updateDetector.GetAvailableUpdatesAsync();
 
         /// <summary>
         /// Get update information for a specific model.
         /// </summary>
-        public async Task<ModelUpdateDetector.ModelUpdateInfo> GetUpdateInfoAsync(string modelId)
-            => await _updateDetector.GetUpdateInfoAsync(modelId);
+        public Task<ModelUpdateDetector.ModelUpdateInfo> GetUpdateInfoAsync(string modelId)
+            => _updateDetector.GetUpdateInfoAsync(modelId);
+
+
+        /// <summary>
+        /// Gets a stable snapshot of update information after a single refresh.
+        /// </summary>
+        public Task<Dictionary<string, ModelUpdateDetector.ModelUpdateInfo>> GetUpdateSnapshotAsync()
+            => _updateDetector.GetUpdateSnapshotAsync();
 
         /// <summary>
         /// Check if a specific model has updates available.
         /// </summary>
-        public async Task<bool> HasUpdateAsync(string modelId)
-            => await _updateDetector.HasUpdateAsync(modelId);
+        public Task<bool> HasUpdateAsync(string modelId)
+            => _updateDetector.HasUpdateAsync(modelId);
 
         /// <summary>
         /// Get the total number of available updates.
         /// </summary>
-        public async Task<int> GetUpdateCountAsync()
-            => await _updateDetector.GetUpdateCountAsync();
+        public Task<int> GetUpdateCountAsync()
+            => _updateDetector.GetUpdateCountAsync();
 
         /// <summary>
         /// Force a refresh of all update information.
         /// </summary>
-        public async Task RefreshAllUpdatesAsync()
-            => await _updateDetector.RefreshAllUpdatesAsync();
+        public Task RefreshAllUpdatesAsync()
+            => _updateDetector.RefreshAllUpdatesAsync();
 
         /// <summary>
         /// Enumerates all available versions for a specific model by inspecting repository contents.
@@ -133,8 +140,8 @@ namespace ModelLibrary.Editor.Services
         /// </summary>
         /// <param name="modelId">Model identifier.</param>
         /// <returns>List of available version strings.</returns>
-        public async Task<List<string>> GetAvailableVersionsAsync(string modelId)
-            => await _indexService.GetAvailableVersionsAsync(modelId);
+        public Task<List<string>> GetAvailableVersionsAsync(string modelId)
+            => _indexService.GetAvailableVersionsAsync(modelId);
 
         /// <summary>
         /// Delete a specific model version from the repository.
@@ -226,10 +233,27 @@ namespace ModelLibrary.Editor.Services
         /// <returns>A tuple containing the absolute cache root path and the loaded model metadata.</returns>
         public async Task<(string versionRoot, ModelMeta meta)> DownloadModelVersionAsync(string id, string version)
         {
+            // SECURITY (CRIT-01): Validate id/version before any filesystem operation.
+            // These values originate from models_index.json which is untrusted.
+            if (!PathUtils.IsSafeIdentifier(id))
+            {
+                throw new ArgumentException($"Unsafe model id rejected: '{id}'", nameof(id));
+            }
+            if (!PathUtils.IsSafeIdentifier(version))
+            {
+                throw new ArgumentException($"Unsafe version rejected: '{version}'", nameof(version));
+            }
+
             // Download all payload & images to local cache folder
             ModelMeta meta = await _repo.LoadMetaAsync(id, version);
 
-            string cacheRoot = EditorPaths.LibraryPath(Path.Combine(ModelLibrarySettings.GetOrCreate().localCacheRoot, id, version));
+            ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
+            string cacheRoot = EditorPaths.LibraryPath(Path.Combine(settings.localCacheRoot, id, version));
+
+            // SECURITY (CRIT-01): Assert cacheRoot is inside the allowed cache base.
+            string allowedCacheBase = EditorPaths.LibraryPath(settings.localCacheRoot);
+            PathUtils.AssertInsideRoot(cacheRoot, allowedCacheBase);
+
             Directory.CreateDirectory(cacheRoot);
 
             // Save meta too (for quick access)
@@ -306,6 +330,7 @@ namespace ModelLibrary.Editor.Services
             string versionRootRel = PathUtils.SanitizePathSeparator(Path.Combine(meta.identity.id, meta.version));
             await _repo.EnsureDirectoryAsync(versionRootRel);
             string[] files = Directory.GetFiles(localVersionRoot, "*", SearchOption.AllDirectories);
+            int rejectedCount = 0;
             for (int i = 0; i < files.Length; i++)
             {
                 string file = files[i];
@@ -314,7 +339,43 @@ namespace ModelLibrary.Editor.Services
                 {
                     continue;
                 }
+
+                string ext = Path.GetExtension(file)?.ToLowerInvariant();
+
+                // SECURITY (CRIT-05 + HIGH-06): Apply extension allowlist.
+                // .meta files are allowed ONLY if their accompanying asset file
+                // has an allowed extension (they're paired). Standalone .meta
+                // files (without a corresponding asset) are skipped.
+                if (ext == FileExtensions.META)
+                {
+                    string assetPath = file.Substring(0, file.Length - FileExtensions.META.Length);
+                    string assetExt = Path.GetExtension(assetPath)?.ToLowerInvariant();
+                    if (string.IsNullOrEmpty(assetExt) || !FileExtensions.IsAcceptablePayloadExtension(assetExt))
+                    {
+                        rejectedCount++;
+                        continue;
+                    }
+                    // .meta for an allowed asset — keep it. GUID regeneration
+                    // for these .meta files is handled in Phase 2 (HIGH-02).
+                    await _repo.UploadFileAsync(versionRootRel + "/" + rel, file);
+                    continue;
+                }
+
+                // SECURITY (CRIT-05 + HIGH-06): Reject any non-allowlisted extension.
+                // This blocks .cs, .dll, .shader, .asmdef, .rsp, etc. — preventing
+                // RCE via malicious EditorScript payloads.
+                if (string.IsNullOrEmpty(ext) || !FileExtensions.IsAcceptablePayloadExtension(ext))
+                {
+                    Debug.LogWarning($"[ModelLibraryService] Rejecting file with disallowed extension '{ext}': {rel}");
+                    rejectedCount++;
+                    continue;
+                }
+
                 await _repo.UploadFileAsync(versionRootRel + "/" + rel, file);
+            }
+            if (rejectedCount > 0)
+            {
+                Debug.LogWarning($"[ModelLibraryService] Skipped {rejectedCount} file(s) with disallowed extensions during submit.");
             }
 
             await _repo.SaveMetaAsync(meta.identity.id, meta.version, meta);
@@ -364,15 +425,29 @@ namespace ModelLibrary.Editor.Services
             {
                 throw new ArgumentException("Model ID cannot be null or empty", nameof(modelId));
             }
-            
+
             if (string.IsNullOrEmpty(version))
             {
                 throw new ArgumentException("Version cannot be null or empty", nameof(version));
             }
 
+            // SECURITY (CRIT-01 + HIGH-01): Validate identifiers and assert containment
+            // BEFORE the filesystem operation, then re-assert immediately before the
+            // delete to close the TOCTOU window.
+            if (!PathUtils.IsSafeIdentifier(modelId))
+            {
+                throw new ArgumentException($"Unsafe model id rejected: '{modelId}'", nameof(modelId));
+            }
+            if (!PathUtils.IsSafeIdentifier(version))
+            {
+                throw new ArgumentException($"Unsafe version rejected: '{version}'", nameof(version));
+            }
+
             ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
+            string allowedCacheBase = EditorPaths.LibraryPath(settings.localCacheRoot);
             string cacheRoot = EditorPaths.LibraryPath(Path.Combine(settings.localCacheRoot, modelId, version));
-            
+            PathUtils.AssertInsideRoot(cacheRoot, allowedCacheBase);
+
             if (!Directory.Exists(cacheRoot))
             {
                 // Already cleared or doesn't exist - nothing to do
@@ -381,16 +456,12 @@ namespace ModelLibrary.Editor.Services
 
             await RetryFileOperationAsync(async () =>
             {
-                // Force garbage collection to release any file handles that might be holding locks
-                // Note: GC.Collect() is expensive and should only be used when necessary (e.g., file handle cleanup)
-                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
-                GC.WaitForPendingFinalizers();
-                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
-                
-                // Double-check directory still exists after GC (it might have been deleted by another process)
-                if (Directory.Exists(cacheRoot))
+                // Re-canonicalize immediately before delete to close TOCTOU window (HIGH-01).
+                string canonical = PathUtils.AssertInsideRoot(cacheRoot, allowedCacheBase);
+
+                if (Directory.Exists(canonical))
                 {
-                    Directory.Delete(cacheRoot, recursive: true);
+                    Directory.Delete(canonical, recursive: true);
                 }
             }, maxRetries: 3, initialDelayMs: 500);
         }

@@ -47,11 +47,6 @@ namespace ModelLibrary.Editor.Windows
 
             InitializeServices();
 
-            if (_service != null && (DateTime.Now - _lastUpdateCheck) > MIN_UPDATE_CHECK_INTERVAL)
-            {
-                _ = CheckForUpdatesAsync();
-            }
-
             EnableBackgroundUpdateChecking();
 
             // Subscribe to play mode state changes
@@ -93,7 +88,10 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            if (_service != null && _indexCache != null && (DateTime.Now - _lastUpdateCheck) > BACKGROUND_UPDATE_CHECK_INTERVAL)
+            if (!_checkingUpdates
+                && _indexCache != null
+                && _manifestCacheInitialized
+                && (DateTime.Now - _lastUpdateCheck) > BACKGROUND_UPDATE_CHECK_INTERVAL)
             {
                 _ = CheckForUpdatesAsync();
             }
@@ -342,46 +340,47 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Checks for model updates in the background.
-        /// Optimized to read directly from the update cache instead of making individual calls.
+        /// Recomputes update badges from the already-populated manifest cache.
+        /// This deliberately avoids repository metadata scans while the browser is visible.
         /// </summary>
-        private async Task CheckForUpdatesAsync()
+        private Task CheckForUpdatesAsync()
         {
-            // Don't check during play mode
-            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            if (EditorApplication.isPlayingOrWillChangePlaymode
+                || _checkingUpdates
+                || !_manifestCacheInitialized
+                || _indexCache?.entries == null)
             {
-                return;
+                return Task.CompletedTask;
             }
 
+            _checkingUpdates = true;
             try
             {
                 _lastUpdateCheck = DateTime.Now;
+                _modelUpdateStatus.Clear();
+                _updateCount = 0;
 
-                // GetUpdateCountAsync() already refreshes the update cache, so we can read from it directly
-                _updateCount = await _service.GetUpdateCountAsync();
-
-                // Check again after async operation
-                if (EditorApplication.isPlayingOrWillChangePlaymode)
+                foreach (ModelIndex.Entry entry in _indexCache.entries)
                 {
-                    return;
-                }
-
-                if (_indexCache?.entries != null)
-                {
-                    _modelUpdateStatus.Clear();
-
-                    // Read directly from cached update info instead of calling HasUpdateAsync for each model
-                    for (int i = 0; i < _indexCache.entries.Count; i++)
+                    if (entry == null || string.IsNullOrEmpty(entry.id))
                     {
-                        // Check play mode in loop as well
-                        if (EditorApplication.isPlayingOrWillChangePlaymode)
-                        {
-                            return;
-                        }
+                        continue;
+                    }
 
-                        ModelIndex.Entry entry = _indexCache.entries[i];
-                        ModelUpdateDetector.ModelUpdateInfo updateInfo = await _service.GetUpdateInfoAsync(entry.id);
-                        _modelUpdateStatus[entry.id] = updateInfo?.hasUpdate ?? false;
+                    bool hasUpdate = false;
+                    if (_manifestCache.TryGetValue(entry.id, out ModelMeta localMeta)
+                        && localMeta != null
+                        && !string.IsNullOrEmpty(localMeta.version)
+                        && localMeta.version != "(unknown)"
+                        && !string.IsNullOrEmpty(entry.latestVersion))
+                    {
+                        hasUpdate = ModelVersionUtils.NeedsUpgrade(localMeta.version, entry.latestVersion);
+                    }
+
+                    _modelUpdateStatus[entry.id] = hasUpdate;
+                    if (hasUpdate)
+                    {
+                        _updateCount++;
                     }
                 }
 
@@ -391,12 +390,17 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                // Only log if not entering play mode
                 if (!EditorApplication.isPlayingOrWillChangePlaymode)
                 {
                     Debug.LogError($"Failed to check for updates: {ex.Message}");
                 }
             }
+            finally
+            {
+                _checkingUpdates = false;
+            }
+
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -554,169 +558,48 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Closes all Model Library plugin windows when entering play mode.
+        /// PERF (HIGH-15): Previously called Resources.FindObjectsOfTypeAll<T>()
+        /// separately for 8 window types — each scan is O(N) over all loaded
+        /// Unity objects (potentially 100,000+). Doing it 8 times caused a
+        /// noticeable play-mode-entry hitch. We now call it once for
+        /// EditorWindow and filter by type.
         /// </summary>
         private static void CloseAllModelLibraryWindows()
         {
             try
             {
-                // Close Model Library Browser
-                ModelLibraryWindow[] browserWindows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
-                if (browserWindows != null)
+                // PERF (HIGH-15): Single FindObjectsOfTypeAll<EditorWindow>() call,
+                // then filter by type.
+                EditorWindow[] allWindows = Resources.FindObjectsOfTypeAll<EditorWindow>();
+                if (allWindows == null) return;
+
+                for (int i = 0; i < allWindows.Length; i++)
                 {
-                    for (int i = 0; i < browserWindows.Length; i++)
+                    EditorWindow window = allWindows[i];
+                    if (window == null) continue;
+
+                    try
                     {
-                        try
+                        // Use pattern matching to identify our window types.
+                        if (window is ModelLibraryWindow browser)
                         {
-                            browserWindows[i].CloseWindow();
+                            browser.CloseWindow();
                         }
-                        catch
+                        else if (window is ModelDetailsWindow
+                                 || window is ModelSubmitWindow
+                                 || window is ModelPreview3DWindow
+                                 || window is BatchUploadWindow
+                                 || window is AnalyticsWindow
+                                 || window is ModelVersionComparisonWindow
+                                 || window is ModelBulkTagWindow)
                         {
-                            // Silently ignore errors closing individual windows
+                            window.Close();
                         }
                     }
-                }
-
-                // Close Model Details windows
-                ModelDetailsWindow[] detailsWindows = Resources.FindObjectsOfTypeAll<ModelDetailsWindow>();
-                if (detailsWindows != null)
-                {
-                    for (int i = 0; i < detailsWindows.Length; i++)
+                    catch (Exception ex)
                     {
-                        try
-                        {
-                            EditorWindow window = detailsWindows[i];
-                            if (window != null)
-                            {
-                                window.Close();
-                            }
-                        }
-                        catch
-                        {
-                            // Silently ignore errors
-                        }
-                    }
-                }
-
-                // Close Model Submit windows
-                ModelSubmitWindow[] submitWindows = Resources.FindObjectsOfTypeAll<ModelSubmitWindow>();
-                if (submitWindows != null)
-                {
-                    for (int i = 0; i < submitWindows.Length; i++)
-                    {
-                        try
-                        {
-                            EditorWindow window = submitWindows[i];
-                            if (window != null)
-                            {
-                                window.Close();
-                            }
-                        }
-                        catch
-                        {
-                            // Silently ignore errors
-                        }
-                    }
-                }
-
-                // Close Model Preview 3D windows
-                ModelPreview3DWindow[] previewWindows = Resources.FindObjectsOfTypeAll<ModelPreview3DWindow>();
-                if (previewWindows != null)
-                {
-                    for (int i = 0; i < previewWindows.Length; i++)
-                    {
-                        try
-                        {
-                            EditorWindow window = previewWindows[i];
-                            if (window != null)
-                            {
-                                window.Close();
-                            }
-                        }
-                        catch
-                        {
-                            // Silently ignore errors
-                        }
-                    }
-                }
-
-                // Close other Model Library windows
-                BatchUploadWindow[] batchWindows = Resources.FindObjectsOfTypeAll<BatchUploadWindow>();
-                if (batchWindows != null)
-                {
-                    for (int i = 0; i < batchWindows.Length; i++)
-                    {
-                        try
-                        {
-                            EditorWindow window = batchWindows[i];
-                            if (window != null)
-                            {
-                                window.Close();
-                            }
-                        }
-                        catch
-                        {
-                            // Silently ignore errors
-                        }
-                    }
-                }
-
-                AnalyticsWindow[] analyticsWindows = Resources.FindObjectsOfTypeAll<AnalyticsWindow>();
-                if (analyticsWindows != null)
-                {
-                    for (int i = 0; i < analyticsWindows.Length; i++)
-                    {
-                        try
-                        {
-                            EditorWindow window = analyticsWindows[i];
-                            if (window != null)
-                            {
-                                window.Close();
-                            }
-                        }
-                        catch
-                        {
-                            // Silently ignore errors
-                        }
-                    }
-                }
-
-                ModelVersionComparisonWindow[] comparisonWindows = Resources.FindObjectsOfTypeAll<ModelVersionComparisonWindow>();
-                if (comparisonWindows != null)
-                {
-                    for (int i = 0; i < comparisonWindows.Length; i++)
-                    {
-                        try
-                        {
-                            EditorWindow window = comparisonWindows[i];
-                            if (window != null)
-                            {
-                                window.Close();
-                            }
-                        }
-                        catch
-                        {
-                            // Silently ignore errors
-                        }
-                    }
-                }
-
-                ModelBulkTagWindow[] bulkTagWindows = Resources.FindObjectsOfTypeAll<ModelBulkTagWindow>();
-                if (bulkTagWindows != null)
-                {
-                    for (int i = 0; i < bulkTagWindows.Length; i++)
-                    {
-                        try
-                        {
-                            EditorWindow window = bulkTagWindows[i];
-                            if (window != null)
-                            {
-                                window.Close();
-                            }
-                        }
-                        catch
-                        {
-                            // Silently ignore errors
-                        }
+                        // STABILITY (INFO-07): Log instead of silently swallowing.
+                        Debug.LogWarning($"[ModelLibrary] Failed to close window {window.GetType().Name}: {ex.Message}");
                     }
                 }
             }

@@ -69,7 +69,7 @@ namespace ModelLibrary.Editor.Windows
 
         private void OnGUI()
         {
-            if(_isExiting)
+            if (_isExiting)
             {
                 return;
             }
@@ -172,7 +172,7 @@ namespace ModelLibrary.Editor.Windows
 
             ModelIndex index = _indexCache;
             DrawTagFilter(index);
-            
+
             // Show authentication error if present
             if (!string.IsNullOrEmpty(_authenticationError))
             {
@@ -186,7 +186,7 @@ namespace ModelLibrary.Editor.Windows
                 }
                 return;
             }
-            
+
             if (index == null || index.entries == null)
             {
                 ModelLibraryUIDrawer.DrawEmptyState("No models available",
@@ -199,42 +199,64 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            IEnumerable<ModelIndex.Entry> query = index.entries;
-
-            if (_filterMode == ModelLibraryUIDrawer.FilterMode.Favorites)
-            {
-                query = query.Where(entry => _favoritesManager.IsFavorite(entry.id));
-            }
-            else if (_filterMode == ModelLibraryUIDrawer.FilterMode.Recent)
-            {
-                query = query.Where(entry => _recentlyUsedManager.RecentlyUsed.Contains(entry.id));
-            }
-
             string trimmedSearch = string.IsNullOrWhiteSpace(_search) ? null : _search.Trim();
-            if (!string.IsNullOrEmpty(trimmedSearch))
+            string lowerSearch = string.IsNullOrEmpty(trimmedSearch) ? null : trimmedSearch.ToLowerInvariant();
+
+            // Reuse the keyboard-selection buffer instead of allocating multiple LINQ
+            // iterators and two new lists on every Layout/Repaint event.
+            _currentEntries.Clear();
+            for (int i = 0; i < index.entries.Count; i++)
             {
-                string lowerSearch = trimmedSearch.ToLowerInvariant();
-                if (lowerSearch == "has:update" || lowerSearch == "has:updates")
+                ModelIndex.Entry entry = index.entries[i];
+                if (entry == null)
                 {
-                    query = query.Where(entry => _modelUpdateStatus.TryGetValue(entry.id, out bool hasUpdate) && hasUpdate);
+                    continue;
                 }
-                else if (lowerSearch == "has:notes" || lowerSearch == "has:note")
+
+                if (_filterMode == ModelLibraryUIDrawer.FilterMode.Favorites
+                    && !_favoritesManager.IsFavorite(entry.id))
                 {
-                    query = query.Where(entry => HasNotes(entry.id, entry.latestVersion));
+                    continue;
                 }
-                else
+
+                if (_filterMode == ModelLibraryUIDrawer.FilterMode.Recent
+                    && !IsRecentlyUsed(entry.id))
                 {
-                    query = query.Where(entry => ModelSearchUtils.EntryMatchesAdvancedSearch(entry, trimmedSearch));
+                    continue;
                 }
+
+                if (!string.IsNullOrEmpty(lowerSearch))
+                {
+                    if (lowerSearch == "has:update" || lowerSearch == "has:updates")
+                    {
+                        if (!_modelUpdateStatus.TryGetValue(entry.id, out bool hasUpdate) || !hasUpdate)
+                        {
+                            continue;
+                        }
+                    }
+                    else if (lowerSearch == "has:notes" || lowerSearch == "has:note")
+                    {
+                        if (!HasNotes(entry.id, entry.latestVersion))
+                        {
+                            continue;
+                        }
+                    }
+                    else if (!ModelSearchUtils.EntryMatchesAdvancedSearch(entry, trimmedSearch))
+                    {
+                        continue;
+                    }
+                }
+
+                if (_selectedTags.Count > 0 && !EntryHasAllSelectedTags(entry))
+                {
+                    continue;
+                }
+
+                _currentEntries.Add(entry);
             }
 
-            if (_selectedTags.Count > 0)
-            {
-                query = query.Where(EntryHasAllSelectedTags);
-            }
-
-            List<ModelIndex.Entry> filteredEntries = query.ToList();
-            filteredEntries = ModelSortUtils.SortEntries(filteredEntries, _sortMode);
+            ModelSortUtils.SortEntriesInPlace(_currentEntries, _sortMode);
+            List<ModelIndex.Entry> filteredEntries = _currentEntries;
             UpdateKeyboardSelectionState(filteredEntries);
 
             _filterMode = ModelLibraryUIDrawer.DrawFilterModeTabs(_filterMode, _favoritesManager.Favorites.Count, _recentlyUsedManager.RecentlyUsed.Count, newMode =>
@@ -324,19 +346,57 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Draws the BulkTag view. Shows bulk tag editor.
+        /// UX (LOW-09): Previously the "Open Bulk Tag Window" button had an
+        /// empty click handler. We now wire it to LaunchBulkTagEditor with
+        /// the currently selected entries, or show a helpful message if no
+        /// entries are selected.
         /// </summary>
         private void DrawBulkTagView()
         {
             UIStyles.DrawPageHeader("Bulk Tag Editor", "Apply tag changes across selected models.");
             using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
-                EditorGUILayout.HelpBox("Bulk Tag view is being integrated. For now, please use the separate Bulk Tag window.", MessageType.Info);
-                EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
-                if (GUILayout.Button("Open Bulk Tag Window", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
+                // Get the currently selected entries (if any) from the filtered list.
+                List<ModelIndex.Entry> selectedEntries = GetSelectedEntries();
+
+                if (selectedEntries == null || selectedEntries.Count == 0)
                 {
-                    // Bulk tag window requires service and entries - handled in Operations
+                    UIStyles.DrawEmptyState(
+                        "No Models Selected",
+                        "Select one or more models in the browser (Shift+Click for range, Ctrl+Click for individual) to bulk-edit their tags.");
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox(
+                        $"{selectedEntries.Count} model(s) selected. Click below to open the Bulk Tag editor.",
+                        MessageType.Info);
+                    EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
+                    if (GUILayout.Button($"Open Bulk Tag Window ({selectedEntries.Count} selected)", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
+                    {
+                        LaunchBulkTagEditor(selectedEntries);
+                    }
                 }
             }
+        }
+
+        /// <summary>
+        /// Returns the currently selected entries from the index based on
+        /// <see cref="_selectedModels"/>. Used by DrawBulkTagView.
+        /// </summary>
+        private List<ModelIndex.Entry> GetSelectedEntries()
+        {
+            List<ModelIndex.Entry> result = new List<ModelIndex.Entry>();
+            if (_selectedModels == null || _indexCache?.entries == null) return result;
+
+            Dictionary<string, ModelIndex.Entry> lookup = EnsureIndexLookup();
+            foreach (string id in _selectedModels)
+            {
+                if (lookup.TryGetValue(id, out ModelIndex.Entry entry) && entry != null)
+                {
+                    result.Add(entry);
+                }
+            }
+            return result;
         }
 
 
@@ -370,7 +430,11 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 bool hasHistory = _searchHistoryManager.History.Count > 0;
-                GUIContent historyButtonContent = new GUIContent(hasHistory ? "▼" : "▼", hasHistory ? $"Search history available ({_searchHistoryManager.History.Count} items)" : "No search history");
+                // UX (MED-24): Previously the ternary returned "▼" in both branches,
+                // giving no visual cue that history existed. Now we show the count.
+                GUIContent historyButtonContent = new GUIContent(
+                    hasHistory ? $"▾ ({_searchHistoryManager.History.Count})" : "▾",
+                    hasHistory ? $"Search history available ({_searchHistoryManager.History.Count} items)" : "No search history");
                 Color originalColor = GUI.color;
                 if (hasHistory)
                 {
@@ -437,15 +501,22 @@ namespace ModelLibrary.Editor.Windows
                     string tooltipText = $"Updates available for {_updateCount} model{(_updateCount == 1 ? string.Empty : "s")}:\n";
                     tooltipText += "Click to filter and view models with updates.\n\n";
                     int shownCount = 0;
-                    foreach (KeyValuePair<string, bool> kvp in _modelUpdateStatus)
+                    // PERF (HIGH-10): Previously used FirstOrDefault inside foreach over
+                    // _modelUpdateStatus — O(N×M) per OnGUI frame. We now build a
+                    // Dictionary<string, Entry> lookup once when the index loads
+                    // (see EnsureIndexLookup) and use TryGetValue here.
+                    if (_indexCache?.entries != null)
                     {
-                        if (kvp.Value && shownCount < 5)
+                        Dictionary<string, ModelIndex.Entry> lookup = EnsureIndexLookup();
+                        foreach (KeyValuePair<string, bool> kvp in _modelUpdateStatus)
                         {
-                            ModelIndex.Entry entry = _indexCache?.entries?.FirstOrDefault(modelEntry => modelEntry.id == kvp.Key);
-                            if (entry != null)
+                            if (kvp.Value && shownCount < 5)
                             {
-                                tooltipText += $"• {entry.name}\n";
-                                shownCount++;
+                                if (lookup.TryGetValue(kvp.Key, out ModelIndex.Entry entry) && entry != null)
+                                {
+                                    tooltipText += $"• {entry.name}\n";
+                                    shownCount++;
+                                }
                             }
                         }
                     }
@@ -628,7 +699,7 @@ namespace ModelLibrary.Editor.Windows
         private void DrawLoadingOverlay()
         {
             Rect overlayRect = new Rect(0, 0, position.width, position.height);
-            
+
             // Draw semi-transparent background
             Color originalColor = GUI.color;
             GUI.color = new Color(0f, 0f, 0f, __LOADING_OVERLAY_ALPHA);
@@ -651,8 +722,8 @@ namespace ModelLibrary.Editor.Windows
                 alignment = TextAnchor.MiddleCenter
             };
 
-            string loadingText = _refreshingManifest 
-                ? "Refreshing model library..." 
+            string loadingText = _refreshingManifest
+                ? "Refreshing model library..."
                 : "Loading model index...";
 
             Rect labelRect = new Rect(boxRect.x, boxRect.y + __LOADING_TITLE_OFFSET_Y, __LOADING_BOX_WIDTH, 30f);
@@ -674,7 +745,7 @@ namespace ModelLibrary.Editor.Windows
             GUI.Label(progressRect, progressDots, progressStyle);
 
             // Consume all events to block interaction
-            if (Event.current.type == EventType.MouseDown || 
+            if (Event.current.type == EventType.MouseDown ||
                 Event.current.type == EventType.MouseUp ||
                 Event.current.type == EventType.KeyDown ||
                 Event.current.type == EventType.ScrollWheel)
@@ -869,9 +940,18 @@ namespace ModelLibrary.Editor.Windows
                 return false;
             }
 
-            foreach (string tag in _selectedTags)
+            foreach (string selectedTag in _selectedTags)
             {
-                bool match = entry.tags.Any(candidate => string.Equals(candidate, tag, StringComparison.OrdinalIgnoreCase));
+                bool match = false;
+                for (int i = 0; i < entry.tags.Count; i++)
+                {
+                    if (string.Equals(entry.tags[i], selectedTag, StringComparison.OrdinalIgnoreCase))
+                    {
+                        match = true;
+                        break;
+                    }
+                }
+
                 if (!match)
                 {
                     return false;
@@ -879,6 +959,25 @@ namespace ModelLibrary.Editor.Windows
             }
 
             return true;
+        }
+
+        private bool IsRecentlyUsed(string modelId)
+        {
+            IReadOnlyList<string> recent = _recentlyUsedManager?.RecentlyUsed;
+            if (recent == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < recent.Count; i++)
+            {
+                if (string.Equals(recent[i], modelId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void DrawListView(List<ModelIndex.Entry> entries)
@@ -1625,7 +1724,8 @@ namespace ModelLibrary.Editor.Windows
                 if (_service != null && !_loadingIndex)
                 {
                     _indexCache = null;
-                    _ = LoadIndexAsync();
+                    // STABILITY (LOW-01): Use FireAndForget to observe exceptions.
+                    LoadIndexAsync().FireAndForget("F5 RefreshIndex");
                     currentEvent.Use();
                 }
                 return;
@@ -1822,8 +1922,14 @@ namespace ModelLibrary.Editor.Windows
 
         private void UpdateKeyboardSelectionState(List<ModelIndex.Entry> entries)
         {
-            _currentEntries.Clear();
-            _currentEntries.AddRange(entries);
+            if (!ReferenceEquals(entries, _currentEntries))
+            {
+                _currentEntries.Clear();
+                if (entries != null)
+                {
+                    _currentEntries.AddRange(entries);
+                }
+            }
 
             if (_currentEntries.Count == 0)
             {

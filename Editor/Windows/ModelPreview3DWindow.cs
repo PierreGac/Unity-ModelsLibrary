@@ -197,19 +197,22 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Unity lifecycle method called when the window is destroyed.
-        /// Ensures all resources are fully released, including forcing garbage collection.
-        /// Note: GC.Collect() is expensive and should only be used when necessary (e.g., file handle cleanup on window close).
+        /// Ensures all resources are fully released.
+        /// PERF (audit MED-18): The previous implementation called
+        /// <c>GC.Collect(MaxGeneration, Forced, blocking: true)</c> twice with
+        /// <c>WaitForPendingFinalizers</c> in between. This froze the editor
+        /// for 200ms-2s on every 3D preview window close. A blocking GC is
+        /// the wrong tool for file-handle cleanup — Unity's asset system
+        /// doesn't run finalizers for UnityObject-derived types (it uses its
+        /// own native ref-counting). We've removed the GC calls; if file
+        /// handle cleanup is needed, callers should use
+        /// <c>EditorUtility.SetDirty</c> + <c>AssetDatabase.SaveAssets</c>
+        /// + <c>Resources.UnloadUnusedAssets</c>, or defer the temp-asset
+        /// deletion via <c>EditorApplication.delayCall</c>.
         /// </summary>
         private void OnDestroy()
         {
             CleanupPreviewResources();
-            
-            // Force garbage collection to release any remaining file handles
-            // This is necessary because Unity's asset system may hold file handles that prevent deletion
-            // We use forced collection with blocking to ensure all finalizers run before we return
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
-            GC.WaitForPendingFinalizers();
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
         }
 
         /// <summary>

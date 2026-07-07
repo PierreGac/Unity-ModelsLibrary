@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
+using ModelLibrary.Data;
 using UnityEditor;
 
 namespace ModelLibrary.Editor.Windows
@@ -14,6 +16,35 @@ namespace ModelLibrary.Editor.Windows
         /// Binding flags for accessing private members via reflection.
         /// </summary>
         private const BindingFlags PRIVATE_INSTANCE_FLAGS = BindingFlags.NonPublic | BindingFlags.Instance;
+
+        /// <summary>
+        /// Returns a <c>Dictionary&lt;string, Entry&gt;</c> lookup of the
+        /// current <c>_indexCache</c> entries by id, building it lazily and
+        /// invalidating it when <c>_indexCache</c> changes.
+        /// PERF (audit HIGH-10): replaces O(N×M) FirstOrDefault-in-foreach
+        /// tooltip building with O(1) TryGetValue.
+        /// </summary>
+        private Dictionary<string, ModelIndex.Entry> EnsureIndexLookup()
+        {
+            if (_indexLookup != null && ReferenceEquals(_indexLookupVersion, _indexCache))
+            {
+                return _indexLookup;
+            }
+
+            _indexLookup = new Dictionary<string, ModelIndex.Entry>(StringComparer.OrdinalIgnoreCase);
+            if (_indexCache?.entries != null)
+            {
+                foreach (ModelIndex.Entry entry in _indexCache.entries)
+                {
+                    if (entry != null && !string.IsNullOrEmpty(entry.id))
+                    {
+                        _indexLookup[entry.id] = entry;
+                    }
+                }
+            }
+            _indexLookupVersion = _indexCache;
+            return _indexLookup;
+        }
 
         /// <summary>
         /// Calls a private method on an object instance using reflection.

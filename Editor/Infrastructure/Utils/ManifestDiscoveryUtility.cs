@@ -32,22 +32,33 @@ namespace ModelLibrary.Editor.Utils
 
             try
             {
-                // Search for new naming convention (.modelLibrary.meta.json) first
-                foreach (string manifestPath in Directory.EnumerateFiles(assetsRoot, NEW_MANIFEST_NAME, SearchOption.AllDirectories))
+                // SECURITY (HIGH-04): Use SafeFileEnumerator to skip reparse points
+                // (symlinks, junctions). The previous Directory.EnumerateFiles with
+                // SearchOption.AllDirectories followed symlinks, which could cause
+                // enumeration of sensitive files outside the project if a symlink
+                // to e.g. ~/.ssh/ was placed inside Assets/.
+                HashSet<string> seen = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+
+                foreach (string manifestPath in SafeFileEnumerator.EnumerateFilesSafe(assetsRoot, NEW_MANIFEST_NAME))
                 {
-                    manifestPaths.Add(manifestPath);
+                    if (seen.Add(manifestPath))
+                    {
+                        manifestPaths.Add(manifestPath);
+                    }
                 }
 
-                // Fallback for old files created before the naming change
-                foreach (string manifestPath in Directory.EnumerateFiles(assetsRoot, OLD_MANIFEST_NAME, SearchOption.AllDirectories))
+                foreach (string manifestPath in SafeFileEnumerator.EnumerateFilesSafe(assetsRoot, OLD_MANIFEST_NAME))
                 {
-                    manifestPaths.Add(manifestPath);
+                    if (seen.Add(manifestPath))
+                    {
+                        manifestPaths.Add(manifestPath);
+                    }
                 }
             }
             catch (System.Exception ex)
             {
-                ErrorLogger.LogError("Manifest Discovery Failed", 
-                    $"Failed to discover manifest files in {assetsRoot}: {ex.Message}", 
+                ErrorLogger.LogError("Manifest Discovery Failed",
+                    $"Failed to discover manifest files in {assetsRoot}: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"AssetsRoot: {assetsRoot}");
             }
 

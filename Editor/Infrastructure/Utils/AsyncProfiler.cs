@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -43,13 +43,25 @@ namespace ModelLibrary.Editor.Utils
             set => EditorPrefs.SetFloat(PREF_KEY_THRESHOLD, Mathf.Max(1f, (float)value));
         }
 
-        public static async Task<T> MeasureAsync<T>(string operationName, Func<Task<T>> action)
+        public static Task<T> MeasureAsync<T>(string operationName, Func<Task<T>> action)
         {
-            if (!Enabled)
+            if (action == null)
             {
-                return await action();
+                throw new ArgumentNullException(nameof(action));
             }
 
+            // Keep the disabled path allocation-light: do not create an async
+            // state machine merely to await and return the same task.
+            if (!Enabled)
+            {
+                return action();
+            }
+
+            return MeasureEnabledAsync(operationName, action);
+        }
+
+        private static async Task<T> MeasureEnabledAsync<T>(string operationName, Func<Task<T>> action)
+        {
             Stopwatch sw = Stopwatch.StartNew();
             try
             {
@@ -62,14 +74,23 @@ namespace ModelLibrary.Editor.Utils
             }
         }
 
-        public static async Task MeasureAsync(string operationName, Func<Task> action)
+        public static Task MeasureAsync(string operationName, Func<Task> action)
         {
-            if (!Enabled)
+            if (action == null)
             {
-                await action();
-                return;
+                throw new ArgumentNullException(nameof(action));
             }
 
+            if (!Enabled)
+            {
+                return action();
+            }
+
+            return MeasureEnabledAsync(operationName, action);
+        }
+
+        private static async Task MeasureEnabledAsync(string operationName, Func<Task> action)
+        {
             Stopwatch sw = Stopwatch.StartNew();
             try
             {

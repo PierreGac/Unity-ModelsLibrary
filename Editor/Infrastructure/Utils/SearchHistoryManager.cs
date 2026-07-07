@@ -35,21 +35,30 @@ namespace ModelLibrary.Editor.Utils
         /// <summary>
         /// Loads search history from EditorPrefs.
         /// </summary>
+        /// <remarks>
+        /// STABILITY (audit CRIT-10): see <see cref="FavoritesManager.LoadFavorites"/>
+        /// for the rationale on the <c>StringArrayWrapper</c> approach.
+        /// </remarks>
         public void LoadSearchHistory()
         {
             _searchHistory.Clear();
-            string historyJson = EditorPrefs.GetString(_prefsKey, "[]");
+            string historyJson = EditorPrefs.GetString(_prefsKey, "");
+            if (string.IsNullOrWhiteSpace(historyJson) || historyJson == "[]")
+            {
+                return;
+            }
+
             try
             {
-                string[] history = JsonUtility.FromJson<string[]>(historyJson);
-                if (history != null)
+                StringArrayWrapper wrapper = JsonUtility.FromJson<StringArrayWrapper>(historyJson);
+                if (wrapper?.values != null)
                 {
-                    _searchHistory.AddRange(history);
+                    _searchHistory.AddRange(wrapper.values);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // If parsing fails, start with empty history
+                Debug.LogWarning($"[SearchHistoryManager] Failed to parse search history: {ex.Message}");
             }
         }
 
@@ -60,12 +69,13 @@ namespace ModelLibrary.Editor.Utils
         {
             try
             {
-                string historyJson = JsonUtility.ToJson(_searchHistory.ToArray());
+                StringArrayWrapper wrapper = new StringArrayWrapper { values = _searchHistory.ToArray() };
+                string historyJson = JsonUtility.ToJson(wrapper);
                 EditorPrefs.SetString(_prefsKey, historyJson);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore save errors
+                Debug.LogWarning($"[SearchHistoryManager] Failed to save search history: {ex.Message}");
             }
         }
 
@@ -133,4 +143,3 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-

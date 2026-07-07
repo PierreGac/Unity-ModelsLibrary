@@ -9,6 +9,19 @@ namespace ModelLibrary.Editor.Utils
     /// Provides a simple interface for generating preview textures from meshes and materials.
     /// Automatically handles camera positioning, lighting setup, and cleanup.
     /// </summary>
+    /// <remarks>
+    /// STABILITY (audit CRIT-12): The previous implementation had two critical issues:
+    /// 1. A C# finalizer (<c>~PreviewUtility3D</c>) that called
+    ///    <c>_preview.Cleanup()</c> — a Unity API — from the GC finalizer
+    ///    thread, which is illegal ("Destroy may only be called from the
+    ///    main thread"). The finalizer has been removed; cleanup is now
+    ///    solely the responsibility of <see cref="Dispose"/>.
+    /// 2. The constructor mutated global <c>RenderSettings</c>
+    ///    (<c>skybox</c>, <c>ambientMode</c>, <c>ambientSkyColor</c>, etc.)
+    ///    and never restored them. This silently corrupted the active
+    ///    scene's lighting. We now save the originals in the constructor
+    ///    and restore them in <see cref="Dispose"/>.
+    /// </remarks>
     public sealed class PreviewUtility3D : IDisposable
     {
         /// <summary>Unity's preview render utility for generating preview textures.</summary>
@@ -22,6 +35,20 @@ namespace ModelLibrary.Editor.Utils
         /// <summary>Reflection probe for adding reflections to the preview.</summary>
         private ReflectionProbe _reflectionProbe;
 
+        // STABILITY (CRIT-12): Saved RenderSettings state, restored on Dispose.
+        private readonly Material _originalSkybox;
+        private readonly UnityEngine.Rendering.AmbientMode _originalAmbientMode;
+        private readonly Color _originalAmbientSkyColor;
+        private readonly Color _originalAmbientEquatorColor;
+        private readonly Color _originalAmbientGroundColor;
+        private readonly float _originalAmbientIntensity;
+
+        // PERF (MED-23): Cache last probe/camera positions to skip re-rendering
+        // the reflection probe when nothing has moved.
+        private Vector3 _lastProbePos = Vector3.zero;
+        private Vector3 _lastCamPos = Vector3.zero;
+        private const float PROBE_MOVE_THRESHOLD = 0.01f;
+
         /// <summary>
         /// Initializes a new PreviewUtility3D instance.
         /// Sets up the preview render utility with a camera, directional light, and reflection probe.
@@ -34,6 +61,16 @@ namespace ModelLibrary.Editor.Utils
             _cam.backgroundColor = new Color(0.1921569f, 0.3019608f, 0.4745098f, 0f);
             _cam.nearClipPlane = 0.1f;
             _cam.farClipPlane = 100f;
+
+            // STABILITY (CRIT-12): Save the original RenderSettings so we can
+            // restore them on Dispose. Without this, every PreviewUtility3D
+            // creation silently corrupted the active scene's lighting.
+            _originalSkybox = RenderSettings.skybox;
+            _originalAmbientMode = RenderSettings.ambientMode;
+            _originalAmbientSkyColor = RenderSettings.ambientSkyColor;
+            _originalAmbientEquatorColor = RenderSettings.ambientEquatorColor;
+            _originalAmbientGroundColor = RenderSettings.ambientGroundColor;
+            _originalAmbientIntensity = RenderSettings.ambientIntensity;
 
             // PreviewRenderUtility with 'true' creates its own scene with built-in lighting
             // We'll add additional lights directly to the preview scene using AddSingleGO
@@ -120,6 +157,7 @@ namespace ModelLibrary.Editor.Utils
         /// <summary>
         /// Disposes of the preview utility and cleans up all resources.
         /// Cleans up the preview render utility which will destroy all GameObjects in the preview scene.
+        /// Also restores the RenderSettings that were mutated in the constructor.
         /// This method is safe to call multiple times and handles exceptions gracefully.
         /// </summary>
         public void Dispose()
@@ -142,6 +180,15 @@ namespace ModelLibrary.Editor.Utils
                 {
                     _preview.Cleanup();
                 }
+
+                // STABILITY (CRIT-12): Restore the original RenderSettings so the
+                // active scene's lighting is not corrupted after the preview closes.
+                RenderSettings.skybox = _originalSkybox;
+                RenderSettings.ambientMode = _originalAmbientMode;
+                RenderSettings.ambientSkyColor = _originalAmbientSkyColor;
+                RenderSettings.ambientEquatorColor = _originalAmbientEquatorColor;
+                RenderSettings.ambientGroundColor = _originalAmbientGroundColor;
+                RenderSettings.ambientIntensity = _originalAmbientIntensity;
             }
             catch (Exception ex)
             {
@@ -173,26 +220,12 @@ namespace ModelLibrary.Editor.Utils
             }
         }
 
-        /// <summary>
-        /// Finalizer to ensure cleanup happens even if Dispose() is not called.
-        /// This is a safety net for cases where the object is not properly disposed.
-        /// Note: Finalizers run on a separate thread, so we must be careful with Unity API calls.
-        /// </summary>
-        ~PreviewUtility3D()
-        {
-            if (!_disposed && _preview != null)
-            {
-                try
-                {
-                    // Call Cleanup() directly - this is safe from finalizer
-                    _preview.Cleanup();
-                }
-                catch
-                {
-                    // Ignore exceptions in finalizer
-                }
-            }
-        }
+        // STABILITY (CRIT-12): The finalizer has been REMOVED.
+        // The previous finalizer called _preview.Cleanup() — a Unity API —
+        // from the GC finalizer thread, which is illegal ("Destroy may only
+        // be called from the main thread") and silently swallowed by its
+        // try/catch. Callers MUST call Dispose() explicitly. The
+        // ModelPreview3DWindow.OnDisable already does this.
 
         /// <summary>
         /// Renders a mesh with a material to a preview texture.
@@ -238,11 +271,21 @@ namespace ModelLibrary.Editor.Utils
             _cam.transform.LookAt(bounds.center);
             _light.transform.SetPositionAndRotation(pos + Vector3.up * 2f, Quaternion.Euler(30, 30, 0));
 
-            // Position reflection probe at mesh center
+            // Position reflection probe at mesh center.
+            // PERF (MED-23): Only re-render the probe when the mesh or camera
+            // position changes significantly. RenderProbe renders a 128x128
+            // cubemap = 6 camera renders, which is expensive to do every frame.
             if (_reflectionProbe != null)
             {
-                _reflectionProbe.transform.position = bounds.center;
-                _reflectionProbe.RenderProbe();
+                bool probeMoved = Vector3.Distance(_lastProbePos, bounds.center) > PROBE_MOVE_THRESHOLD;
+                bool camMoved = Vector3.Distance(_lastCamPos, pos) > PROBE_MOVE_THRESHOLD;
+                if (probeMoved || camMoved)
+                {
+                    _reflectionProbe.transform.position = bounds.center;
+                    _reflectionProbe.RenderProbe();
+                    _lastProbePos = bounds.center;
+                    _lastCamPos = pos;
+                }
             }
 
             // Ensure camera is properly set up
@@ -307,11 +350,19 @@ namespace ModelLibrary.Editor.Utils
             _cam.transform.LookAt(lookAt);
             _light.transform.SetPositionAndRotation(cameraPosition + Vector3.up * 2f, Quaternion.Euler(30, 30, 0));
 
-            // Position reflection probe at lookAt point (mesh center)
+            // Position reflection probe at lookAt point (mesh center).
+            // PERF (MED-23): Same skip-when-stationary optimization as above.
             if (_reflectionProbe != null)
             {
-                _reflectionProbe.transform.position = lookAt;
-                _reflectionProbe.RenderProbe();
+                bool probeMoved = Vector3.Distance(_lastProbePos, lookAt) > PROBE_MOVE_THRESHOLD;
+                bool camMoved = Vector3.Distance(_lastCamPos, cameraPosition) > PROBE_MOVE_THRESHOLD;
+                if (probeMoved || camMoved)
+                {
+                    _reflectionProbe.transform.position = lookAt;
+                    _reflectionProbe.RenderProbe();
+                    _lastProbePos = lookAt;
+                    _lastCamPos = cameraPosition;
+                }
             }
 
             // Ensure camera is properly set up

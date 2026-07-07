@@ -16,6 +16,7 @@ namespace ModelLibrary.Editor.Windows
     {
         private void ClearThumbnailCache()
         {
+            _thumbnailCacheGeneration++;
             foreach (KeyValuePair<string, Texture2D> kvp in _thumbnailCache)
             {
                 Texture2D texture = kvp.Value;
@@ -34,6 +35,7 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void ClearMetaCache()
         {
+            _metaCacheGeneration++;
             _metaCache.Clear();
             _metaCacheOrder.Clear();
             _metaCacheNodes.Clear();
@@ -65,19 +67,32 @@ namespace ModelLibrary.Editor.Windows
                 _ = LoadMetaAsync(modelId, version);
             }
 
-            // Update notes count after reload (will be called again when metadata loads)
-            UpdateNotesCount();
-            UpdateWindowTitle();
-            Repaint();
+            // Coalesce notification/title work with any in-flight metadata loads.
+            RequestCacheUiRefresh(updateNotes: true);
         }
 
         private async Task LoadMetaAsync(string id, string version)
         {
+            if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(version) || _service == null)
+            {
+                return;
+            }
+
             string key = id + "@" + version;
-            _loadingMeta.Add(key);
+            if (!_loadingMeta.Add(key))
+            {
+                return;
+            }
+
+            int generation = _metaCacheGeneration;
             try
             {
                 ModelMeta meta = await _service.GetMetaAsync(id, version);
+                if (generation != _metaCacheGeneration)
+                {
+                    return;
+                }
+
                 AddMetaCacheEntry(key, meta);
                 string previewPath = meta?.previewImagePath;
                 if (!string.IsNullOrEmpty(previewPath))
@@ -89,29 +104,48 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
-                // Update notes count and window title after metadata is loaded
-                UpdateNotesCount();
-                UpdateWindowTitle();
-                Repaint();
+                // Multiple cache-warm tasks often complete in the same editor tick.
+                // Schedule one notes recount/title update/repaint instead of one per model.
+                RequestCacheUiRefresh(updateNotes: true);
             }
             catch (Exception ex)
             {
                 ErrorLogger.LogError("Load Meta Failed",
                     $"Failed to load metadata for {id} version {version}: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"Key: {key}, ModelId: {id}, Version: {version}");
+                RequestCacheUiRefresh(updateNotes: false);
             }
             finally
             {
-                _loadingMeta.Remove(key);
+                // Do not let an obsolete task remove the marker of a newer load
+                // started after ClearMetaCache incremented the generation.
+                if (generation == _metaCacheGeneration)
+                {
+                    _loadingMeta.Remove(key);
+                }
             }
         }
 
         private async Task LoadThumbnailAsync(string cacheKey, string id, string version, string relativePath)
         {
-            _loadingThumbnails.Add(cacheKey);
+            if (string.IsNullOrEmpty(cacheKey) || _service == null || !_loadingThumbnails.Add(cacheKey))
+            {
+                return;
+            }
+
+            int generation = _thumbnailCacheGeneration;
             try
             {
                 Texture2D texture = await _service.GetPreviewTextureAsync(id, version, relativePath);
+                if (generation != _thumbnailCacheGeneration)
+                {
+                    if (texture != null)
+                    {
+                        DestroyImmediate(texture);
+                    }
+                    return;
+                }
+
                 if (texture != null)
                 {
                     AddThumbnailCacheEntry(cacheKey, texture);
@@ -120,7 +154,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     RemoveThumbnailCacheEntry(cacheKey);
                 }
-                Repaint();
+                RequestCacheUiRefresh(updateNotes: false);
             }
             catch (Exception ex)
             {
@@ -128,11 +162,53 @@ namespace ModelLibrary.Editor.Windows
                     $"Failed to load thumbnail: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"CacheKey: {cacheKey}, ModelId: {id}, Version: {version}, RelativePath: {relativePath}");
                 RemoveThumbnailCacheEntry(cacheKey);
+                RequestCacheUiRefresh(updateNotes: false);
             }
             finally
             {
-                _loadingThumbnails.Remove(cacheKey);
+                if (generation == _thumbnailCacheGeneration)
+                {
+                    _loadingThumbnails.Remove(cacheKey);
+                }
             }
+        }
+
+        /// <summary>
+        /// Coalesces cache-driven UI refreshes into a single delayed callback.
+        /// Metadata warm-up can otherwise trigger dozens of full OnGUI passes and
+        /// notes recounts in one burst.
+        /// </summary>
+        private void RequestCacheUiRefresh(bool updateNotes)
+        {
+            _cacheUiRefreshNeedsNotes |= updateNotes;
+            if (_cacheUiRefreshScheduled)
+            {
+                return;
+            }
+
+            _cacheUiRefreshScheduled = true;
+            EditorApplication.delayCall += FlushCacheUiRefresh;
+        }
+
+        private void FlushCacheUiRefresh()
+        {
+            _cacheUiRefreshScheduled = false;
+            if (this == null || _isExiting)
+            {
+                _cacheUiRefreshNeedsNotes = false;
+                return;
+            }
+
+            bool updateNotes = _cacheUiRefreshNeedsNotes;
+            _cacheUiRefreshNeedsNotes = false;
+
+            if (updateNotes)
+            {
+                UpdateNotesCount();
+                UpdateWindowTitle();
+            }
+
+            Repaint();
         }
 
         private bool TryGetMetaFromCache(string key, out ModelMeta meta)
@@ -371,6 +447,7 @@ namespace ModelLibrary.Editor.Windows
             _localInstallCache.Remove(modelId);
             _negativeCache.Remove(modelId);
             _manifestCache.Remove(modelId);
+            _ = CheckForUpdatesAsync();
         }
 
         /// <summary>
@@ -396,6 +473,9 @@ namespace ModelLibrary.Editor.Windows
                 _manifestCacheInitialized = true;
             }
             
+            // Recompute the update badge from the cache we just changed.
+            _ = CheckForUpdatesAsync();
+
             // Force repaint if viewing browser to show updated status
             if (_currentView == ViewType.Browser)
             {
@@ -593,6 +673,7 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 _manifestCacheInitialized = true;
+                _ = CheckForUpdatesAsync();
                 Repaint();
             }
             catch (Exception ex)

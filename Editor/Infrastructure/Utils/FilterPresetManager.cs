@@ -103,14 +103,20 @@ namespace ModelLibrary.Editor.Utils
 
         /// <summary>
         /// Shows a dialog to save the current filter state as a preset.
+        /// STABILITY (HIGH-16): Updated to use the callback-based
+        /// EditorInputDialog API. The synchronous overload always returned
+        /// null because Unity's EditorWindow.ShowModal() is non-blocking.
         /// </summary>
         /// <param name="currentSearch">The current search query.</param>
         /// <param name="currentTags">The currently selected tags.</param>
         public void ShowSavePresetDialog(string currentSearch, HashSet<string> currentTags)
         {
-            string presetName = EditorInputDialog.Show("Save Filter Preset", "Enter a name for this preset:", "My Preset");
-            if (!string.IsNullOrWhiteSpace(presetName))
+            EditorInputDialog.Show("Save Filter Preset", "Enter a name for this preset:", "My Preset", presetName =>
             {
+                if (string.IsNullOrWhiteSpace(presetName))
+                {
+                    return;
+                }
                 FilterPreset preset = new FilterPreset
                 {
                     name = presetName.Trim(),
@@ -124,7 +130,7 @@ namespace ModelLibrary.Editor.Utils
                 // Add new preset
                 _filterPresets.Add(preset);
                 SaveFilterPresets();
-            }
+            });
         }
 
         /// <summary>

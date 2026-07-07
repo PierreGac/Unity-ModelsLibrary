@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using ModelLibrary.Data;
-using ModelLibrary.Editor.Utils;
 
 namespace ModelLibrary.Editor.Utils
 {
@@ -11,11 +9,8 @@ namespace ModelLibrary.Editor.Utils
     /// </summary>
     public enum ModelSortMode
     {
-        /// <summary>Sort by model name (alphabetical).</summary>
         Name,
-        /// <summary>Sort by update date (newest first).</summary>
         Date,
-        /// <summary>Sort by version number (latest first).</summary>
         Version
     }
 
@@ -25,28 +20,76 @@ namespace ModelLibrary.Editor.Utils
     public static class ModelSortUtils
     {
         /// <summary>
-        /// Sorts a list of model entries according to the specified sort mode.
+        /// Returns a sorted copy of the supplied list.
         /// </summary>
-        /// <param name="entries">List of entries to sort.</param>
-        /// <param name="mode">Sort mode to use.</param>
-        /// <returns>Sorted list of entries.</returns>
         public static List<ModelIndex.Entry> SortEntries(List<ModelIndex.Entry> entries, ModelSortMode mode)
         {
-            return mode switch
+            if (entries == null)
             {
-                ModelSortMode.Name => entries.OrderBy(e => e.name, StringComparer.OrdinalIgnoreCase).ToList(),
-                ModelSortMode.Date => entries.OrderByDescending(e => e.updatedTimeTicks).ToList(),
-                ModelSortMode.Version => entries.OrderByDescending(e =>
-                {
-                    if (SemVer.TryParse(e.latestVersion, out SemVer v))
-                    {
-                        return v;
-                    }
-                    return new SemVer(0, 0, 0);
-                }).ToList(),
-                _ => entries
-            };
+                return new List<ModelIndex.Entry>();
+            }
+
+            List<ModelIndex.Entry> copy = new List<ModelIndex.Entry>(entries);
+            SortEntriesInPlace(copy, mode);
+            return copy;
+        }
+
+        /// <summary>
+        /// Sorts an existing buffer without allocating a second list. Intended for
+        /// per-OnGUI browser filtering where the same list is reused every event.
+        /// </summary>
+        public static void SortEntriesInPlace(List<ModelIndex.Entry> entries, ModelSortMode mode)
+        {
+            if (entries == null || entries.Count < 2)
+            {
+                return;
+            }
+
+            switch (mode)
+            {
+                case ModelSortMode.Date:
+                    entries.Sort(CompareByDateDescending);
+                    break;
+                case ModelSortMode.Version:
+                    entries.Sort(CompareByVersionDescending);
+                    break;
+                default:
+                    entries.Sort(CompareByName);
+                    break;
+            }
+        }
+
+        private static int CompareByName(ModelIndex.Entry left, ModelIndex.Entry right)
+        {
+            return StringComparer.OrdinalIgnoreCase.Compare(left?.name, right?.name);
+        }
+
+        private static int CompareByDateDescending(ModelIndex.Entry left, ModelIndex.Entry right)
+        {
+            long leftTicks = left?.updatedTimeTicks ?? 0L;
+            long rightTicks = right?.updatedTimeTicks ?? 0L;
+            return rightTicks.CompareTo(leftTicks);
+        }
+
+        private static int CompareByVersionDescending(ModelIndex.Entry left, ModelIndex.Entry right)
+        {
+            bool leftParsed = SemVer.TryParse(left?.latestVersion, out SemVer leftVersion);
+            bool rightParsed = SemVer.TryParse(right?.latestVersion, out SemVer rightVersion);
+
+            if (leftParsed && rightParsed)
+            {
+                return rightVersion.CompareTo(leftVersion);
+            }
+            if (leftParsed)
+            {
+                return -1;
+            }
+            if (rightParsed)
+            {
+                return 1;
+            }
+
+            return StringComparer.OrdinalIgnoreCase.Compare(right?.latestVersion, left?.latestVersion);
         }
     }
 }
-

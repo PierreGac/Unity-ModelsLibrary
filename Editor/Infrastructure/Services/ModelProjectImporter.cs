@@ -541,16 +541,25 @@ namespace ModelLibrary.Editor.Services
                 // Find all .meta files in the destination directory
                 string[] metaFiles = Directory.GetFiles(destAbs, "*.meta", SearchOption.AllDirectories);
 
+                // SECURITY (HIGH-02): Track assigned GUIDs to ensure no duplicates.
+                HashSet<string> assignedGuids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
                 for (int i = 0; i < metaFiles.Length; i++)
                 {
                     string metaFile = metaFiles[i];
                     string content = await File.ReadAllTextAsync(metaFile);
-                    if (content.Contains("guid:"))
+
+                    // SECURITY (HIGH-02): Use a strict line-based parser instead of
+                    // a regex. The previous regex `guid: [a-f0-9]{32}` matched
+                    // "guid:" anywhere in the file — including inside comments,
+                    // string fields, and PluginImporter references — which could
+                    // rewrite unintended lines and break importer settings.
+                    // The .meta file format is YAML; the guid field appears at
+                    // the top of the file as `guid: <32 hex chars>` on its own line.
+                    string newContent = RewriteGuidLine(content, assignedGuids);
+                    if (newContent != null && newContent != content)
                     {
-                        // Generate new GUID
-                        string newGuid = Guid.NewGuid().ToString("N");
-                        content = System.Text.RegularExpressions.Regex.Replace(content, @"guid: [a-f0-9]{32}", $"guid: {newGuid}");
-                        await File.WriteAllTextAsync(metaFile, content);
+                        await File.WriteAllTextAsync(metaFile, newContent);
                     }
                 }
 
@@ -562,6 +571,68 @@ namespace ModelLibrary.Editor.Services
             {
                 Debug.LogError($"[ModelProjectImporter] Error regenerating GUIDs: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Rewrites the top-level <c>guid:</c> line in a .meta file's YAML
+        /// content with a fresh unique GUID. Returns the new content, or
+        /// <c>null</c> if no guid line was found.
+        /// SECURITY (HIGH-02): Only rewrites lines that match the strict
+        /// pattern <c>^guid: [a-f0-9]{32}\s*$</c> at the top level of the
+        /// YAML document (no indentation). Nested <c>guid:</c> keys inside
+        /// sub-objects (e.g. PluginImporter references) are left untouched.
+        /// </summary>
+        private static string RewriteGuidLine(string content, HashSet<string> assignedGuids)
+        {
+            if (string.IsNullOrEmpty(content)) return null;
+
+            // Split keeping line endings so we can reassemble exactly.
+            string[] lines = content.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+
+            bool found = false;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i];
+                // Top-level guid line: starts at column 0, no leading whitespace.
+                // Unity .meta files always have this as the second field after fileFormatVersion.
+                if (line.StartsWith("guid:", StringComparison.Ordinal))
+                {
+                    string rest = line.Substring(5).Trim();
+                    // Must be exactly 32 hex chars (Unity GUID format).
+                    if (rest.Length >= 32 && IsHex(rest.Substring(0, 32)))
+                    {
+                        // Generate a new unique GUID.
+                        string newGuid;
+                        do
+                        {
+                            newGuid = Guid.NewGuid().ToString("N");
+                        } while (assignedGuids.Contains(newGuid));
+                        assignedGuids.Add(newGuid);
+
+                        // Preserve any trailing comment after the GUID.
+                        string trailing = rest.Length > 32 ? rest.Substring(32) : "";
+                        lines[i] = "guid: " + newGuid + trailing;
+                        found = true;
+                        break; // Only one top-level guid per .meta file.
+                    }
+                }
+            }
+
+            return found ? string.Join("\n", lines) : null;
+        }
+
+        /// <summary>Returns true if the given string contains only lowercase hex chars.</summary>
+        private static bool IsHex(string s)
+        {
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>

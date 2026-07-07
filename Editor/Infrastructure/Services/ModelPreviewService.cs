@@ -29,7 +29,16 @@ namespace ModelLibrary.Editor.Services
                 return null;
             }
 
-            string key = PathUtils.SanitizePathSeparator(($"{id}/{version}/{relativePath}")).ToLowerInvariant();
+            // SECURITY (CRIT-02): Validate id/version (which come from models_index.json)
+            // and reject any ".." in relativePath (which comes from model.json).
+            if (!PathUtils.IsSafeIdentifier(id) || !PathUtils.IsSafeIdentifier(version))
+            {
+                UnityEngine.Debug.LogWarning($"[ModelPreviewService] Rejected unsafe id/version: {id}/{version}");
+                return null;
+            }
+            string safeRelativePath = PathUtils.ValidateRelativePathStrict(relativePath);
+
+            string key = PathUtils.SanitizePathSeparator(($"{id}/{version}/{safeRelativePath}")).ToLowerInvariant();
             if (_previewCache.TryGetValue(key, out Texture2D cached) && cached != null)
             {
                 return cached;
@@ -37,7 +46,10 @@ namespace ModelLibrary.Editor.Services
 
             ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
             string cacheRoot = EditorPaths.LibraryPath(Path.Combine(settings.localCacheRoot, id, version));
-            string localPath = Path.Combine(cacheRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            string localPath = Path.Combine(cacheRoot, safeRelativePath.Replace('/', Path.DirectorySeparatorChar));
+
+            // SECURITY (CRIT-02): Assert localPath is inside cacheRoot before any IO.
+            PathUtils.AssertInsideRoot(localPath, cacheRoot);
 
             if (!File.Exists(localPath))
             {
@@ -47,7 +59,7 @@ namespace ModelLibrary.Editor.Services
                     Directory.CreateDirectory(directory);
                 }
 
-                string repoPath = PathUtils.SanitizePathSeparator(($"{id}/{version}/{relativePath}"));
+                string repoPath = PathUtils.SanitizePathSeparator(($"{id}/{version}/{safeRelativePath}"));
                 await AsyncProfiler.MeasureAsync("Repository.DownloadFile", () => _repo.DownloadFileAsync(repoPath, localPath));
             }
 

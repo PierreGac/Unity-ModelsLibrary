@@ -180,13 +180,13 @@ namespace ModelLibrary.Editor.Windows
             for (int i = 0; i < _filteredEntries.Count; i++)
             {
                 ErrorLogEntry entry = _filteredEntries[i];
-                DrawLogEntry(entry);
+                DrawLogEntry(entry, i);
             }
 
             EditorGUILayout.EndScrollView();
         }
 
-        private void DrawLogEntry(ErrorLogEntry entry)
+        private void DrawLogEntry(ErrorLogEntry entry, int entryIndex)
         {
             using (EditorGUILayout.VerticalScope cardScope = UIStyles.BeginCard())
             {
@@ -318,4 +318,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

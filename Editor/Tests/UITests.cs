@@ -192,156 +192,41 @@ namespace ModelLibrary.Editor.Tests
         #endregion
 
         #region Multiline Text Display Tests
+        // INFO (audit INFO-03): These tests were tautologies — they tested
+        // .NET BCL string.Split behavior, not any production code. They have
+        // been removed and replaced with real production-code tests in
+        // PathSecurityTests.cs and FileExtensionsSecurityTests.cs.
 
-        [Test]
-        public void TestMultilineTextRendering()
-        {
-            // Test that multiline text is properly handled
-            string multilineText = "Line 1\nLine 2\nLine 3";
-            string[] lines = multilineText.Split('\n');
-
-            Assert.AreEqual(3, lines.Length, "Should split into 3 lines");
-            Assert.AreEqual("Line 1", lines[0], "First line should be correct");
-            Assert.AreEqual("Line 2", lines[1], "Second line should be correct");
-            Assert.AreEqual("Line 3", lines[2], "Third line should be correct");
-        }
-
-        [Test]
-        public void TestEmptyMultilineText()
-        {
-            // Test empty multiline text
-            string emptyText = "";
-            string[] lines = emptyText.Split('\n');
-
-            Assert.AreEqual(1, lines.Length, "Empty text should split into 1 line");
-            Assert.AreEqual("", lines[0], "Empty line should be empty string");
-        }
-
-        [Test]
-        public void TestSingleLineText()
-        {
-            // Test single line text
-            string singleLine = "Single line text";
-            string[] lines = singleLine.Split('\n');
-
-            Assert.AreEqual(1, lines.Length, "Single line should split into 1 line");
-            Assert.AreEqual("Single line text", lines[0], "Single line should be correct");
-        }
-
-        [Test]
-        public void TestMultilineTextWithCarriageReturns()
-        {
-            // Test text with carriage returns
-            string textWithCR = "Line 1\r\nLine 2\r\nLine 3";
-            string[] lines = textWithCR.Split(new string[] { "\r\n", "\n" }, System.StringSplitOptions.None);
-
-            Assert.AreEqual(3, lines.Length, "Should split into 3 lines");
-            Assert.AreEqual("Line 1", lines[0], "First line should be correct");
-            Assert.AreEqual("Line 2", lines[1], "Second line should be correct");
-            Assert.AreEqual("Line 3", lines[2], "Third line should be correct");
-        }
+        // [Test] public void TestMultilineTextRendering() — REMOVED (tautology)
+        // [Test] public void TestEmptyMultilineText()      — REMOVED (tautology)
+        // [Test] public void TestSingleLineText()          — REMOVED (tautology)
+        // [Test] public void TestMultilineTextWithCarriageReturns() — REMOVED (tautology)
 
         #endregion
 
         #region Tag Filtering Tests
+        // INFO (audit INFO-03): TestTagCaseInsensitiveFiltering and
+        // TestTagExactMatchFiltering were tautologies — they tested
+        // .NET string.Equals, not any production code. They have been
+        // removed. Real tests for ModelSearchUtils can be added later
+        // when that utility is unit-testable (currently depends on
+        // EditorApplication state).
 
-        [Test]
-        public void TestTagCaseInsensitiveFiltering()
-        {
-            // Test that tag filtering is case insensitive
-            List<string> tags = new List<string> { "Weapon", "ARMOR", "weapon", "Armor", "WEAPON" };
-            List<string> filteredTags = new List<string>();
-
-            for (int i = 0; i < tags.Count; i++)
-            {
-                string tag = tags[i];
-                if (tag.Equals("weapon", System.StringComparison.OrdinalIgnoreCase))
-                {
-                    filteredTags.Add(tag);
-                }
-            }
-
-            Assert.AreEqual(3, filteredTags.Count, "Should find 3 weapon tags (case insensitive)");
-        }
-
-        [Test]
-        public void TestTagExactMatchFiltering()
-        {
-            // Test exact match filtering
-            List<string> tags = new List<string> { "Weapon", "Weapons", "Weaponry", "Weapon" };
-            List<string> exactMatches = new List<string>();
-
-            for (int i = 0; i < tags.Count; i++)
-            {
-                string tag = tags[i];
-                if (tag.Equals("Weapon", System.StringComparison.OrdinalIgnoreCase))
-                {
-                    exactMatches.Add(tag);
-                }
-            }
-
-            Assert.AreEqual(2, exactMatches.Count, "Should find 2 exact matches");
-        }
-
-        [Test]
-        public void TestTagContainsFiltering()
-        {
-            // Test contains filtering
-            List<string> tags = new List<string> { "Weapon", "Weapons", "Weaponry", "Sword", "Bow" };
-            List<string> containsWeapon = new List<string>();
-
-            for (int i = 0; i < tags.Count; i++)
-            {
-                string tag = tags[i];
-                if (tag.Contains("Weapon", System.StringComparison.OrdinalIgnoreCase))
-                {
-                    containsWeapon.Add(tag);
-                }
-            }
-
-            Assert.AreEqual(3, containsWeapon.Count, "Should find 3 tags containing 'Weapon'");
-        }
-
-        [Test]
-        public void TestEmptyTagFiltering()
-        {
-            // Test filtering with empty tags
-            List<string> tags = new List<string> { "", "Weapon", "   ", "Armor", null };
-            List<string> validTags = new List<string>();
-
-            for (int i = 0; i < tags.Count; i++)
-            {
-                string tag = tags[i];
-                if (!string.IsNullOrWhiteSpace(tag))
-                {
-                    validTags.Add(tag);
-                }
-            }
-
-            Assert.AreEqual(2, validTags.Count, "Should find 2 valid tags");
-            Assert.IsTrue(validTags.Contains("Weapon"), "Should contain 'Weapon'");
-            Assert.IsTrue(validTags.Contains("Armor"), "Should contain 'Armor'");
-        }
-
-        [Test]
-        public void TestTagFilteringWithSpecialCharacters()
-        {
-            // Test filtering with special characters
-            List<string> tags = new List<string> { "Weapon-1", "Weapon_2", "Weapon.3", "Weapon 4", "Weapon" };
-            List<string> weaponTags = new List<string>();
-
-            for (int i = 0; i < tags.Count; i++)
-            {
-                string tag = tags[i];
-                if (tag.StartsWith("Weapon", System.StringComparison.OrdinalIgnoreCase))
-                {
-                    weaponTags.Add(tag);
-                }
-            }
-
-            Assert.AreEqual(5, weaponTags.Count, "Should find all 5 weapon tags");
-        }
+        // [Test] public void TestTagCaseInsensitiveFiltering() — REMOVED (tautology)
+        // [Test] public void TestTagExactMatchFiltering()        — REMOVED (tautology)
 
         #endregion
+
+        // INFO (audit INFO-03): The following tests were tautologies that
+        // tested .NET BCL string methods (.Equals, .Contains, .StartsWith,
+        // string.IsNullOrWhiteSpace) rather than any production code. They
+        // have been removed and replaced with real production-code tests in
+        // PathSecurityTests.cs and FileExtensionsSecurityTests.cs.
+        //
+        // Removed tests:
+        // - TestTagExactMatchFiltering (tested string.Equals)
+        // - TestTagContainsFiltering    (tested string.Contains)
+        // - TestEmptyTagFiltering       (tested string.IsNullOrWhiteSpace)
+        // - TestTagFilteringWithSpecialCharacters (tested string.StartsWith)
     }
 }

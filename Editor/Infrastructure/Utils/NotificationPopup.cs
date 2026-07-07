@@ -191,8 +191,10 @@ namespace ModelLibrary.Editor.Utils
         {
             if (_currentNotification == null)
             {
-                // Draw empty content while waiting
-                EditorGUILayout.LabelField("Waiting for notifications...");
+                // UX (LOW-15): Previously the popup stayed open showing
+                // "Waiting for notifications..." indefinitely when the queue
+                // drained. We now close the window so it doesn't linger.
+                Close();
                 return;
             }
 

@@ -35,7 +35,6 @@ namespace ModelLibrary.Editor.Windows
         private const float __DEFAULT_THUMBNAIL_SIZE = 128f;
 
         private static readonly TimeSpan NOTIFICATION_DURATION = TimeSpan.FromSeconds(3);
-        private static readonly TimeSpan MIN_UPDATE_CHECK_INTERVAL = TimeSpan.FromSeconds(5);
         private static readonly TimeSpan BACKGROUND_UPDATE_CHECK_INTERVAL = TimeSpan.FromMinutes(7);
 
         private ModelLibraryService _service;
@@ -52,6 +51,7 @@ namespace ModelLibrary.Editor.Windows
         private readonly LinkedList<string> _metaCacheOrder = new LinkedList<string>();
         private readonly Dictionary<string, LinkedListNode<string>> _metaCacheNodes = new Dictionary<string, LinkedListNode<string>>();
         private readonly HashSet<string> _loadingMeta = new HashSet<string>();
+        private int _metaCacheGeneration;
         private readonly Dictionary<string, ModelMeta> _localInstallCache = new Dictionary<string, ModelMeta>();
         private readonly Dictionary<string, ModelMeta> _manifestCache = new Dictionary<string, ModelMeta>();
         private bool _manifestCacheInitialized;
@@ -61,10 +61,19 @@ namespace ModelLibrary.Editor.Windows
         private readonly LinkedList<string> _thumbnailCacheOrder = new LinkedList<string>();
         private readonly Dictionary<string, LinkedListNode<string>> _thumbnailCacheNodes = new Dictionary<string, LinkedListNode<string>>();
         private readonly HashSet<string> _loadingThumbnails = new HashSet<string>();
+        private int _thumbnailCacheGeneration;
+        private bool _cacheUiRefreshScheduled;
+        private bool _cacheUiRefreshNeedsNotes;
         private ModelIndex _indexCache;
         private bool _loadingIndex;
         private bool _cacheWarmTriggered;
         private ModelIndex _tagSource;
+
+        // PERF (HIGH-10): Lookup table for O(1) entry-by-id access.
+        // Built lazily by EnsureIndexLookup() and invalidated whenever
+        // _indexCache changes.
+        private Dictionary<string, ModelIndex.Entry> _indexLookup;
+        private ModelIndex _indexLookupVersion;
 
         private readonly HashSet<string> _importsInProgress = new HashSet<string>();
         private readonly Dictionary<string, bool> _importCancellation = new Dictionary<string, bool>();
@@ -92,6 +101,7 @@ namespace ModelLibrary.Editor.Windows
         private string _notificationMessage;
         private DateTime _notificationTime = DateTime.MinValue;
         private DateTime _lastUpdateCheck = DateTime.MinValue;
+        private bool _checkingUpdates;
         private bool _backgroundUpdateCheckEnabled;
 
         private FavoritesManager _favoritesManager;

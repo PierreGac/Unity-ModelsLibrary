@@ -360,7 +360,16 @@ namespace ModelLibrary.Editor.Utils
         }
 
         /// <summary>
+        /// Draws an informational empty state without action buttons.
+        /// </summary>
+        public static void DrawEmptyState(string title, string message)
+        {
+            DrawEmptyState(title, message, null, null, null, null);
+        }
+
+        /// <summary>
         /// Draws a consistent empty state with optional primary/secondary actions.
+        /// Empty or null labels are not rendered, so callers never get a blank disabled button.
         /// </summary>
         public static void DrawEmptyState(string title, string message, string primaryLabel, Action primaryAction, string secondaryLabel = null, Action secondaryAction = null)
         {
@@ -370,21 +379,31 @@ namespace ModelLibrary.Editor.Utils
                 EditorGUILayout.LabelField(title, TitleLabel);
                 EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
                 EditorGUILayout.HelpBox(message, MessageType.Info);
-                EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
+                bool hasPrimary = !string.IsNullOrEmpty(primaryLabel);
+                bool hasSecondary = !string.IsNullOrEmpty(secondaryLabel);
+                if (!hasPrimary && !hasSecondary)
+                {
+                    return;
+                }
+
+                EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     GUILayout.FlexibleSpace();
 
-                    using (new EditorGUI.DisabledScope(primaryAction == null))
+                    if (hasPrimary)
                     {
-                        if (DrawPrimaryButton(primaryLabel, GUILayout.Width(UIConstants.BUTTON_WIDTH_MEDIUM), GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
+                        using (new EditorGUI.DisabledScope(primaryAction == null))
                         {
-                            primaryAction?.Invoke();
+                            if (DrawPrimaryButton(primaryLabel, GUILayout.Width(UIConstants.BUTTON_WIDTH_MEDIUM), GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
+                            {
+                                primaryAction?.Invoke();
+                            }
                         }
                     }
 
-                    if (!string.IsNullOrEmpty(secondaryLabel))
+                    if (hasSecondary)
                     {
                         using (new EditorGUI.DisabledScope(secondaryAction == null))
                         {

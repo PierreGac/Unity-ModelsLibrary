@@ -81,14 +81,32 @@ namespace ModelLibrary.Editor.Services
                 string indexPath = Path.Combine(root, MODELS_INDEX_FILE_NAME);
                 if (createBackup && File.Exists(indexPath))
                 {
-                    string timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                    // STABILITY (MED-08): Include milliseconds in the timestamp
+                    // to avoid collision when two rebuilds happen in the same
+                    // second. Previously the second rebuild would throw
+                    // IOException because File.Copy was called with
+                    // overwrite:false.
+                    string timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmssfff");
                     string backupPath = Path.Combine(root, BACKUP_FILE_PREFIX + timestamp);
-                    File.Copy(indexPath, backupPath, overwrite: false);
+                    File.Copy(indexPath, backupPath, overwrite: true);
                     report.backupPath = backupPath;
                 }
 
+                // STABILITY (MED-08): Write the new index to a temp file
+                // first, then atomically move it into place. This prevents
+                // leaving the index in a corrupt state if the write is
+                // interrupted (power loss, process kill).
                 ModelIndex newIndex = new ModelIndex { entries = entries };
-                await repo.SaveIndexAsync(newIndex);
+                string tempIndexPath = Path.Combine(root, MODELS_INDEX_FILE_NAME + ".tmp");
+                string json = JsonUtil.ToJson(newIndex);
+                await File.WriteAllTextAsync(tempIndexPath, json);
+                // File.Move with overwrite:true is atomic on the same volume
+                // (on Windows since .NET Core 3.0 / .NET 5; on Linux always).
+                if (File.Exists(indexPath))
+                {
+                    File.Delete(indexPath);
+                }
+                File.Move(tempIndexPath, indexPath);
                 report.success = report.errors.Count == 0;
             }
             catch (Exception ex)
