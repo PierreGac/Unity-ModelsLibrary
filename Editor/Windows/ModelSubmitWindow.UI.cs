@@ -134,15 +134,58 @@ namespace ModelLibrary.Editor.Windows
                 "Example: Assets/Models/MyModel", 
                 MessageType.Info);
             string displayInstallPath = string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath;
+            InstallPathValidator.ValidationResult installPathValidation =
+                InstallPathValidator.Validate(
+                    displayInstallPath,
+                    _name,
+                    _mode == SubmitMode.Update &&
+                    _latestSelectedMeta != null &&
+                    !string.IsNullOrWhiteSpace(_latestSelectedMeta.installPath) &&
+                    string.Equals(
+                        InstallPathUtils.NormalizeInstallPath(displayInstallPath),
+                        InstallPathUtils.NormalizeInstallPath(_latestSelectedMeta.installPath),
+                        StringComparison.OrdinalIgnoreCase));
+            bool hasInstallPathErrors = !installPathValidation.IsValid;
+
+            Color originalGuiColor = GUI.color;
+            if (hasInstallPathErrors)
+            {
+                GUI.color = Color.red;
+            }
+
             string newInstallPath = EditorGUILayout.TextField(new GUIContent("Install Path", 
                 "The absolute path where the model will be installed in your Unity project (e.g., Assets/Models/MyModel)"), 
                 displayInstallPath);
+
+            GUI.color = originalGuiColor;
             
             // Always update the field value to ensure it's captured
             if (newInstallPath != displayInstallPath || string.IsNullOrWhiteSpace(_installPath))
             {
                 _installPath = newInstallPath;
                 SaveDraft(); // Auto-save when path changes
+            }
+
+            if (hasInstallPathErrors)
+            {
+                EditorGUILayout.Space(2);
+                for (int i = 0; i < installPathValidation.Errors.Count; i++)
+                {
+                    EditorGUILayout.HelpBox(installPathValidation.Errors[i], MessageType.Error);
+                }
+
+                if (!string.IsNullOrWhiteSpace(installPathValidation.SuggestedInstallPath))
+                {
+                    EditorGUILayout.HelpBox(
+                        $"Suggested install path: {installPathValidation.SuggestedInstallPath}",
+                        MessageType.Info);
+
+                    if (GUILayout.Button("Use Suggested Install Path", GUILayout.Width(UIConstants.BUTTON_WIDTH_LARGE)))
+                    {
+                        _installPath = installPathValidation.SuggestedInstallPath;
+                        SaveDraft();
+                    }
+                }
             }
 
             EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);

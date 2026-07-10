@@ -39,7 +39,8 @@ namespace ModelLibrary.Editor.Utils
                 candidate = InstallPathUtils.BuildInstallPath(modelName);
             }
 
-            return InstallPathUtils.NormalizeInstallPath(candidate) ?? InstallPathUtils.BuildInstallPath(modelName);
+            string normalized = InstallPathUtils.NormalizeInstallPath(candidate) ?? InstallPathUtils.BuildInstallPath(modelName);
+            return normalized;
         }
 
         /// <summary>

@@ -596,7 +596,7 @@ namespace ModelLibrary.Editor.Windows
             return null;
         }
 
-        private string DefaultInstallPath() => "Assets/Models/NewModel";
+        private string DefaultInstallPath() => InstallPathUtils.BuildInstallPath(_name);
 
         /// <summary>
         /// Gets the default relative path for model submission based on selected assets.

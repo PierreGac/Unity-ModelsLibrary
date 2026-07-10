@@ -127,6 +127,59 @@ namespace ModelLibrary.Editor.Utils
         }
 
         /// <summary>
+        /// Validates an install path for common format issues.
+        /// </summary>
+        /// <param name="installPath">Install path starting with Assets/.</param>
+        /// <returns>List of validation error messages, empty if valid.</returns>
+        public static List<string> ValidateInstallPath(string installPath)
+        {
+            List<string> errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(installPath))
+            {
+                errors.Add("Install path is required");
+                return errors;
+            }
+
+            string trimmedPath = installPath.Trim();
+            string sanitizedPath = SanitizePathSeparator(trimmedPath);
+
+            if (!sanitizedPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Install path must start with 'Assets/'");
+            }
+
+            char[] invalidChars = Path.GetInvalidPathChars();
+            for (int i = 0; i < invalidChars.Length; i++)
+            {
+                char invalidChar = invalidChars[i];
+                if (trimmedPath.Contains(invalidChar))
+                {
+                    errors.Add($"Install path contains invalid character: '{invalidChar}'");
+                    break;
+                }
+            }
+
+            if (sanitizedPath.Contains("..") || sanitizedPath.Contains("~"))
+            {
+                errors.Add("Install path cannot contain '..' or '~' (path traversal not allowed)");
+            }
+
+            if (sanitizedPath.EndsWith("/"))
+            {
+                errors.Add("Install path should not end with a slash");
+            }
+
+            const int MAX_INSTALL_PATH_LENGTH = 260;
+            if (sanitizedPath.Length > MAX_INSTALL_PATH_LENGTH)
+            {
+                errors.Add($"Install path is too long (maximum {MAX_INSTALL_PATH_LENGTH} characters)");
+            }
+
+            return errors;
+        }
+
+        /// <summary>
         /// Checks if the path ends with a Materials folder.
         /// </summary>
         /// <param name="path">The path to check</param>

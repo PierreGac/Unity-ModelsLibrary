@@ -91,6 +91,31 @@ namespace ModelLibrary.Editor.Windows
             List<string> pathErrors = PathUtils.ValidateRelativePath(_relativePath);
             errors.AddRange(pathErrors);
 
+            // Validate install path for new submissions
+            string installPathToValidate = string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath.Trim();
+            bool allowExistingModelContent = false;
+            if (_mode == SubmitMode.Update && _latestSelectedMeta != null && !string.IsNullOrWhiteSpace(_latestSelectedMeta.installPath))
+            {
+                string normalizedCurrent = InstallPathUtils.NormalizeInstallPath(installPathToValidate);
+                string normalizedExisting = InstallPathUtils.NormalizeInstallPath(_latestSelectedMeta.installPath);
+                allowExistingModelContent = string.Equals(normalizedCurrent, normalizedExisting, StringComparison.OrdinalIgnoreCase);
+            }
+
+            InstallPathValidator.ValidationResult installPathResult =
+                InstallPathValidator.Validate(installPathToValidate, _name, allowExistingModelContent);
+            if (!installPathResult.IsValid)
+            {
+                for (int i = 0; i < installPathResult.Errors.Count; i++)
+                {
+                    errors.Add(installPathResult.Errors[i]);
+                }
+
+                if (!string.IsNullOrWhiteSpace(installPathResult.SuggestedInstallPath))
+                {
+                    errors.Add($"Suggested install path: {installPathResult.SuggestedInstallPath}");
+                }
+            }
+
             // Validate changelog using comprehensive validator
             bool isUpdateMode = _mode == SubmitMode.Update;
             List<string> changelogErrors = ChangelogValidator.ValidateChangelog(_changeSummary, isUpdateMode);
