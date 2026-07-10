@@ -183,6 +183,69 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
+        /// Returns the viewport width available for wrapping tag badge rows.
+        /// Must be called before entering a scroll view; inside a scroll view the layout
+        /// width is unbounded and wrapping would never occur.
+        /// </summary>
+        private float GetTagBadgeWrapWidth()
+        {
+            const float VERTICAL_SCROLLBAR_WIDTH = 18f;
+            const float LAYOUT_EDGE_PADDING = UIConstants.PADDING_LARGE * 2f;
+
+            float availableWidth = GetHostEditorWindowWidth();
+            availableWidth -= VERTICAL_SCROLLBAR_WIDTH + LAYOUT_EDGE_PADDING;
+            return Mathf.Max(1f, availableWidth);
+        }
+
+        /// <summary>
+        /// Resolves the width of the editor window hosting this UI.
+        /// When rendered inside ModelLibraryWindow the hidden instance position is unset,
+        /// so the parent library window position is used instead.
+        /// </summary>
+        private float GetHostEditorWindowWidth()
+        {
+            if (position.width > 1f)
+            {
+                return position.width;
+            }
+
+            ModelLibraryWindow libraryWindow = GetWindow<ModelLibraryWindow>(false, null, false);
+            if (libraryWindow != null && libraryWindow.position.width > 1f)
+            {
+                return libraryWindow.position.width;
+            }
+
+            return EditorGUIUtility.currentViewWidth;
+        }
+
+        /// <summary>
+        /// Returns whether the next badge should start a new row.
+        /// </summary>
+        /// <param name="currentLineWidth">Width already used on the current row.</param>
+        /// <param name="nextButtonWidth">Width of the next badge button.</param>
+        /// <param name="availableWidth">Total width available for one row.</param>
+        private static bool ShouldWrapTagBadgeRow(float currentLineWidth, float nextButtonWidth, float availableWidth)
+        {
+            if (currentLineWidth <= 0f)
+            {
+                return false;
+            }
+
+            return currentLineWidth + __TAG_BADGE_HORIZONTAL_PADDING + nextButtonWidth > availableWidth;
+        }
+
+        /// <summary>
+        /// Ends the current badge row and starts a new one.
+        /// </summary>
+        /// <param name="currentLineWidth">Current row width tracker to reset.</param>
+        private static void BeginNextTagBadgeRow(ref float currentLineWidth)
+        {
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.BeginHorizontal();
+            currentLineWidth = 0f;
+        }
+
+        /// <summary>
         /// Draws clickable badges for tags already used in the model catalog.
         /// </summary>
         private void DrawExistingTagsPicker()
@@ -206,6 +269,7 @@ namespace ModelLibrary.Editor.Windows
             EnsureTagBadgeStyles();
 
             string tagToAdd = null;
+            float availableWidth = GetTagBadgeWrapWidth();
             _existingTagsScroll = EditorGUILayout.BeginScrollView(
                 _existingTagsScroll,
                 GUILayout.MaxHeight(__EXISTING_TAGS_SCROLL_HEIGHT));
@@ -213,7 +277,6 @@ namespace ModelLibrary.Editor.Windows
             EnsureCatalogTagBadgeCache();
 
             float currentLineWidth = 0f;
-            float availableWidth = EditorGUIUtility.currentViewWidth - UIConstants.PADDING_LARGE * 2f;
             EditorGUILayout.BeginHorizontal();
 
             for (int i = 0; i < _catalogTagBadgeCache.Count; i++)
@@ -222,11 +285,9 @@ namespace ModelLibrary.Editor.Windows
                 GUIStyle badgeStyle = entry.AlreadyAdded ? _existingTagBadgeAddedStyle : _existingTagBadgeStyle;
                 Color badgeColor = entry.AlreadyAdded ? UIConstants.COLOR_GREEN : UIConstants.COLOR_LIGHT_BLUE;
 
-                if (currentLineWidth > 0f && currentLineWidth + entry.ButtonWidth > availableWidth)
+                if (ShouldWrapTagBadgeRow(currentLineWidth, entry.ButtonWidth, availableWidth))
                 {
-                    EditorGUILayout.EndHorizontal();
-                    EditorGUILayout.BeginHorizontal();
-                    currentLineWidth = 0f;
+                    BeginNextTagBadgeRow(ref currentLineWidth);
                 }
 
                 using (new EditorGUI.DisabledScope(entry.AlreadyAdded))
@@ -259,7 +320,7 @@ namespace ModelLibrary.Editor.Windows
             Action<int> onBadgeClicked)
         {
             float currentLineWidth = 0f;
-            float availableWidth = EditorGUIUtility.currentViewWidth - UIConstants.PADDING_LARGE * 2f;
+            float availableWidth = GetTagBadgeWrapWidth();
             EditorGUILayout.BeginHorizontal();
 
             for (int i = 0; i < tags.Count; i++)
@@ -267,11 +328,9 @@ namespace ModelLibrary.Editor.Windows
                 string label = $"{__TAG_BADGE_EMOJI} {tags[i]}";
                 float buttonWidth = badgeStyle.CalcSize(new GUIContent(label)).x + __TAG_BADGE_HORIZONTAL_PADDING;
 
-                if (currentLineWidth > 0f && currentLineWidth + buttonWidth > availableWidth)
+                if (ShouldWrapTagBadgeRow(currentLineWidth, buttonWidth, availableWidth))
                 {
-                    EditorGUILayout.EndHorizontal();
-                    EditorGUILayout.BeginHorizontal();
-                    currentLineWidth = 0f;
+                    BeginNextTagBadgeRow(ref currentLineWidth);
                 }
 
                 if (DrawSingleTagBadgeButton(label, badgeStyle, badgeColor, buttonWidth))

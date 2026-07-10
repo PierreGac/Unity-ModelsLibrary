@@ -44,6 +44,10 @@ namespace ModelLibrary.Editor.Windows
         private const float __GRID_CARD_SPACING = UIConstants.SPACING_STANDARD;
         private const float __GRID_CARD_PADDING = UIConstants.PADDING_SMALL;
         private const float __GRID_CARD_EXTRA_HEIGHT = 80f;
+        private const float __GRID_CARD_BOX_HORIZONTAL_MARGIN = UIConstants.PADDING_SMALL * 2f;
+        private const float __BROWSER_CONTENT_HORIZONTAL_INSET = 20f;
+        private const float __BROWSER_VERTICAL_SCROLLBAR_WIDTH = 18f;
+        private const float __GRID_LAYOUT_SAFETY_BUFFER = 4f;
         private const float __IMAGE_CARD_SPACING = UIConstants.SPACING_DEFAULT;
 
         private const float __LOADING_OVERLAY_ALPHA = 0.5f;
@@ -1004,6 +1008,31 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
+        private float GetBrowserContentWidth()
+        {
+            float availableWidth = position.width;
+            if (availableWidth <= 1f)
+            {
+                availableWidth = EditorGUIUtility.currentViewWidth;
+            }
+
+            availableWidth -= __BROWSER_CONTENT_HORIZONTAL_INSET
+                + __BROWSER_VERTICAL_SCROLLBAR_WIDTH
+                + __GRID_LAYOUT_SAFETY_BUFFER;
+            return Mathf.Max(1f, availableWidth);
+        }
+
+        /// <summary>
+        /// Calculates how many fixed-width cards fit on one row, accounting for inter-card spacing.
+        /// </summary>
+        /// <param name="availableWidth">Usable viewport width for the row.</param>
+        /// <param name="cardLayoutWidth">Outer horizontal footprint of one card (content + margins).</param>
+        /// <param name="interCardSpacing">Space inserted between adjacent cards.</param>
+        private static int CalculateGridColumnCount(float availableWidth, float cardLayoutWidth, float interCardSpacing)
+        {
+            return Mathf.Max(1, Mathf.FloorToInt((availableWidth + interCardSpacing) / (cardLayoutWidth + interCardSpacing)));
+        }
+
         private void DrawGridView(List<ModelIndex.Entry> entries)
         {
             float thumbnailSize = _thumbnailSize;
@@ -1011,9 +1040,10 @@ namespace ModelLibrary.Editor.Windows
             float cardPadding = __GRID_CARD_PADDING;
             float minCardWidth = thumbnailSize + (cardPadding * 2f);
             float minCardHeight = thumbnailSize + __GRID_CARD_EXTRA_HEIGHT;
+            float cardLayoutWidth = minCardWidth + __GRID_CARD_BOX_HORIZONTAL_MARGIN;
 
-            float availableWidth = EditorGUIUtility.currentViewWidth - 20f;
-            int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / (minCardWidth + spacing)));
+            float availableWidth = GetBrowserContentWidth();
+            int columns = CalculateGridColumnCount(availableWidth, cardLayoutWidth, spacing);
             _lastGridColumns = columns;
 
             int totalRows = Mathf.CeilToInt((float)entries.Count / columns);
@@ -1067,10 +1097,10 @@ namespace ModelLibrary.Editor.Windows
         {
             float thumbnailSize = _thumbnailSize;
             float spacing = __IMAGE_CARD_SPACING;
-            float minCardWidth = thumbnailSize + spacing;
+            float cardLayoutWidth = thumbnailSize;
 
-            float availableWidth = EditorGUIUtility.currentViewWidth - 20f;
-            int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / minCardWidth));
+            float availableWidth = GetBrowserContentWidth();
+            int columns = CalculateGridColumnCount(availableWidth, cardLayoutWidth, spacing);
             _lastImageColumns = columns;
             int totalRows = Mathf.CeilToInt((float)entries.Count / columns);
             float rowHeight = __IMAGE_ESTIMATED_ROW_HEIGHT;
