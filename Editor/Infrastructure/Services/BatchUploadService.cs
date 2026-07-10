@@ -220,7 +220,8 @@ namespace ModelLibrary.Editor.Services
                 updatedTimeTicks = DateTime.Now.Ticks,
                 uploadTimeTicks = DateTime.Now.Ticks,
                 payloadRelativePaths = payloadPaths,
-                tags = new Tags { values = item.tags }
+                tags = new Tags { values = item.tags },
+                installPath = InstallPathUtils.BuildInstallPath(item.modelName)
             };
 
             return await Task.FromResult(meta);

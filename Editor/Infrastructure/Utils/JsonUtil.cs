@@ -25,12 +25,20 @@ namespace ModelLibrary.Editor.Utils
 
         /// <summary>
         /// Convert a JSON string back to an object of the specified type.
-        /// This is the standard Unity JsonUtility deserialization.
+        /// ModelMeta deserialization automatically migrates legacy relativePath values into installPath.
         /// </summary>
         /// <typeparam name="t">The type of object to deserialize to</typeparam>
         /// <param name="json">The JSON string to parse</param>
         /// <returns>Object of type T, or default(T) if parsing fails</returns>
-        public static T FromJson<T>(string json) => JsonUtility.FromJson<T>(json);
+        public static T FromJson<T>(string json)
+        {
+            if (typeof(T) == typeof(ModelMeta))
+            {
+                return (T)(object)FromJsonWithMigration<ModelMeta>(json);
+            }
+
+            return JsonUtility.FromJson<T>(json);
+        }
 
         /// <summary>
         /// Robust deserialization with version handling and migration support.

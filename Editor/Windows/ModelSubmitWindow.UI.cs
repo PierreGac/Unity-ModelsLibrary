@@ -190,21 +190,6 @@ namespace ModelLibrary.Editor.Windows
 
             EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
-            // Relative Path with validation feedback
-            EditorGUILayout.LabelField(new GUIContent("Relative Path", 
-                "The path relative to the Assets folder where model files are stored in the repository.\n" +
-                "Example: Models/MyModel\n\n" +
-                "This is used for organizing files in the repository, not in your project."), UIStyles.SectionHeader);
-            EditorGUILayout.HelpBox(
-                "Relative Path: How files are organized in the REPOSITORY (not in your project).\n" +
-                "This is the path relative to the Assets folder, used for repository file organization.\n" +
-                "Example: Models/MyModel\n\n" +
-                "Note: This is different from Install Path - Install Path is for YOUR project, Relative Path is for the repository.", 
-                MessageType.Info);
-            DrawRelativePathField();
-
-            // Advanced path options (progressive disclosure)
-            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
             _showAdvancedPathOptions = EditorGUILayout.Foldout(_showAdvancedPathOptions, "Advanced Path Options", true);
             if (_showAdvancedPathOptions)
             {
@@ -214,7 +199,6 @@ namespace ModelLibrary.Editor.Windows
                 if (GUILayout.Button("Reset to Default Path", GUILayout.Width(UIConstants.BUTTON_WIDTH_LARGE)))
                 {
                     _installPath = DefaultInstallPath();
-                    _relativePath = string.Empty;
                     SaveDraft();
                 }
 
@@ -309,119 +293,6 @@ namespace ModelLibrary.Editor.Windows
 
             // Change Summary with validation feedback
             DrawChangelogField();
-        }
-
-        /// <summary>
-        /// Draws the relative path field with real-time validation feedback.
-        /// </summary>
-        private void DrawRelativePathField()
-        {
-            // Get validation errors for the current relative path
-            List<string> pathErrors = PathUtils.ValidateRelativePath(_relativePath);
-            bool hasPathErrors = pathErrors.Count > 0;
-
-            // Set the text field color based on validation state
-            Color originalColor = GUI.color;
-            if (hasPathErrors)
-            {
-                GUI.color = Color.red;
-            }
-
-            // Draw the text field
-            string displayRelativePath = string.IsNullOrWhiteSpace(_relativePath) ? GetDefaultRelativePath() : _relativePath;
-            string newRelativePath = EditorGUILayout.TextField("Relative Path", displayRelativePath);
-
-            // Restore original color
-            GUI.color = originalColor;
-
-            // Always update the field value to ensure it's captured
-            if (newRelativePath != displayRelativePath || string.IsNullOrWhiteSpace(_relativePath))
-            {
-                _relativePath = newRelativePath;
-                SaveDraft(); // Auto-save when path changes
-            }
-
-            // Show validation feedback
-            if (hasPathErrors)
-            {
-                EditorGUILayout.Space(2);
-
-                // Show error icon and message
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    EditorGUILayout.LabelField(new GUIContent("⚠", "Path validation error"),
-                        GUILayout.Width(20));
-
-                    // Show the first error message
-                    string firstError = pathErrors[0];
-                    EditorGUILayout.LabelField(firstError, EditorStyles.helpBox);
-                }
-
-                // If there are multiple errors, show a tooltip with all errors
-                if (pathErrors.Count > 1)
-                {
-                    EditorGUILayout.LabelField($"... and {pathErrors.Count - 1} more error(s)",
-                        EditorStyles.miniLabel);
-                }
-
-                // Show helpful suggestions for common issues
-                ShowPathValidationSuggestions(pathErrors);
-            }
-            else if (!string.IsNullOrWhiteSpace(_relativePath))
-            {
-                // Show success indicator for valid paths
-                EditorGUILayout.Space(2);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    EditorGUILayout.LabelField(new GUIContent("✓", "Path is valid"),
-                        GUILayout.Width(20));
-                    EditorGUILayout.LabelField("Path is valid", EditorStyles.miniLabel);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Shows helpful suggestions for common path validation errors.
-        /// </summary>
-        /// <param name="errors">List of validation errors</param>
-        private static void ShowPathValidationSuggestions(List<string> errors)
-        {
-            bool showSuggestions = false;
-            List<string> suggestions = new List<string>();
-
-            foreach (string error in errors)
-            {
-                if (error.Contains("Materials"))
-                {
-                    suggestions.Add("• Use the parent folder instead (e.g., 'Models/Benne' instead of 'Models/Benne/Materials')");
-                    showSuggestions = true;
-                }
-                else if (error.Contains("path traversal"))
-                {
-                    suggestions.Add("• Remove '..' and '~' characters from the path");
-                    showSuggestions = true;
-                }
-                else if (error.Contains("reserved folder"))
-                {
-                    suggestions.Add("• Avoid using 'Editor', 'Resources', 'StreamingAssets', or 'Plugins' in the path");
-                    showSuggestions = true;
-                }
-                else if (error.Contains("slash"))
-                {
-                    suggestions.Add("• Remove leading or trailing slashes from the path");
-                    showSuggestions = true;
-                }
-            }
-
-            if (showSuggestions)
-            {
-                EditorGUILayout.Space(2);
-                EditorGUILayout.LabelField("Suggestions:", EditorStyles.boldLabel);
-                foreach (string suggestion in suggestions)
-                {
-                    EditorGUILayout.LabelField(suggestion, EditorStyles.helpBox);
-                }
-            }
         }
 
         /// <summary>

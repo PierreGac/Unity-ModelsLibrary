@@ -115,7 +115,6 @@ namespace ModelLibrary.Editor.Windows
                     _changeSummary = "Initial submission";
                 }
                 _installPath = DefaultInstallPath();
-                _relativePath = GetDefaultRelativePath();
             }
             else
             {
@@ -212,7 +211,6 @@ namespace ModelLibrary.Editor.Windows
                 _description = _latestSelectedMeta?.description ?? string.Empty;
                 _tags = new List<string>(_latestSelectedMeta?.tags?.values ?? new List<string>());
                 _installPath = _latestSelectedMeta?.installPath ?? DefaultInstallPath();
-                _relativePath = _latestSelectedMeta?.relativePath ?? GetDefaultRelativePath();
                 _version = SuggestNextVersion(entry.latestVersion);
             }
             catch (Exception ex)
@@ -315,22 +313,14 @@ namespace ModelLibrary.Editor.Windows
             // Validate and normalize paths before submission
             // Ensure paths are not empty or using default values (which indicates they weren't properly set)
             string finalInstallPath = string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath.Trim();
-            string finalRelativePath = string.IsNullOrWhiteSpace(_relativePath) ? GetDefaultRelativePath() : _relativePath.Trim();
             
-            // Warn if paths are using defaults (may indicate user didn't set them intentionally)
             if (finalInstallPath == DefaultInstallPath())
             {
                 Debug.LogWarning($"[ModelSubmitWindow] Install path using default value. Consider setting a custom path.");
             }
             
-            if (finalRelativePath == GetDefaultRelativePath())
-            {
-                Debug.LogWarning($"[ModelSubmitWindow] Relative path using default value. Consider setting a custom path.");
-            }
-            
-            // Log paths for debugging (only in development builds to avoid log spam)
             #if UNITY_EDITOR && DEVELOPMENT_BUILD
-            Debug.Log($"[ModelSubmitWindow] Submitting with installPath: '{finalInstallPath}', relativePath: '{finalRelativePath}'");
+            Debug.Log($"[ModelSubmitWindow] Submitting with installPath: '{finalInstallPath}'");
             #endif
 
             try
@@ -343,16 +333,11 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
-                ModelMeta meta = await ModelDeployer.BuildMetaFromSelectionAsync(identityName, identityId, _version, _description, _imageAbsPaths, _tags, finalInstallPath, finalRelativePath, _idProvider);
+                ModelMeta meta = await ModelDeployer.BuildMetaFromSelectionAsync(identityName, identityId, _version, _description, _imageAbsPaths, _tags, finalInstallPath, _idProvider);
                 
-                // Verify paths were set in meta
                 if (string.IsNullOrWhiteSpace(meta.installPath) || meta.installPath == DefaultInstallPath())
                 {
                     Debug.LogWarning($"[ModelSubmitWindow] Meta installPath was not set correctly. Expected: '{finalInstallPath}', Got: '{meta.installPath}'");
-                }
-                if (string.IsNullOrWhiteSpace(meta.relativePath) || meta.relativePath == GetDefaultRelativePath())
-                {
-                    Debug.LogWarning($"[ModelSubmitWindow] Meta relativePath was not set correctly. Expected: '{finalRelativePath}', Got: '{meta.relativePath}'");
                 }
 
                 if (_cancelSubmission)
@@ -596,25 +581,34 @@ namespace ModelLibrary.Editor.Windows
             return null;
         }
 
-        private string DefaultInstallPath() => InstallPathUtils.BuildInstallPath(_name);
+        private string DefaultInstallPath()
+        {
+            string fromSelection = GetDefaultInstallPathFromSelection();
+            if (!string.IsNullOrWhiteSpace(fromSelection))
+            {
+                return fromSelection;
+            }
+
+            return InstallPathUtils.BuildInstallPath(_name);
+        }
 
         /// <summary>
-        /// Gets the default relative path for model submission based on selected assets.
+        /// Gets the default install path for model submission based on selected assets.
         /// Prioritizes finding the model root folder (containing FBX/OBJ files) rather than
         /// using subfolders like Materials. Walks up directory tree if needed to find model root.
         /// </summary>
-        private string GetDefaultRelativePath()
+        private string GetDefaultInstallPathFromSelection()
         {
             string[] selected = Selection.assetGUIDs;
             if (selected == null || selected.Length == 0)
             {
-                return "Models/NewModel";
+                return null;
             }
 
-            // Step 1: Look for FBX/OBJ files in selection first - these indicate model root
             string meshFilePath = null;
-            foreach (string guid in selected)
+            for (int i = 0; i < selected.Length; i++)
             {
+                string guid = selected[i];
                 string assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 if (string.IsNullOrEmpty(assetPath) || AssetDatabase.IsValidFolder(assetPath))
                 {
@@ -625,96 +619,88 @@ namespace ModelLibrary.Editor.Windows
                 if (extension == FileExtensions.FBX || extension == FileExtensions.OBJ)
                 {
                     meshFilePath = assetPath;
-                    break; // Found a mesh file, use its directory
+                    break;
                 }
             }
 
-            // Step 2: If mesh file found, use its directory as model root
             if (!string.IsNullOrEmpty(meshFilePath))
             {
                 string directory = Path.GetDirectoryName(meshFilePath);
                 if (!string.IsNullOrEmpty(directory) && directory.StartsWith("Assets/"))
                 {
-                    string relativePath = directory[7..]; // Remove "Assets/" prefix
-                    Debug.Log($"[ModelSubmitWindow] Found mesh file, using directory as relative path: {relativePath}");
-                    return relativePath;
+                    string installPath = PathUtils.SanitizePathSeparator(directory);
+                    Debug.Log($"[ModelSubmitWindow] Found mesh file, using directory as install path: {installPath}");
+                    return InstallPathValidator.BuildSuggestedInstallPath(installPath, _name);
                 }
             }
 
-            // Step 3: No mesh file in selection - walk up directory tree to find model root
-            // Start from first selected asset
             string firstAssetPath = AssetDatabase.GUIDToAssetPath(selected[0]);
             if (!string.IsNullOrEmpty(firstAssetPath) && firstAssetPath.StartsWith("Assets/"))
             {
-                string currentDir = AssetDatabase.IsValidFolder(firstAssetPath) 
-                    ? firstAssetPath 
+                string currentDir = AssetDatabase.IsValidFolder(firstAssetPath)
+                    ? firstAssetPath
                     : Path.GetDirectoryName(firstAssetPath);
 
                 if (!string.IsNullOrEmpty(currentDir))
                 {
-                    // Walk up directory tree looking for folder containing FBX/OBJ files
                     string searchDir = currentDir;
-                    int maxDepth = 5; // Prevent infinite loops
+                    const int MAX_DIRECTORY_WALK_DEPTH = 5;
                     int depth = 0;
 
-                    while (!string.IsNullOrEmpty(searchDir) && searchDir.StartsWith("Assets/") && depth < maxDepth)
+                    while (!string.IsNullOrEmpty(searchDir) && searchDir.StartsWith("Assets/") && depth < MAX_DIRECTORY_WALK_DEPTH)
                     {
-                        // Check if this directory contains FBX/OBJ files
                         string[] filesInDir = Directory.GetFiles(searchDir, "*.*", SearchOption.TopDirectoryOnly);
-                        bool hasMeshFiles = filesInDir.Any(file =>
+                        bool hasMeshFiles = false;
+                        for (int i = 0; i < filesInDir.Length; i++)
                         {
-                            string ext = Path.GetExtension(file).ToLowerInvariant();
-                            return ext == FileExtensions.FBX || ext == FileExtensions.OBJ;
-                        });
+                            string ext = Path.GetExtension(filesInDir[i]).ToLowerInvariant();
+                            if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ)
+                            {
+                                hasMeshFiles = true;
+                                break;
+                            }
+                        }
 
                         if (hasMeshFiles)
                         {
-                            // Found model root directory
-                            string relativePath = searchDir[7..]; // Remove "Assets/" prefix
-                            Debug.Log($"[ModelSubmitWindow] Found model root directory (contains mesh files): {relativePath}");
-                            return relativePath;
+                            string installPath = PathUtils.SanitizePathSeparator(searchDir);
+                            Debug.Log($"[ModelSubmitWindow] Found model root directory (contains mesh files): {installPath}");
+                            return InstallPathValidator.BuildSuggestedInstallPath(installPath, _name);
                         }
 
-                        // Move up one level
                         string parentDir = Path.GetDirectoryName(searchDir);
                         if (string.IsNullOrEmpty(parentDir) || parentDir == searchDir)
                         {
-                            break; // Reached root or no parent
+                            break;
                         }
                         searchDir = parentDir;
                         depth++;
                     }
 
-                    // Step 4: Fallback - use directory of first selected asset (current behavior)
-                    // But exclude common subfolders like Materials, Textures, etc.
                     string fallbackDir = currentDir;
                     if (fallbackDir.StartsWith("Assets/"))
                     {
-                        string relativePath = fallbackDir[7..];
-                        
-                        // Exclude common subfolders - walk up one level if in Materials/Textures/etc
                         string[] subfoldersToExclude = { "Materials", "Textures", "Prefabs", "Scripts", "Animations" };
-                        string[] pathParts = relativePath.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
-                        
+                        string relativePortion = fallbackDir[7..];
+                        string[] pathParts = relativePortion.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+
                         if (pathParts.Length > 1 && subfoldersToExclude.Contains(pathParts[pathParts.Length - 1], StringComparer.OrdinalIgnoreCase))
                         {
-                            // In a subfolder - use parent directory
-                            relativePath = string.Join("/", pathParts.Take(pathParts.Length - 1));
-                            Debug.Log($"[ModelSubmitWindow] Excluded subfolder, using parent directory: {relativePath}");
+                            relativePortion = string.Join("/", pathParts.Take(pathParts.Length - 1));
+                            Debug.Log($"[ModelSubmitWindow] Excluded subfolder, using parent directory: Assets/{relativePortion}");
                         }
                         else
                         {
-                            Debug.Log($"[ModelSubmitWindow] Using directory of selected asset as relative path: {relativePath}");
+                            Debug.Log($"[ModelSubmitWindow] Using directory of selected asset as install path: {fallbackDir}");
                         }
-                        
-                        return relativePath;
+
+                        return InstallPathValidator.BuildSuggestedInstallPath($"Assets/{relativePortion}", _name);
                     }
                 }
             }
 
-            // Step 5: Final fallback
-            Debug.Log("[ModelSubmitWindow] Could not determine relative path from selection, using default");
-            return "Models/NewModel";
+            Debug.Log("[ModelSubmitWindow] Could not determine install path from selection, using default");
+            return null;
         }
     }
 }

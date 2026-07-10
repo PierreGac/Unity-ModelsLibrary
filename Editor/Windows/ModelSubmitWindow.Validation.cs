@@ -87,11 +87,7 @@ namespace ModelLibrary.Editor.Windows
                 errors.Add("Version is required");
             }
 
-            // Validate relative path
-            List<string> pathErrors = PathUtils.ValidateRelativePath(_relativePath);
-            errors.AddRange(pathErrors);
-
-            // Validate install path for new submissions
+            // Validate install path
             string installPathToValidate = string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath.Trim();
             bool allowExistingModelContent = false;
             if (_mode == SubmitMode.Update && _latestSelectedMeta != null && !string.IsNullOrWhiteSpace(_latestSelectedMeta.installPath))

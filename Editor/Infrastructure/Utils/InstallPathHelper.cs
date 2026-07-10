@@ -14,7 +14,7 @@ namespace ModelLibrary.Editor.Utils
     {
         /// <summary>
         /// Determines the install path for a model based on its metadata.
-        /// Tries multiple sources in order: relativePath, installPath, or default path.
+        /// Uses installPath from meta, or falls back to a default path built from the model name.
         /// </summary>
         /// <param name="meta">The model metadata containing path information.</param>
         /// <returns>The determined install path, normalized to start with "Assets/".</returns>
@@ -23,24 +23,16 @@ namespace ModelLibrary.Editor.Utils
             string modelName = meta?.identity?.name ?? "Model";
             string candidate;
 
-            // First try the relative path from meta
-            if (!string.IsNullOrWhiteSpace(meta?.relativePath))
-            {
-                candidate = $"Assets/{meta.relativePath}";
-            }
-            // Then try the install path from meta
-            else if (!string.IsNullOrWhiteSpace(meta?.installPath))
+            if (!string.IsNullOrWhiteSpace(meta?.installPath))
             {
                 candidate = meta.installPath;
             }
-            // Finally fall back to default
             else
             {
                 candidate = InstallPathUtils.BuildInstallPath(modelName);
             }
 
-            string normalized = InstallPathUtils.NormalizeInstallPath(candidate) ?? InstallPathUtils.BuildInstallPath(modelName);
-            return normalized;
+            return InstallPathUtils.NormalizeInstallPath(candidate) ?? InstallPathUtils.BuildInstallPath(modelName);
         }
 
         /// <summary>

@@ -61,7 +61,6 @@ namespace ModelLibrary.Editor.Windows
 
             _service = new ModelLibraryService(repo);
             _installPath = DefaultInstallPath();
-            _relativePath = GetDefaultRelativePath();
 
             // Pre-populate model name from selected assets if available
             PrePopulateFromSelection();

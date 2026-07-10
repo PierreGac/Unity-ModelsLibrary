@@ -24,7 +24,7 @@ namespace ModelLibrary.Editor.Tests
                 {
                     name = "TestModel"
                 },
-                relativePath = "Models/TestModel/TestModel.FBX" // This points to a file, not a directory
+                installPath = "Assets/Models/TestModel/TestModel.FBX"
             };
 
             // This should not throw an exception and should return a directory path
@@ -56,7 +56,7 @@ namespace ModelLibrary.Editor.Tests
                 {
                     name = "TestModel"
                 },
-                relativePath = "Models/TestModel" // This is already a directory path
+                installPath = "Assets/Models/TestModel"
             };
 
             string resolvedPath = ResolveDestinationPathForTest(meta, null);
@@ -73,7 +73,7 @@ namespace ModelLibrary.Editor.Tests
                 {
                     name = "TestModel"
                 },
-                relativePath = "Models/TestModel"
+                installPath = "Assets/Models/TestModel"
             };
 
             string overridePath = "Assets/Custom/Path";
@@ -84,14 +84,14 @@ namespace ModelLibrary.Editor.Tests
         [Test]
         public void TestPathResolutionFallback()
         {
-            // Test fallback to default path when no relative path is provided
+            // Test fallback to default path when no install path is provided
             ModelMeta meta = new ModelMeta
             {
                 identity = new ModelIdentity
                 {
                     name = "TestModel"
                 },
-                relativePath = null
+                installPath = null
             };
 
             string resolvedPath = ResolveDestinationPathForTest(meta, null);
@@ -334,11 +334,10 @@ namespace ModelLibrary.Editor.Tests
                 return overrideInstallPath;
             }
 
-            if (!string.IsNullOrEmpty(meta?.relativePath))
+            if (!string.IsNullOrEmpty(meta?.installPath))
             {
-                string resolvedPath = $"Assets/{meta.relativePath}";
+                string resolvedPath = meta.installPath;
 
-                // Ensure the path points to a directory, not a file
                 if (File.Exists(Path.GetFullPath(resolvedPath)))
                 {
                     resolvedPath = Path.GetDirectoryName(resolvedPath);

@@ -349,24 +349,14 @@ namespace ModelLibrary.Editor.Tests
         {
             // Test the complete workflow of path preservation
             ModelMeta originalMeta = CreateTestModelMeta();
-            originalMeta.relativePath = "Models/Weapons";
             originalMeta.installPath = "Assets/Models/Weapons";
 
-            // Simulate the workflow steps
-            string resolvedRelativePath = PathUtils.SanitizePathSeparator(originalMeta.relativePath);
             string resolvedInstallPath = PathUtils.SanitizePathSeparator(originalMeta.installPath);
 
-            // Verify paths are preserved correctly
-            Assert.AreEqual("Models/Weapons", resolvedRelativePath, "Relative path should be preserved");
             Assert.AreEqual("Assets/Models/Weapons", resolvedInstallPath, "Install path should be preserved");
 
-            // Verify validation passes
-            List<string> relativePathErrors = PathUtils.ValidateRelativePath(resolvedRelativePath);
-            Assert.IsEmpty(relativePathErrors, "Resolved relative path should be valid");
-
-            // Verify path consistency
-            Assert.IsTrue(resolvedInstallPath.EndsWith(resolvedRelativePath),
-                "Install path should end with relative path");
+            List<string> installPathErrors = PathUtils.ValidateInstallPath(resolvedInstallPath);
+            Assert.IsEmpty(installPathErrors, "Resolved install path should be valid");
         }
 
         #endregion
@@ -392,7 +382,6 @@ namespace ModelLibrary.Editor.Tests
                 createdTimeTicks = DateTime.Now.Ticks,
                 updatedTimeTicks = DateTime.Now.Ticks,
                 uploadTimeTicks = DateTime.Now.Ticks,
-                relativePath = "Models/TestModel",
                 installPath = "Assets/Models/TestModel"
             };
         }

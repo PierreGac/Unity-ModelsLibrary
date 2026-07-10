@@ -138,12 +138,6 @@ namespace ModelLibrary.Data
         public string installPath;
 
         /// <summary>
-        /// Relative path from Assets folder for the model (e.g., "Models/Spaceship").
-        /// Used as default install location when importing the model.
-        /// </summary>
-        public string relativePath;
-
-        /// <summary>
         /// Feedback notes from developers to modelers about this specific version.
         /// These persist with the model and help track issues, suggestions, and improvements.
         /// </summary>

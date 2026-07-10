@@ -388,47 +388,41 @@ namespace ModelLibrary.Editor.Services
 
         /// <summary>
         /// Resolves the destination path for model import with comprehensive validation and logging.
-        /// Priority order: 1) Override path (if provided), 2) Meta relative path (if valid), 3) Fallback default path.
-        /// Validates paths and handles file-to-directory conversion if needed.
+        /// Priority order: 1) Override path (if provided), 2) Meta install path (if valid), 3) Fallback default path.
         /// </summary>
-        /// <param name="meta">Model metadata containing relative path information.</param>
+        /// <param name="meta">Model metadata containing install path information.</param>
         /// <param name="overrideInstallPath">Optional override path for installation (user-selected).</param>
         /// <returns>Resolved destination path relative to project root (e.g., "Assets/Models/ModelName").</returns>
         private static string ResolveDestinationPath(ModelMeta meta, string overrideInstallPath)
         {
-            // Priority 1: Override path (highest priority)
             if (!string.IsNullOrEmpty(overrideInstallPath))
             {
                 Debug.Log($"[ModelProjectImporter] Using override install path: {overrideInstallPath}");
                 return PathUtils.SanitizePathSeparator(overrideInstallPath);
             }
 
-            // Priority 2: Meta relative path (with validation)
-            if (meta != null && !string.IsNullOrEmpty(meta.relativePath))
+            if (meta != null && !string.IsNullOrEmpty(meta.installPath))
             {
-                // Validate the relative path before using it
-                List<string> pathErrors = PathUtils.ValidateRelativePath(meta.relativePath);
+                List<string> pathErrors = PathUtils.ValidateInstallPath(meta.installPath);
                 if (pathErrors.Count > 0)
                 {
-                    Debug.LogWarning($"[ModelProjectImporter] Invalid relative path '{meta.relativePath}': {string.Join(", ", pathErrors)}. Using fallback path.");
+                    Debug.LogWarning($"[ModelProjectImporter] Invalid install path '{meta.installPath}': {string.Join(", ", pathErrors)}. Using fallback path.");
                 }
                 else
                 {
-                    string resolvedPath = $"Assets/{meta.relativePath}";
+                    string resolvedPath = PathUtils.SanitizePathSeparator(meta.installPath);
 
-                    // Ensure the path points to a directory, not a file
                     if (File.Exists(Path.GetFullPath(resolvedPath)))
                     {
-                        Debug.LogWarning($"[ModelProjectImporter] Relative path points to a file: {meta.relativePath}. Converting to directory path.");
+                        Debug.LogWarning($"[ModelProjectImporter] Install path points to a file: {meta.installPath}. Converting to directory path.");
                         resolvedPath = Path.GetDirectoryName(resolvedPath);
                     }
 
-                    Debug.Log($"[ModelProjectImporter] Using meta relative path: {resolvedPath}");
+                    Debug.Log($"[ModelProjectImporter] Using meta install path: {resolvedPath}");
                     return PathUtils.SanitizePathSeparator(resolvedPath);
                 }
             }
 
-            // Priority 3: Fallback to safe default
             string safeName = SanitizeFolderName(meta != null && meta.identity != null ? meta.identity.name : "UnknownModel");
             string fallbackPath = $"Assets/Models/{safeName}";
             Debug.Log($"[ModelProjectImporter] Using fallback path for model '{(meta != null && meta.identity != null ? meta.identity.name : "Unknown")}': {fallbackPath}");

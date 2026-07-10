@@ -952,10 +952,6 @@ namespace ModelLibrary.Editor.Windows
                 {
                     EditorGUILayout.LabelField("Install Path:", _meta.installPath);
                 }
-                if (!string.IsNullOrEmpty(_meta.relativePath))
-                {
-                    EditorGUILayout.LabelField("Relative Path:", _meta.relativePath);
-                }
             }
 
             EditorGUILayout.Space(__UI_SPACING);

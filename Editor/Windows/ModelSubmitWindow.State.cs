@@ -30,7 +30,7 @@ namespace ModelLibrary.Editor.Windows
         {
             /// <summary>Basic information tab (name, version, description, tags).</summary>
             BasicInfo,
-            /// <summary>Assets tab (install path, relative path).</summary>
+            /// <summary>Assets tab (install path).</summary>
             Assets,
             /// <summary>Images tab (preview images).</summary>
             Images,
@@ -93,8 +93,6 @@ namespace ModelLibrary.Editor.Windows
         private string _description = string.Empty;
         /// <summary>Absolute install path in the Unity project (e.g., "Assets/Models/ModelName").</summary>
         private string _installPath;
-        /// <summary>Relative path from Assets folder (e.g., "Models/ModelName").</summary>
-        private string _relativePath;
         /// <summary>List of absolute paths to preview images.</summary>
         private List<string> _imageAbsPaths = new();
         /// <summary>List of tags for categorizing the model.</summary>

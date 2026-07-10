@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using ModelLibrary.Data;
+using ModelLibrary.Editor.Utils;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Serialization
@@ -67,7 +68,7 @@ namespace ModelLibrary.Editor.Serialization
                 ModelMeta modelMeta = JsonUtility.FromJson<ModelMeta>(json);
                 if (modelMeta != null)
                 {
-                    // Apply migration if needed
+                    ApplyLegacyInstallPathMigration(modelMeta, json);
                     if (ModelMetaMigration.MigrateToCurrentVersion(ref modelMeta))
                     {
                         return modelMeta;
@@ -116,10 +117,7 @@ namespace ModelLibrary.Editor.Serialization
                     modelMeta.installPath = installPath;
                 }
 
-                if (TryExtractStringValue(json, "relativePath", out string relativePath))
-                {
-                    modelMeta.relativePath = relativePath;
-                }
+                ApplyLegacyInstallPathMigration(modelMeta, json);
 
                 if (TryExtractStringValue(json, "previewImagePath", out string previewImagePath))
                 {
@@ -264,6 +262,28 @@ namespace ModelLibrary.Editor.Serialization
                 Debug.LogWarning($"VersionedJsonUtil: Failed to extract int value for {fieldName}: {ex.Message}");
             }
             return false;
+        }
+
+        /// <summary>
+        /// Migrates legacy relativePath values from older model.json files into installPath.
+        /// </summary>
+        private static void ApplyLegacyInstallPathMigration(ModelMeta modelMeta, string json)
+        {
+            if (modelMeta == null || !string.IsNullOrWhiteSpace(modelMeta.installPath) || string.IsNullOrEmpty(json))
+            {
+                return;
+            }
+
+            if (!TryExtractStringValue(json, "relativePath", out string legacyRelativePath) ||
+                string.IsNullOrWhiteSpace(legacyRelativePath))
+            {
+                return;
+            }
+
+            string normalized = PathUtils.SanitizePathSeparator(legacyRelativePath.Trim());
+            modelMeta.installPath = normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+                ? normalized
+                : $"Assets/{normalized.TrimStart('/')}";
         }
 
         /// <summary>

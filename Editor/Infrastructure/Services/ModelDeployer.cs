@@ -30,10 +30,9 @@ namespace ModelLibrary.Editor.Services
         /// <param name="imagePaths">List of absolute paths to preview images.</param>
         /// <param name="tags">List of tags for categorizing the model.</param>
         /// <param name="installPath">Absolute install path in the Unity project (e.g., "Assets/Models/ModelName").</param>
-        /// <param name="relativePath">Relative path from Assets folder (e.g., "Models/ModelName").</param>
         /// <param name="idProvider">User identity provider for getting author information.</param>
         /// <returns>Complete ModelMeta object ready for submission.</returns>
-        public static async Task<ModelMeta> BuildMetaFromSelectionAsync(string identityName, string identityId, string version, string description, IEnumerable<string> imagePaths, IEnumerable<string> tags, string installPath, string relativePath, IUserIdentityProvider idProvider)
+        public static async Task<ModelMeta> BuildMetaFromSelectionAsync(string identityName, string identityId, string version, string description, IEnumerable<string> imagePaths, IEnumerable<string> tags, string installPath, IUserIdentityProvider idProvider)
         {
             string resolvedId = string.IsNullOrWhiteSpace(identityId) ? Guid.NewGuid().ToString("N") : identityId;
             ModelMeta meta = new ModelMeta
@@ -45,8 +44,7 @@ namespace ModelLibrary.Editor.Services
                 createdTimeTicks = DateTime.Now.Ticks,
                 updatedTimeTicks = DateTime.Now.Ticks,
                 uploadTimeTicks = DateTime.Now.Ticks,
-                installPath = ResolveInstallPath(installPath, identityName),
-                relativePath = ResolveRelativePath(relativePath, identityName)
+                installPath = ResolveInstallPath(installPath, identityName)
             };
 
             // Collect selected assets (FBX, textures, materials, etc.) and their dependencies
@@ -472,46 +470,6 @@ namespace ModelLibrary.Editor.Services
 
             string finalPath = PathUtils.SanitizePathSeparator(path);
             Debug.Log($"[ModelDeployer] Final resolved install path for model '{identityName}': {finalPath}");
-            return finalPath;
-        }
-
-        /// <summary>
-        /// Resolves and validates the relative path for a model.
-        /// Validates the path using PathUtils, removes "Assets/" prefix if present, and ensures proper formatting.
-        /// Falls back to a default path if validation fails.
-        /// </summary>
-        /// <param name="relativePath">The relative path provided by the user (may be null or invalid).</param>
-        /// <param name="identityName">Model name used for generating default paths.</param>
-        /// <returns>Resolved and validated relative path (without "Assets/" prefix).</returns>
-        private static string ResolveRelativePath(string relativePath, string identityName)
-        {
-            string sanitizedName = SanitizeFolderName(identityName);
-            string defaultPath = $"Models/{sanitizedName}";
-
-            // Validate relative path if provided
-            if (!string.IsNullOrWhiteSpace(relativePath))
-            {
-                List<string> pathErrors = PathUtils.ValidateRelativePath(relativePath);
-                if (pathErrors.Count > 0)
-                {
-                    Debug.LogWarning($"[ModelDeployer] Invalid relative path '{relativePath}' for model '{identityName}': {string.Join(", ", pathErrors)}. Using fallback path.");
-                    relativePath = null; // Force fallback to default
-                }
-                else
-                {
-                    Debug.Log($"[ModelDeployer] Using validated relative path '{relativePath}' for model '{identityName}'");
-                }
-            }
-
-            string path = string.IsNullOrWhiteSpace(relativePath) ? defaultPath : PathUtils.SanitizePathSeparator(relativePath);
-            if (path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
-            {
-                path = path[7..]; // Remove "Assets/" prefix
-                Debug.Log($"[ModelDeployer] Removed 'Assets/' prefix from path: {path}");
-            }
-
-            string finalPath = PathUtils.SanitizePathSeparator(path);
-            Debug.Log($"[ModelDeployer] Final resolved relative path for model '{identityName}': {finalPath}");
             return finalPath;
         }
 

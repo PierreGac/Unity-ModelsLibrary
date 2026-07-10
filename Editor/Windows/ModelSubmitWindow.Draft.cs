@@ -25,7 +25,6 @@ namespace ModelLibrary.Editor.Windows
                     description = _description,
                     tags = new List<string>(_tags),
                     installPath = _installPath,
-                    relativePath = _relativePath,
                     imagePaths = new List<string>(_imageAbsPaths),
                     changeSummary = _changeSummary,
                     mode = _mode
@@ -61,7 +60,6 @@ namespace ModelLibrary.Editor.Windows
                     _description = draft.description ?? string.Empty;
                     _tags = draft.tags ?? new List<string>();
                     _installPath = draft.installPath ?? DefaultInstallPath();
-                    _relativePath = draft.relativePath ?? GetDefaultRelativePath();
                     _imageAbsPaths = draft.imagePaths ?? new List<string>();
                     _changeSummary = draft.changeSummary ?? "Initial submission";
                     _mode = draft.mode;
@@ -89,7 +87,6 @@ namespace ModelLibrary.Editor.Windows
             public string description;
             public List<string> tags;
             public string installPath;
-            public string relativePath;
             public List<string> imagePaths;
             public string changeSummary;
             public SubmitMode mode;
