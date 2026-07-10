@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Services;
+using ModelLibrary.Editor.Utils;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
@@ -53,6 +54,12 @@ namespace ModelLibrary.Editor.Windows
         private const string __DRAFT_PREF_KEY = "ModelLibrary.SubmitDraft";
         /// <summary>Duration to show notification (3 seconds).</summary>
         private static readonly TimeSpan _notificationDuration = TimeSpan.FromSeconds(3);
+        /// <summary>Emoji prefix shown on tag badge buttons.</summary>
+        private const string __TAG_BADGE_EMOJI = "🏷️";
+        /// <summary>Maximum height of the existing tags badge scroll area.</summary>
+        private const int __EXISTING_TAGS_SCROLL_HEIGHT = 100;
+        /// <summary>Horizontal padding between tag badge buttons.</summary>
+        private const float __TAG_BADGE_HORIZONTAL_PADDING = 4f;
 
         // File Size Constants
         /// <summary>Maximum allowed image file size (50MB).</summary>
@@ -105,6 +112,50 @@ namespace ModelLibrary.Editor.Windows
         private bool _showAdvancedTagOptions = false;
         /// <summary>Whether the advanced path options section is expanded.</summary>
         private bool _showAdvancedPathOptions = false;
+        /// <summary>Cached tags from the model catalog used for quick tag selection.</summary>
+        private readonly TagCacheManager _tagCacheManager = new TagCacheManager();
+        /// <summary>Scroll position for the existing tags badge list.</summary>
+        private Vector2 _existingTagsScroll = Vector2.zero;
+
+        /// <summary>Revision counter incremented when selected tags change.</summary>
+        private int _tagsRevision;
+
+        /// <summary>Revision counter incremented when the catalog tag list changes.</summary>
+        private int _catalogTagsRevision;
+
+        /// <summary>Case-insensitive lookup of tags currently on the submission form.</summary>
+        private readonly HashSet<string> _selectedTagsLookup = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Tracks which <see cref="_tagsRevision"/> built <see cref="_selectedTagsLookup"/>.</summary>
+        private int _selectedTagsLookupRevision = -1;
+
+        /// <summary>Precomputed layout data for catalog tag badge buttons.</summary>
+        private readonly List<CatalogTagBadgeEntry> _catalogTagBadgeCache = new List<CatalogTagBadgeEntry>();
+
+        /// <summary>Combined revision key for <see cref="_catalogTagBadgeCache"/>.</summary>
+        private int _catalogTagBadgeCacheRevision = -1;
+
+        /// <summary>Cache key for <see cref="_cachedValidationErrors"/>.</summary>
+        private string _validationCacheKey = string.Empty;
+
+        /// <summary>Cached validation errors reused across IMGUI Layout/Repaint events.</summary>
+        private readonly List<string> _cachedValidationErrors = new List<string>();
+
+        /// <summary>Cache key for <see cref="_cachedInstallPathValidation"/>.</summary>
+        private string _installPathValidationCacheKey = string.Empty;
+
+        /// <summary>Cached install path validation reused across IMGUI events.</summary>
+        private InstallPathValidator.ValidationResult _cachedInstallPathValidation;
+
+        /// <summary>Precomputed label and width for one catalog tag badge button.</summary>
+        private struct CatalogTagBadgeEntry
+        {
+            public string Tag;
+            public string Label;
+            public float ButtonWidth;
+            public bool AlreadyAdded;
+        }
+
         /// <summary>User identity provider for getting author information.</summary>
         private readonly IUserIdentityProvider _idProvider = new SimpleUserIdentityProvider();
         /// <summary>Notification message to display temporarily.</summary>

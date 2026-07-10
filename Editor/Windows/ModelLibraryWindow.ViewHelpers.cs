@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using ModelLibrary.Data;
 using UnityEditor;
+using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
 {
@@ -71,6 +72,14 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
+                for (Exception current = ex; current != null; current = current.InnerException)
+                {
+                    if (current is ExitGUIException)
+                    {
+                        throw;
+                    }
+                }
+
                 UnityEngine.Debug.LogError($"[ModelLibraryWindow] Failed to invoke method '{methodName}' on {instance.GetType().Name}: {ex.Message}");
             }
 

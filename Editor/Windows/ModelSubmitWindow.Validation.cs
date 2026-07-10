@@ -72,12 +72,102 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Validates the current form state and returns a list of validation errors.
         /// Checks model name, version, path validity, changelog requirements, and duplicate detection.
+        /// Results are cached until submission inputs change so hover repaints stay fast.
         /// </summary>
         /// <returns>List of validation error messages. Empty list indicates valid form state.</returns>
         private List<string> GetValidationErrors()
         {
-            List<string> errors = new List<string>();
+            string cacheKey = BuildValidationCacheKey();
+            if (cacheKey == _validationCacheKey)
+            {
+                return _cachedValidationErrors;
+            }
 
+            _validationCacheKey = cacheKey;
+            _cachedValidationErrors.Clear();
+            BuildValidationErrors(_cachedValidationErrors);
+            return _cachedValidationErrors;
+        }
+
+        /// <summary>
+        /// Builds a cache key from all inputs that affect form validation.
+        /// </summary>
+        /// <returns>Stable cache key string.</returns>
+        private string BuildValidationCacheKey()
+        {
+            string selectedModelVersion = string.Empty;
+            if (_mode == SubmitMode.Update && _existingModels.Count > 0)
+            {
+                int selectedIndex = Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1);
+                ModelIndex.Entry selectedModel = _existingModels[selectedIndex];
+                selectedModelVersion = selectedModel?.latestVersion ?? string.Empty;
+            }
+
+            return string.Concat(
+                ((int)_mode).ToString(), "|",
+                _name ?? string.Empty, "|",
+                _version ?? string.Empty, "|",
+                _installPath ?? string.Empty, "|",
+                _changeSummary ?? string.Empty, "|",
+                _selectedModelIndex.ToString(), "|",
+                _existingModels.Count.ToString(), "|",
+                selectedModelVersion, "|",
+                _isLoadingIndex.ToString(), "|",
+                _latestSelectedMeta?.installPath ?? string.Empty, "|",
+                BuildSelectionCacheKey());
+        }
+
+        /// <summary>
+        /// Builds a cache key from the current Unity selection used for asset validation.
+        /// </summary>
+        /// <returns>Selection cache key string.</returns>
+        private static string BuildSelectionCacheKey()
+        {
+            string[] guids = Selection.assetGUIDs;
+            if (guids == null || guids.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            return string.Join(",", guids);
+        }
+
+        /// <summary>
+        /// Validates the install path and caches the result until inputs change.
+        /// </summary>
+        /// <param name="installPathToValidate">Install path to validate.</param>
+        /// <returns>Cached install path validation result.</returns>
+        private InstallPathValidator.ValidationResult GetInstallPathValidation(string installPathToValidate)
+        {
+            bool allowExistingModelContent = false;
+            if (_mode == SubmitMode.Update && _latestSelectedMeta != null && !string.IsNullOrWhiteSpace(_latestSelectedMeta.installPath))
+            {
+                string normalizedCurrent = InstallPathUtils.NormalizeInstallPath(installPathToValidate);
+                string normalizedExisting = InstallPathUtils.NormalizeInstallPath(_latestSelectedMeta.installPath);
+                allowExistingModelContent = string.Equals(normalizedCurrent, normalizedExisting, StringComparison.OrdinalIgnoreCase);
+            }
+
+            string cacheKey = string.Concat(
+                installPathToValidate ?? string.Empty, "|",
+                _name ?? string.Empty, "|",
+                allowExistingModelContent.ToString());
+
+            if (cacheKey == _installPathValidationCacheKey)
+            {
+                return _cachedInstallPathValidation;
+            }
+
+            _installPathValidationCacheKey = cacheKey;
+            _cachedInstallPathValidation = InstallPathValidator.Validate(installPathToValidate, _name, allowExistingModelContent);
+            return _cachedInstallPathValidation;
+        }
+
+        /// <summary>
+        /// Populates a validation error list from the current form state.
+        /// </summary>
+        /// <param name="errors">List to populate with validation errors.</param>
+        private void BuildValidationErrors(List<string> errors)
+        {
             if (string.IsNullOrWhiteSpace(_name))
             {
                 errors.Add("Model name is required");
@@ -87,18 +177,8 @@ namespace ModelLibrary.Editor.Windows
                 errors.Add("Version is required");
             }
 
-            // Validate install path
             string installPathToValidate = string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath.Trim();
-            bool allowExistingModelContent = false;
-            if (_mode == SubmitMode.Update && _latestSelectedMeta != null && !string.IsNullOrWhiteSpace(_latestSelectedMeta.installPath))
-            {
-                string normalizedCurrent = InstallPathUtils.NormalizeInstallPath(installPathToValidate);
-                string normalizedExisting = InstallPathUtils.NormalizeInstallPath(_latestSelectedMeta.installPath);
-                allowExistingModelContent = string.Equals(normalizedCurrent, normalizedExisting, StringComparison.OrdinalIgnoreCase);
-            }
-
-            InstallPathValidator.ValidationResult installPathResult =
-                InstallPathValidator.Validate(installPathToValidate, _name, allowExistingModelContent);
+            InstallPathValidator.ValidationResult installPathResult = GetInstallPathValidation(installPathToValidate);
             if (!installPathResult.IsValid)
             {
                 for (int i = 0; i < installPathResult.Errors.Count; i++)
@@ -112,12 +192,10 @@ namespace ModelLibrary.Editor.Windows
                 }
             }
 
-            // Validate changelog using comprehensive validator
             bool isUpdateMode = _mode == SubmitMode.Update;
             List<string> changelogErrors = ChangelogValidator.ValidateChangelog(_changeSummary, isUpdateMode);
             errors.AddRange(changelogErrors);
 
-            // Validate that at least one valid asset is selected
             if (!HasValidAssetSelection())
             {
                 errors.Add("Please select at least one valid model asset (FBX or OBJ file)");
@@ -125,13 +203,11 @@ namespace ModelLibrary.Editor.Windows
 
             if (_mode == SubmitMode.New)
             {
-                // Check for duplicate model name
                 if (ModelNameExists(_name))
                 {
                     errors.Add($"Model '{_name}' already exists. Switch to 'Update Existing' to submit a new version.");
                 }
 
-                // Check for duplicate version (even for new models, in case of exact name match)
                 if (ModelVersionExists(_name, _version))
                 {
                     errors.Add($"Version {_version} already exists for model '{_name}'");
@@ -146,15 +222,13 @@ namespace ModelLibrary.Editor.Windows
                 else
                 {
                     ModelIndex.Entry selectedModel = _existingModels[Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1)];
-                    
-                    // Validate selected model entry
+
                     if (selectedModel == null)
                     {
                         errors.Add("Selected model entry is invalid");
-                        return errors;
+                        return;
                     }
 
-                    // Check for duplicate version
                     if (string.IsNullOrEmpty(selectedModel.latestVersion))
                     {
                         errors.Add("Selected model has no version information");
@@ -172,8 +246,6 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
             }
-
-            return errors;
         }
 
         /// <summary>

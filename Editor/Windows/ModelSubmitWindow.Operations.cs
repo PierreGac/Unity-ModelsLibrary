@@ -133,6 +133,8 @@ namespace ModelLibrary.Editor.Windows
             try
             {
                 ModelIndex index = await _service.GetIndexAsync();
+                _tagCacheManager.UpdateTagCache(index);
+                MarkCatalogTagsDirty();
                 _existingModels.Clear();
                 if (index?.entries != null)
                 {
@@ -152,6 +154,8 @@ namespace ModelLibrary.Editor.Windows
             catch
             {
                 _existingModels.Clear();
+                _tagCacheManager.UpdateTagCache(null);
+                MarkCatalogTagsDirty();
             }
             finally
             {
@@ -210,6 +214,7 @@ namespace ModelLibrary.Editor.Windows
                 _name = entry.name;
                 _description = _latestSelectedMeta?.description ?? string.Empty;
                 _tags = new List<string>(_latestSelectedMeta?.tags?.values ?? new List<string>());
+                MarkTagsDirty();
                 _installPath = _latestSelectedMeta?.installPath ?? DefaultInstallPath();
                 _version = SuggestNextVersion(entry.latestVersion);
             }

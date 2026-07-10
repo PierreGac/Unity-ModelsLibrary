@@ -30,6 +30,53 @@ namespace ModelLibrary.Editor.Windows
             };
             return _wordWrappedTextAreaStyle;
         }
+
+        private static bool _tagBadgeStylesInitialized;
+        private static GUIStyle _existingTagBadgeStyle;
+        private static GUIStyle _existingTagBadgeAddedStyle;
+        private static GUIStyle _selectedTagBadgeStyle;
+
+        /// <summary>
+        /// Initializes cached GUIStyles for tag badge buttons once.
+        /// Creating GUIStyles during OnGUI causes severe hover/repaint slowdowns.
+        /// </summary>
+        private static void EnsureTagBadgeStyles()
+        {
+            if (_tagBadgeStylesInitialized)
+            {
+                return;
+            }
+
+            _tagBadgeStylesInitialized = true;
+
+            _existingTagBadgeStyle = new GUIStyle(UIStyles.TagPill)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontStyle = FontStyle.Normal
+            };
+            _existingTagBadgeStyle.normal.textColor = UIConstants.COLOR_LIGHT_BLUE;
+            _existingTagBadgeStyle.hover.textColor = Color.white;
+            _existingTagBadgeStyle.active.textColor = Color.white;
+
+            _existingTagBadgeAddedStyle = new GUIStyle(UIStyles.TagPill)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontStyle = FontStyle.Bold
+            };
+            _existingTagBadgeAddedStyle.normal.textColor = UIConstants.COLOR_GREEN;
+            _existingTagBadgeAddedStyle.hover.textColor = UIConstants.COLOR_GREEN;
+            _existingTagBadgeAddedStyle.active.textColor = UIConstants.COLOR_GREEN;
+
+            _selectedTagBadgeStyle = new GUIStyle(UIStyles.TagPill)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontStyle = FontStyle.Bold
+            };
+            _selectedTagBadgeStyle.normal.textColor = UIConstants.COLOR_GREEN;
+            _selectedTagBadgeStyle.hover.textColor = UIConstants.COLOR_RED;
+            _selectedTagBadgeStyle.active.textColor = UIConstants.COLOR_RED;
+        }
+
         /// <summary>
         /// Draws the Basic Info tab content (name, version, description, tags).
         /// </summary>
@@ -72,33 +119,13 @@ namespace ModelLibrary.Editor.Windows
                 _newTag = EditorGUILayout.TextField("Add Tag", _newTag);
                 if (GUILayout.Button("Add", GUILayout.Width(__BUTTON_WIDTH_MEDIUM)) && !string.IsNullOrWhiteSpace(_newTag))
                 {
-                    _tags.Add(_newTag.Trim());
+                    TryAddTagToModel(_newTag);
                     _newTag = string.Empty;
-                    SaveDraft(); // Auto-save when tags change
                 }
             }
 
-            // Show tags list
-            if (_tags.Count > 0)
-            {
-                EditorGUILayout.Space(UIConstants.SPACING_SMALL);
-                for (int i = _tags.Count - 1; i >= 0; i--)
-                {
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        EditorGUILayout.LabelField("- " + _tags[i]);
-                        if (GUILayout.Button("x", GUILayout.Width(__BUTTON_WIDTH_SMALL)))
-                        {
-                            _tags.RemoveAt(i);
-                            SaveDraft(); // Auto-save when tags change
-                        }
-                    }
-                }
-            }
-            else
-            {
-                EditorGUILayout.HelpBox("No tags added. Tags help categorize and find your model.", MessageType.Info);
-            }
+            DrawSelectedTagsList();
+            DrawExistingTagsPicker();
 
             // Advanced tag options (progressive disclosure)
             EditorGUILayout.Space(UIConstants.SPACING_SMALL);
@@ -112,6 +139,7 @@ namespace ModelLibrary.Editor.Windows
                     if (EditorUtility.DisplayDialog("Clear All Tags", "Are you sure you want to remove all tags?", "Yes", "No"))
                     {
                         _tags.Clear();
+                        MarkTagsDirty();
                         SaveDraft();
                     }
                 }
@@ -120,7 +148,275 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Draws the Assets tab content (install path, relative path).
+        /// Draws the tags currently assigned to the model being submitted.
+        /// </summary>
+        private void DrawSelectedTagsList()
+        {
+            if (_tags.Count == 0)
+            {
+                EditorGUILayout.HelpBox("No tags added yet. Pick from existing tags below or type a new one.", MessageType.Info);
+                return;
+            }
+
+            EnsureTagBadgeStyles();
+
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
+            EditorGUILayout.LabelField("Selected Tags", EditorStyles.miniBoldLabel);
+
+            int removeIndex = -1;
+            DrawTagBadgeButtons(
+                _tags,
+                _selectedTagBadgeStyle,
+                UIConstants.COLOR_GREEN,
+                (int index) => removeIndex = index);
+
+            if (removeIndex >= 0)
+            {
+                _tags.RemoveAt(removeIndex);
+                MarkTagsDirty();
+                SaveDraft();
+            }
+            else
+            {
+                EditorGUILayout.LabelField("Click a selected tag to remove it.", EditorStyles.miniLabel);
+            }
+        }
+
+        /// <summary>
+        /// Draws clickable badges for tags already used in the model catalog.
+        /// </summary>
+        private void DrawExistingTagsPicker()
+        {
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
+            EditorGUILayout.LabelField("Existing Tags", EditorStyles.miniBoldLabel);
+            EditorGUILayout.LabelField("Click a tag to add it to this model.", EditorStyles.miniLabel);
+
+            if (_isLoadingIndex)
+            {
+                EditorGUILayout.LabelField("Loading tags from catalog...", EditorStyles.miniLabel);
+                return;
+            }
+
+            if (_tagCacheManager.SortedTags.Count == 0)
+            {
+                EditorGUILayout.HelpBox("No tags found in the catalog yet. Add a new tag above to create one.", MessageType.Info);
+                return;
+            }
+
+            EnsureTagBadgeStyles();
+
+            string tagToAdd = null;
+            _existingTagsScroll = EditorGUILayout.BeginScrollView(
+                _existingTagsScroll,
+                GUILayout.MaxHeight(__EXISTING_TAGS_SCROLL_HEIGHT));
+
+            EnsureCatalogTagBadgeCache();
+
+            float currentLineWidth = 0f;
+            float availableWidth = EditorGUIUtility.currentViewWidth - UIConstants.PADDING_LARGE * 2f;
+            EditorGUILayout.BeginHorizontal();
+
+            for (int i = 0; i < _catalogTagBadgeCache.Count; i++)
+            {
+                CatalogTagBadgeEntry entry = _catalogTagBadgeCache[i];
+                GUIStyle badgeStyle = entry.AlreadyAdded ? _existingTagBadgeAddedStyle : _existingTagBadgeStyle;
+                Color badgeColor = entry.AlreadyAdded ? UIConstants.COLOR_GREEN : UIConstants.COLOR_LIGHT_BLUE;
+
+                if (currentLineWidth > 0f && currentLineWidth + entry.ButtonWidth > availableWidth)
+                {
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.BeginHorizontal();
+                    currentLineWidth = 0f;
+                }
+
+                using (new EditorGUI.DisabledScope(entry.AlreadyAdded))
+                {
+                    if (DrawSingleTagBadgeButton(entry.Label, badgeStyle, badgeColor, entry.ButtonWidth) && !entry.AlreadyAdded)
+                    {
+                        tagToAdd = entry.Tag;
+                    }
+                }
+
+                currentLineWidth += entry.ButtonWidth;
+            }
+
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndScrollView();
+
+            if (!string.IsNullOrEmpty(tagToAdd))
+            {
+                TryAddTagToModel(tagToAdd);
+            }
+        }
+
+        /// <summary>
+        /// Draws a wrapping row of tag badge buttons from a string list.
+        /// </summary>
+        private void DrawTagBadgeButtons(
+            IReadOnlyList<string> tags,
+            GUIStyle badgeStyle,
+            Color badgeColor,
+            Action<int> onBadgeClicked)
+        {
+            float currentLineWidth = 0f;
+            float availableWidth = EditorGUIUtility.currentViewWidth - UIConstants.PADDING_LARGE * 2f;
+            EditorGUILayout.BeginHorizontal();
+
+            for (int i = 0; i < tags.Count; i++)
+            {
+                string label = $"{__TAG_BADGE_EMOJI} {tags[i]}";
+                float buttonWidth = badgeStyle.CalcSize(new GUIContent(label)).x + __TAG_BADGE_HORIZONTAL_PADDING;
+
+                if (currentLineWidth > 0f && currentLineWidth + buttonWidth > availableWidth)
+                {
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.BeginHorizontal();
+                    currentLineWidth = 0f;
+                }
+
+                if (DrawSingleTagBadgeButton(label, badgeStyle, badgeColor, buttonWidth))
+                {
+                    onBadgeClicked?.Invoke(i);
+                }
+
+                currentLineWidth += buttonWidth;
+            }
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>
+        /// Draws one tag badge button with a tinted background.
+        /// </summary>
+        private static bool DrawSingleTagBadgeButton(string label, GUIStyle badgeStyle, Color badgeColor, float buttonWidth = 0f)
+        {
+            Color originalBackground = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(
+                badgeColor.r,
+                badgeColor.g,
+                badgeColor.b,
+                UIConstants.BADGE_BACKGROUND_ALPHA);
+
+            bool clicked;
+            if (buttonWidth > 0f)
+            {
+                clicked = GUILayout.Button(label, badgeStyle, GUILayout.Width(buttonWidth));
+            }
+            else
+            {
+                clicked = GUILayout.Button(label, badgeStyle, GUILayout.ExpandWidth(false));
+            }
+
+            GUI.backgroundColor = originalBackground;
+            return clicked;
+        }
+
+        /// <summary>
+        /// Marks selected-tag caches dirty after the tag list changes.
+        /// </summary>
+        private void MarkTagsDirty()
+        {
+            _tagsRevision++;
+        }
+
+        /// <summary>
+        /// Marks catalog-tag layout caches dirty after the catalog tag list changes.
+        /// </summary>
+        private void MarkCatalogTagsDirty()
+        {
+            _catalogTagsRevision++;
+        }
+
+        /// <summary>
+        /// Rebuilds the case-insensitive lookup for selected tags when needed.
+        /// </summary>
+        private void EnsureSelectedTagsLookup()
+        {
+            if (_selectedTagsLookupRevision == _tagsRevision)
+            {
+                return;
+            }
+
+            _selectedTagsLookupRevision = _tagsRevision;
+            _selectedTagsLookup.Clear();
+            for (int i = 0; i < _tags.Count; i++)
+            {
+                string tag = _tags[i];
+                if (!string.IsNullOrWhiteSpace(tag))
+                {
+                    _selectedTagsLookup.Add(tag.Trim());
+                }
+            }
+        }
+
+        /// <summary>
+        /// Rebuilds precomputed catalog tag badge layout data when tags or selection change.
+        /// </summary>
+        private void EnsureCatalogTagBadgeCache()
+        {
+            int revisionKey = (_catalogTagsRevision * 397) ^ _tagsRevision;
+            if (_catalogTagBadgeCacheRevision == revisionKey)
+            {
+                return;
+            }
+
+            _catalogTagBadgeCacheRevision = revisionKey;
+            _catalogTagBadgeCache.Clear();
+            EnsureSelectedTagsLookup();
+
+            for (int i = 0; i < _tagCacheManager.SortedTags.Count; i++)
+            {
+                string tag = _tagCacheManager.SortedTags[i];
+                bool alreadyAdded = _selectedTagsLookup.Contains(tag.Trim());
+                GUIStyle badgeStyle = alreadyAdded ? _existingTagBadgeAddedStyle : _existingTagBadgeStyle;
+                string label = string.Concat(__TAG_BADGE_EMOJI, " ", tag);
+                float buttonWidth = badgeStyle.CalcSize(new GUIContent(label)).x + __TAG_BADGE_HORIZONTAL_PADDING;
+
+                CatalogTagBadgeEntry entry = new CatalogTagBadgeEntry
+                {
+                    Tag = tag,
+                    Label = label,
+                    ButtonWidth = buttonWidth,
+                    AlreadyAdded = alreadyAdded
+                };
+                _catalogTagBadgeCache.Add(entry);
+            }
+        }
+
+        /// <summary>
+        /// Adds a tag to the submission list if it is not already present.
+        /// </summary>
+        /// <param name="tag">Tag value to add.</param>
+        private void TryAddTagToModel(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag) || IsTagAlreadyOnModel(tag))
+            {
+                return;
+            }
+
+            _tags.Add(tag.Trim());
+            MarkTagsDirty();
+            SaveDraft();
+        }
+
+        /// <summary>
+        /// Checks whether a tag is already on the model submission list.
+        /// </summary>
+        /// <param name="tag">Tag value to check.</param>
+        /// <returns>True when the tag is already selected.</returns>
+        private bool IsTagAlreadyOnModel(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+            {
+                return false;
+            }
+
+            EnsureSelectedTagsLookup();
+            return _selectedTagsLookup.Contains(tag.Trim());
+        }
+
+        /// <summary>
+        /// Draws the Assets tab content (install path).
         /// </summary>
         private void DrawAssetsTab()
         {
@@ -134,17 +430,7 @@ namespace ModelLibrary.Editor.Windows
                 "Example: Assets/Models/MyModel", 
                 MessageType.Info);
             string displayInstallPath = string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath;
-            InstallPathValidator.ValidationResult installPathValidation =
-                InstallPathValidator.Validate(
-                    displayInstallPath,
-                    _name,
-                    _mode == SubmitMode.Update &&
-                    _latestSelectedMeta != null &&
-                    !string.IsNullOrWhiteSpace(_latestSelectedMeta.installPath) &&
-                    string.Equals(
-                        InstallPathUtils.NormalizeInstallPath(displayInstallPath),
-                        InstallPathUtils.NormalizeInstallPath(_latestSelectedMeta.installPath),
-                        StringComparison.OrdinalIgnoreCase));
+            InstallPathValidator.ValidationResult installPathValidation = GetInstallPathValidation(displayInstallPath);
             bool hasInstallPathErrors = !installPathValidation.IsValid;
 
             Color originalGuiColor = GUI.color;

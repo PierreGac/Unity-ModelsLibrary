@@ -59,6 +59,7 @@ namespace ModelLibrary.Editor.Windows
                     _version = draft.version ?? "1.0.0";
                     _description = draft.description ?? string.Empty;
                     _tags = draft.tags ?? new List<string>();
+                    MarkTagsDirty();
                     _installPath = draft.installPath ?? DefaultInstallPath();
                     _imageAbsPaths = draft.imagePaths ?? new List<string>();
                     _changeSummary = draft.changeSummary ?? "Initial submission";
