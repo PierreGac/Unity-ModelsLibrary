@@ -3,10 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
-using ModelLibrary.Editor;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Services;
-using ModelLibrary.Editor.Settings;
 using ModelLibrary.Editor.Utils;
 using ModelLibrary.Editor.Windows;
 using UnityEditor;
@@ -21,6 +19,7 @@ namespace ModelLibrary.Editor
     /// </summary>
     public static class ContextMenus
     {
+        private static List<string> _manifestPaths = null;
         /// <summary>
         /// Right-click context menu item to submit selected model assets.
         /// This menu item appears in the Project view when right-clicking on assets.
@@ -53,6 +52,11 @@ namespace ModelLibrary.Editor
         [MenuItem("Assets/Model Library/Submit Model", true, 1000)]
         public static bool ValidateSubmitModelFromSelection()
         {
+            // Search for manifest files in the project
+            // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
+            // Unity doesn't import files starting with dot, so they're not in the AssetDatabase
+            _manifestPaths = ManifestDiscoveryUtility.DiscoverAllManifestFiles("Assets");
+
             // Only allow Artists to submit models
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
             if (identityProvider.GetUserRole() != UserRole.Artist && identityProvider.GetUserRole() != UserRole.Admin)
@@ -221,14 +225,9 @@ namespace ModelLibrary.Editor
                 return null;
             }
 
-            // Search for manifest files in the project
-            // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
-            // Unity doesn't import files starting with dot, so they're not in the AssetDatabase
-            List<string> manifestPaths = ManifestDiscoveryUtility.DiscoverAllManifestFiles("Assets");
-
-            for (int i = 0; i < manifestPaths.Count; i++)
+            for (int i = 0; i < _manifestPaths.Count; i++)
             {
-                string manifestPath = manifestPaths[i];
+                string manifestPath = _manifestPaths[i];
                 if (string.IsNullOrEmpty(manifestPath))
                 {
                     continue;
@@ -263,14 +262,10 @@ namespace ModelLibrary.Editor
                 return null;
             }
 
-            // Search for manifest files in the project
-            // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
-            // Unity doesn't import files starting with dot, so they're not in the AssetDatabase
-            List<string> manifestPaths = ManifestDiscoveryUtility.DiscoverAllManifestFiles("Assets");
 
-            for (int i = 0; i < manifestPaths.Count; i++)
+            for (int i = 0; i < _manifestPaths.Count; i++)
             {
-                string manifestPath = manifestPaths[i];
+                string manifestPath = _manifestPaths[i];
                 if (string.IsNullOrEmpty(manifestPath))
                 {
                     continue;
