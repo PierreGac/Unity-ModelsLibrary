@@ -55,7 +55,7 @@ namespace ModelLibrary.Editor
         {
             // Only allow Artists to submit models
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            if (identityProvider.GetUserRole() != UserRole.Artist)
+            if (identityProvider.GetUserRole() != UserRole.Artist && identityProvider.GetUserRole() != UserRole.Admin)
             {
                 return false;
             }
