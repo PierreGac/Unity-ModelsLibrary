@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
+using ModelLibrary.Editor.Settings;
 using ModelLibrary.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
@@ -44,6 +45,7 @@ namespace ModelLibrary.Editor.Windows
             string author = _meta?.author ?? "Unknown";
             EditorGUILayout.LabelField(modelName, UIStyles.TitleLabel);
             EditorGUILayout.LabelField($"v{version} by {author}", UIStyles.MutedLabel);
+            DrawModelPathSummary();
 
             // Delete version button (with safety checks)
             DrawDeleteVersionButton();
@@ -272,6 +274,45 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Draws the repository version path and local install path (when installed) under the header.
+        /// </summary>
+        private void DrawModelPathSummary()
+        {
+            string repositoryPath = BuildRepositoryVersionPath();
+            if (!string.IsNullOrEmpty(repositoryPath))
+            {
+                EditorGUILayout.LabelField($"Repository: {repositoryPath}", UIStyles.MutedLabel);
+            }
+
+            if (_isInstalled && !string.IsNullOrEmpty(_installPath))
+            {
+                string installedPath = _installPath.Replace('\\', '/');
+                EditorGUILayout.LabelField($"Installed: {installedPath}", UIStyles.MutedLabel);
+            }
+        }
+
+        /// <summary>
+        /// Builds the repository location for the model version being viewed.
+        /// </summary>
+        private string BuildRepositoryVersionPath()
+        {
+            if (string.IsNullOrEmpty(_modelId) || string.IsNullOrEmpty(_version))
+            {
+                return string.Empty;
+            }
+
+            string relativeVersionPath = string.Concat(_modelId, "/", _version);
+            ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
+            if (settings == null || string.IsNullOrWhiteSpace(settings.repositoryRoot))
+            {
+                return relativeVersionPath;
+            }
+
+            string repositoryRoot = settings.repositoryRoot.Trim().Replace('\\', '/').TrimEnd('/');
+            return string.Concat(repositoryRoot, "/", relativeVersionPath);
         }
 
         private void DrawModelStructure()
