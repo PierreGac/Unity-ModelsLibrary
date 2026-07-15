@@ -162,6 +162,23 @@ namespace ModelLibrary.Editor.Utils
         }
 
         /// <summary>
+        /// Returns true when the install path exists on disk and already contains model files or a manifest.
+        /// </summary>
+        /// <param name="installPath">Install path relative to the project (must start with Assets/).</param>
+        /// <returns>True when the folder contains model content.</returns>
+        public static bool PathContainsModelContent(string installPath)
+        {
+            string normalizedPath = InstallPathUtils.NormalizeInstallPath(installPath);
+            if (string.IsNullOrWhiteSpace(normalizedPath))
+            {
+                return false;
+            }
+
+            string absolutePath = Path.GetFullPath(normalizedPath);
+            return FolderContainsModelContent(absolutePath);
+        }
+
+        /// <summary>
         /// Builds a suggested install path using the parent of the current path and the model name.
         /// When the current path still uses the default placeholder folder name, the leaf segment
         /// is replaced instead of appending the new model name.

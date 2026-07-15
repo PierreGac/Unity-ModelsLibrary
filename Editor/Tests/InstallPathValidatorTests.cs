@@ -69,6 +69,51 @@ namespace ModelLibrary.Editor.Tests
         }
 
         [Test]
+        public void PathContainsModelContent_ReturnsTrueWhenManifestExists()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
+            string modelPath = Path.Combine(tempRoot, "Assets", "Models", "My_Model");
+            Directory.CreateDirectory(modelPath);
+            File.WriteAllText(Path.Combine(modelPath, ".modelLibrary.meta.json"), "{}");
+
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                Assert.IsTrue(InstallPathValidator.PathContainsModelContent("Assets/Models/My_Model"));
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
+
+        [Test]
+        public void PathContainsModelContent_ReturnsFalseForEmptyFolder()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
+            string modelPath = Path.Combine(tempRoot, "Assets", "Models", "My_Model");
+            Directory.CreateDirectory(modelPath);
+
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                Assert.IsFalse(InstallPathValidator.PathContainsModelContent("Assets/Models/My_Model"));
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
+
+        [Test]
         public void Validate_Import_AllowsUpdateWhenModelFolderHasSubfoldersWithModelFiles()
         {
             string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));

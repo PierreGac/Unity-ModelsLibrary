@@ -131,6 +131,31 @@ namespace ModelLibrary.Editor.Utils
             return InstallPathUtils.NormalizeInstallPath(relative);
         }
 
+        /// <summary>
+        /// Asks the user to confirm a model update that will overwrite an existing install folder.
+        /// Skips the prompt when the target folder does not already contain model content.
+        /// </summary>
+        /// <param name="modelName">Display name of the model being updated.</param>
+        /// <param name="installPath">Target install path relative to Assets/.</param>
+        /// <returns>True when the user confirms or no overwrite confirmation is required; false when cancelled.</returns>
+        public bool ConfirmModelUpdateOverwrite(string modelName, string installPath)
+        {
+            if (!InstallPathValidator.PathContainsModelContent(installPath))
+            {
+                return true;
+            }
+
+            string displayName = string.IsNullOrWhiteSpace(modelName) ? "this model" : modelName;
+            string normalizedInstallPath = InstallPathUtils.NormalizeInstallPath(installPath) ?? installPath;
+            string message =
+                $"Updating '{displayName}' will install files to:\n\n{normalizedInstallPath}\n\n" +
+                "This folder already contains an installed version of this model. Existing files may be overwritten.\n\n" +
+                "Proceeding may cause data loss or corruption if the project has local changes in this folder.\n\n" +
+                "Do you want to proceed?";
+
+            return EditorUtility.DisplayDialog("Confirm Model Update", message, "Yes, Proceed", "No, Cancel");
+        }
+
         private static void ShowInvalidInstallPathDialog(
             string installPath,
             List<string> errors,

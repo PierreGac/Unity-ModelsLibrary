@@ -107,10 +107,14 @@ namespace ModelLibrary.Editor.Windows
                         return;
                     }
                 }
+                else if (isUpgrade)
+                {
+                    chosenInstallPath = resolvedStoredInstallPath;
+                }
                 else
                 {
                     int choice = EditorUtility.DisplayDialogComplex(
-                        isUpgrade ? "Update Model" : "Import Model",
+                        "Import Model",
                         $"Select an install location for '{meta.identity.name}'.\nStored path: {resolvedStoredInstallPath}",
                         "Use Stored Path",
                         "Choose Folder...",
@@ -145,6 +149,14 @@ namespace ModelLibrary.Editor.Windows
                         }
                         chosenInstallPath = custom;
                     }
+                }
+
+                if (isUpgrade && !_installPathHelper.ConfirmModelUpdateOverwrite(modelName, chosenInstallPath))
+                {
+                    _importCancellation[id] = true;
+                    cancellationTokenSource.Cancel();
+                    titleContent.text = "Model Library";
+                    return;
                 }
 
                 if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)
