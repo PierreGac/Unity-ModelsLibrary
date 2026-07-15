@@ -50,6 +50,9 @@ namespace ModelLibrary.Editor.Utils
         /// <summary>Large button width (250 pixels).</summary>
         public const float BUTTON_WIDTH_LARGE = 250f;
 
+        /// <summary>Width for the Add Dependencies button on mesh asset rows (120 pixels).</summary>
+        public const float BUTTON_WIDTH_ADD_DEPENDENCIES = 120f;
+
         /// <summary>Standard window minimum width (500 pixels).</summary>
         public const float WINDOW_MIN_WIDTH = 500f;
 
@@ -92,6 +95,9 @@ namespace ModelLibrary.Editor.Utils
 
         /// <summary>Preview background gray.</summary>
         public static readonly Color COLOR_PREVIEW_BACKGROUND = new Color(0.2f, 0.2f, 0.2f, 1f);
+
+        /// <summary>Text color for dependency relationship labels in the submit asset list.</summary>
+        public static readonly Color COLOR_DEPENDENCY_LABEL = new Color(0.3f, 0.78f, 0.38f);
 
         /// <summary>Alpha used for subtle badge backgrounds.</summary>
         public const float BADGE_BACKGROUND_ALPHA = 0.2f;

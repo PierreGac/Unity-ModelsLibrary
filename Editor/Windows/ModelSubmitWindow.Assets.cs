@@ -120,6 +120,40 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
+        /// Adds Unity-referenced dependencies for a mesh asset to the submission list.
+        /// </summary>
+        /// <param name="meshGuid">GUID of the FBX or OBJ mesh asset.</param>
+        /// <returns>Number of assets added to the list.</returns>
+        private int AddDependenciesForMeshAsset(string meshGuid)
+        {
+            string meshPath = AssetDatabase.GUIDToAssetPath(meshGuid);
+            if (!AssetDependencyResolver.IsMeshAssetPath(meshPath))
+            {
+                return 0;
+            }
+
+            List<string> dependencyGuids = AssetDependencyResolver.CollectReferencedGuids(
+                new[] { meshGuid },
+                excludeGuids: _selectedAssetGuidLookup);
+
+            int addedCount = 0;
+            for (int i = 0; i < dependencyGuids.Count; i++)
+            {
+                if (TryAddAssetGuid(dependencyGuids[i], saveDraft: false))
+                {
+                    addedCount++;
+                }
+            }
+
+            if (addedCount > 0)
+            {
+                SaveDraft();
+            }
+
+            return addedCount;
+        }
+
+        /// <summary>
         /// Removes an asset from the submission list at the given index.
         /// </summary>
         /// <param name="index">Index of the asset to remove.</param>
@@ -214,7 +248,7 @@ namespace ModelLibrary.Editor.Windows
                 for (int i = 0; i < folderGuids.Length; i++)
                 {
                     string folderAssetPath = AssetDatabase.GUIDToAssetPath(folderGuids[i]);
-                    if (HasMeshExtension(folderAssetPath))
+                    if (AssetDependencyResolver.IsMeshAssetPath(folderAssetPath))
                     {
                         return true;
                     }
@@ -223,23 +257,91 @@ namespace ModelLibrary.Editor.Windows
                 return false;
             }
 
-            return HasMeshExtension(path);
+            return AssetDependencyResolver.IsMeshAssetPath(path);
         }
 
         /// <summary>
-        /// Returns whether the asset path has a mesh file extension.
+        /// Pings an asset in the Project window and selects it.
         /// </summary>
-        /// <param name="assetPath">Unity asset path.</param>
-        /// <returns>True for FBX or OBJ files.</returns>
-        private static bool HasMeshExtension(string assetPath)
+        /// <param name="asset">Project asset to highlight.</param>
+        private static void PingAssetInProject(UnityEngine.Object asset)
         {
-            if (string.IsNullOrEmpty(assetPath) || AssetDatabase.IsValidFolder(assetPath))
+            if (asset == null)
             {
-                return false;
+                return;
             }
 
-            string extension = Path.GetExtension(assetPath).ToLowerInvariant();
-            return extension == FileExtensions.FBX || extension == FileExtensions.OBJ;
+            EditorGUIUtility.PingObject(asset);
+            Selection.activeObject = asset;
+        }
+
+        /// <summary>
+        /// Handles click-to-ping interaction for an asset row content area.
+        /// </summary>
+        /// <param name="clickRect">Rect covering the clickable asset info region.</param>
+        /// <param name="asset">Project asset to ping when clicked.</param>
+        private static void TryHandleAssetRowClick(Rect clickRect, UnityEngine.Object asset)
+        {
+            if (asset == null)
+            {
+                return;
+            }
+
+            Event currentEvent = Event.current;
+            if (currentEvent.type == EventType.Repaint)
+            {
+                EditorGUIUtility.AddCursorRect(clickRect, MouseCursor.Link);
+                return;
+            }
+
+            if (currentEvent.type != EventType.MouseDown || currentEvent.button != 0)
+            {
+                return;
+            }
+
+            if (!clickRect.Contains(currentEvent.mousePosition))
+            {
+                return;
+            }
+
+            PingAssetInProject(asset);
+            currentEvent.Use();
+        }
+
+        /// <summary>
+        /// Returns the cached map of dependency asset GUIDs to referencing mesh display names.
+        /// </summary>
+        /// <returns>Dependency source map for the current asset selection.</returns>
+        private IReadOnlyDictionary<string, List<string>> GetAssetDependencySourceNames()
+        {
+            string cacheKey = BuildSelectedAssetGuidsCacheKey();
+            if (!string.Equals(cacheKey, _assetDependencyMapCacheKey, StringComparison.Ordinal))
+            {
+                _cachedDependencySourceNames = AssetDependencyResolver.BuildDependencySourceNamesByGuid(_selectedAssetGuids);
+                _assetDependencyMapCacheKey = cacheKey;
+            }
+
+            return _cachedDependencySourceNames;
+        }
+
+        /// <summary>
+        /// Returns a dependency label for an asset when it is referenced by meshes in the list.
+        /// </summary>
+        /// <param name="assetGuid">Asset GUID to describe.</param>
+        /// <param name="dependencySources">Map of dependency GUIDs to referencing mesh names.</param>
+        /// <returns>Formatted dependency label, or empty when the asset is not a listed dependency.</returns>
+        private static string GetAssetDependencyLabel(
+            string assetGuid,
+            IReadOnlyDictionary<string, List<string>> dependencySources)
+        {
+            if (string.IsNullOrEmpty(assetGuid)
+                || dependencySources == null
+                || !dependencySources.TryGetValue(assetGuid, out List<string> sourceMeshNames))
+            {
+                return string.Empty;
+            }
+
+            return AssetDependencyResolver.FormatDependencySourceLabel(sourceMeshNames);
         }
 
         /// <summary>

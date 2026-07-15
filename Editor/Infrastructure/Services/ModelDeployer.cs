@@ -201,74 +201,14 @@ namespace ModelLibrary.Editor.Services
             // Log GUID collection for debugging
             Debug.Log($"[ModelDeployer] Collected {guids.Count} asset GUIDs for model '{meta.identity.name}': {string.Join(", ", guids.Take(5))}{(guids.Count > 5 ? "..." : "")}");
 
-            // Dependencies: gather GUIDs referenced by selected assets (materials, textures)
-            HashSet<string> dependencyGuids = new HashSet<string>();
-            foreach (string guid in guids)
-            {
-                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                string[] deps = AssetDatabase.GetDependencies(assetPath, recursive: true);
-                foreach (string dep in deps)
-                {
-                    string dGuid = AssetDatabase.AssetPathToGUID(dep);
-                    if (!string.IsNullOrEmpty(dGuid) && dGuid != guid)
-                    {
-                        // Filter out shader-related files
-                        string dext = Path.GetExtension(dep).ToLowerInvariant();
-                        if (FileExtensions.IsNotAllowedFileExtension(dext))
-                        {
-                            continue;
-                        }
-                        dependencyGuids.Add(dGuid);
-                    }
-                }
-            }
-            foreach (string d in dependencyGuids)
-            {
-                if (!meta.assetGuids.Contains(d))
-                {
-                    meta.dependencies.Add(d);
-                    // Add type/name context if available in the current project
-                    string depPath = AssetDatabase.GUIDToAssetPath(d);
-                    Type depType = string.IsNullOrEmpty(depPath) ? null : AssetDatabase.GetMainAssetTypeAtPath(depPath);
-                    meta.dependenciesDetailed.Add(new DependencyRef
-                    {
-                        guid = d,
-                        type = depType != null ? depType.Name : string.Empty,
-                        name = string.IsNullOrEmpty(depPath) ? string.Empty : Path.GetFileNameWithoutExtension(depPath)
-                    });
-                    // Also add to materials/textures if recognizable
-                    if (!string.IsNullOrEmpty(depPath))
-                    {
-                        string depExt = Path.GetExtension(depPath).ToLowerInvariant();
-                        if (depExt == FileExtensions.FBX || depExt == FileExtensions.OBJ)
-                        {
-                            AccumulateMeshStats(depPath, processedMeshIds, ref totalVertices, ref totalTriangles);
-                        }
+            List<string> dependencyGuids = AssetDependencyResolver.CollectReferencedGuids(
+                guids,
+                excludeGuids: guids);
 
-                        string typeName = depType != null ? depType.Name : null;
-                        if (typeName == nameof(Material))
-                        {
-                            meta.materials.Add(new AssetRef
-                            {
-                                guid = d,
-                                name = Path.GetFileNameWithoutExtension(depPath),
-                                relativePath = null,
-                                type = typeName
-                            });
-                        }
-                        else if (typeName == nameof(Texture2D))
-                        {
-                            meta.textures.Add(new AssetRef
-                            {
-                                guid = d,
-                                name = Path.GetFileNameWithoutExtension(depPath),
-                                relativePath = null,
-                                type = typeName
-                            });
-                        }
-                    }
-                }
-            }
+            AssetDependencyResolver.EnrichModelMetaWithDependencies(
+                meta,
+                dependencyGuids,
+                depPath => AccumulateMeshStats(depPath, processedMeshIds, ref totalVertices, ref totalTriangles));
 
             // Add images (expected to be absolute paths or project relative under Assets)
             meta.imageRelativePaths = imagePaths != null ? imagePaths.Select(p => $"images/{Path.GetFileName(p)}").ToList() : new List<string>();

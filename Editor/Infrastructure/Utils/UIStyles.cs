@@ -14,6 +14,7 @@ namespace ModelLibrary.Editor.Utils
         private static GUIStyle _sectionHeader;
         private static GUIStyle _cardBox;
         private static GUIStyle _mutedLabel;
+        private static GUIStyle _dependencyLabel;
         private static GUIStyle _tagPill;
         private static GUIStyle _toolbarButton;
         private static GUIStyle _toolbarPopup;
@@ -60,6 +61,16 @@ namespace ModelLibrary.Editor.Utils
             {
                 EnsureStyles();
                 return _mutedLabel;
+            }
+        }
+
+        /// <summary>Green label for dependency relationship hints in the submit asset list.</summary>
+        public static GUIStyle DependencyLabel
+        {
+            get
+            {
+                EnsureStyles();
+                return _dependencyLabel;
             }
         }
 
@@ -166,6 +177,17 @@ namespace ModelLibrary.Editor.Utils
             {
                 fontSize = UIConstants.FONT_SIZE_MUTED,
                 wordWrap = true
+            };
+
+            _dependencyLabel = new GUIStyle(EditorStyles.miniLabel)
+            {
+                fontSize = UIConstants.FONT_SIZE_MUTED,
+                wordWrap = true,
+                fontStyle = FontStyle.Italic,
+                normal = { textColor = UIConstants.COLOR_DEPENDENCY_LABEL },
+                hover = { textColor = UIConstants.COLOR_DEPENDENCY_LABEL },
+                active = { textColor = UIConstants.COLOR_DEPENDENCY_LABEL },
+                focused = { textColor = UIConstants.COLOR_DEPENDENCY_LABEL }
             };
 
             _cardBox = new GUIStyle(EditorStyles.helpBox)

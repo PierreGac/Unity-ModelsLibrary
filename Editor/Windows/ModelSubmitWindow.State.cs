@@ -110,6 +110,11 @@ namespace ModelLibrary.Editor.Windows
         private readonly List<string> _selectedAssetGuids = new List<string>();
         /// <summary>Case-insensitive lookup of <see cref="_selectedAssetGuids"/>.</summary>
         private readonly HashSet<string> _selectedAssetGuidLookup = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Cache key for <see cref="_cachedDependencySourceNames"/>.</summary>
+        private string _assetDependencyMapCacheKey = string.Empty;
+        /// <summary>Cached map of dependency asset GUIDs to referencing mesh display names.</summary>
+        private Dictionary<string, List<string>> _cachedDependencySourceNames =
+            new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         /// <summary>Temporary object picker value for adding a single asset.</summary>
         private UnityEngine.Object _assetPickerObject;
         /// <summary>Whether the advanced tag options section is expanded.</summary>

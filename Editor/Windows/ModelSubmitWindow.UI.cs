@@ -87,7 +87,7 @@ namespace ModelLibrary.Editor.Windows
         {
             EditorGUILayout.LabelField("Model Assets", UIStyles.SectionHeader);
             EditorGUILayout.HelpBox(
-                "These project assets will be packaged with your submission. Add FBX/OBJ meshes plus related materials and textures.",
+                "These project assets will be packaged with your submission. Add FBX/OBJ meshes plus related materials and textures, or use Add Dependencies on a mesh row to pull in referenced assets.",
                 MessageType.Info);
 
             DrawAssetDropArea();
@@ -136,6 +136,8 @@ namespace ModelLibrary.Editor.Windows
                     _assetListScrollPosition,
                     GUILayout.Height(__ASSET_LIST_SCROLL_HEIGHT));
 
+                IReadOnlyDictionary<string, List<string>> dependencySources = GetAssetDependencySourceNames();
+
                 for (int i = 0; i < _selectedAssetGuids.Count; i++)
                 {
                     string guid = _selectedAssetGuids[i];
@@ -146,33 +148,55 @@ namespace ModelLibrary.Editor.Windows
 
                     using (new EditorGUILayout.HorizontalScope("box"))
                     {
-                        Texture preview = asset != null
-                            ? AssetPreview.GetMiniThumbnail(asset)
-                            : null;
-
-                        if (preview != null)
+                        using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandWidth(true)))
                         {
-                            GUILayout.Label(preview, GUILayout.Width(32), GUILayout.Height(32));
-                        }
-                        else
-                        {
-                            EditorGUI.DrawRect(
-                                GUILayoutUtility.GetRect(32, 32, GUILayout.Width(32), GUILayout.Height(32)),
-                                new Color(0.2f, 0.2f, 0.2f, 1f));
+                            Texture preview = asset != null
+                                ? AssetPreview.GetMiniThumbnail(asset)
+                                : null;
+
+                            if (preview != null)
+                            {
+                                GUILayout.Label(preview, GUILayout.Width(32), GUILayout.Height(32));
+                            }
+                            else
+                            {
+                                EditorGUI.DrawRect(
+                                    GUILayoutUtility.GetRect(32, 32, GUILayout.Width(32), GUILayout.Height(32)),
+                                    new Color(0.2f, 0.2f, 0.2f, 1f));
+                            }
+
+                            using (new EditorGUILayout.VerticalScope())
+                            {
+                                string displayName = string.IsNullOrEmpty(assetPath)
+                                    ? "(missing asset)"
+                                    : Path.GetFileName(assetPath);
+                                EditorGUILayout.LabelField(displayName, EditorStyles.boldLabel);
+                                EditorGUILayout.LabelField(
+                                    $"{GetAssetTypeLabel(guid)} • {assetPath}",
+                                    EditorStyles.miniLabel);
+
+                                string dependencyLabel = GetAssetDependencyLabel(guid, dependencySources);
+                                if (!string.IsNullOrEmpty(dependencyLabel))
+                                {
+                                    EditorGUILayout.LabelField(dependencyLabel, UIStyles.DependencyLabel);
+                                }
+                            }
                         }
 
-                        using (new EditorGUILayout.VerticalScope())
-                        {
-                            string displayName = string.IsNullOrEmpty(assetPath)
-                                ? "(missing asset)"
-                                : Path.GetFileName(assetPath);
-                            EditorGUILayout.LabelField(displayName, EditorStyles.boldLabel);
-                            EditorGUILayout.LabelField(
-                                $"{GetAssetTypeLabel(guid)} • {assetPath}",
-                                EditorStyles.miniLabel);
-                        }
+                        Rect assetInfoRect = GUILayoutUtility.GetLastRect();
+                        TryHandleAssetRowClick(assetInfoRect, asset);
 
-                        GUILayout.FlexibleSpace();
+                        if (AssetDependencyResolver.IsMeshAssetPath(assetPath))
+                        {
+                            if (GUILayout.Button(
+                                "Add Dependencies",
+                                GUILayout.Width(UIConstants.BUTTON_WIDTH_ADD_DEPENDENCIES),
+                                GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
+                            {
+                                AddDependenciesForMeshAsset(guid);
+                                break;
+                            }
+                        }
 
                         if (GUILayout.Button("Remove", GUILayout.Width(70), GUILayout.Height(30)))
                         {
