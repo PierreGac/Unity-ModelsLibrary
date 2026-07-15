@@ -17,6 +17,82 @@ namespace ModelLibrary.Editor.Windows
     public partial class ModelSubmitWindow
     {
         /// <summary>
+        /// Default model name used for new submissions before prefilling from selection.
+        /// </summary>
+        private const string __DEFAULT_MODEL_NAME = "New Model";
+
+        /// <summary>
+        /// Default version string for new submissions.
+        /// </summary>
+        private const string __DEFAULT_VERSION = "1.0.0";
+
+        /// <summary>
+        /// Default changelog summary for new model submissions.
+        /// </summary>
+        private const string __DEFAULT_CHANGE_SUMMARY = "Initial submission";
+
+        /// <summary>
+        /// Resets all submission form fields to their defaults and repopulates from the
+        /// current Project selection. Called when opening the submit view for a new submission.
+        /// </summary>
+        /// <param name="resolveMeshDependencies">
+        /// When true, automatically adds materials and textures referenced by selected mesh assets.
+        /// </param>
+        /// <param name="selectionGuids">
+        /// Optional asset GUIDs captured at entry time. Falls back to the current Project selection.
+        /// </param>
+        public void PrepareForNewSubmission(bool resolveMeshDependencies = false, string[] selectionGuids = null)
+        {
+            _mode = SubmitMode.New;
+            _selectedTab = FormTab.BasicInfo;
+            _selectedModelIndex = 0;
+            _loadingBaseMeta = false;
+            _isSubmitting = false;
+            _cancelSubmission = false;
+            _changeSummary = __DEFAULT_CHANGE_SUMMARY;
+            _latestSelectedMeta = null;
+
+            _name = __DEFAULT_MODEL_NAME;
+            _version = __DEFAULT_VERSION;
+            _description = string.Empty;
+            _installPath = null;
+            _imageAbsPaths.Clear();
+            _tags.Clear();
+            _newTag = string.Empty;
+            _scrollPosition = Vector2.zero;
+            _assetListScrollPosition = Vector2.zero;
+            _selectedAssetGuids.Clear();
+            _selectedAssetGuidLookup.Clear();
+            _assetDependencyMapCacheKey = string.Empty;
+            _cachedDependencySourceNames.Clear();
+            _assetPickerObject = null;
+            _showAdvancedTagOptions = false;
+            _showAdvancedPathOptions = false;
+            _tagPickerState.MarkTagsDirty();
+            _tagPickerState.MarkCatalogTagsDirty();
+            _tagDuplicateWarning = null;
+
+            _validationCacheKey = string.Empty;
+            _cachedValidationErrors.Clear();
+            _installPathValidationCacheKey = string.Empty;
+            _cachedInstallPathValidation = default;
+
+            _notificationMessage = null;
+            _notificationTime = DateTime.MinValue;
+
+            ClearPreviewTextureCache();
+
+            InitializeSelectedAssetsFromProjectSelection(selectionGuids);
+            if (resolveMeshDependencies)
+            {
+                AddDependenciesForAllMeshAssets();
+            }
+
+            PrePopulateFromSelection();
+            _installPath = ResolveDefaultInstallPath();
+        }
+
+        /// <summary>
         /// Pre-populates form fields from currently selected assets in Project view.
         /// Extracts model name from file names (for FBX/OBJ), folder structure, or existing model manifests.
         /// Priority: 1) File name (FBX/OBJ), 2) Folder name, 3) Existing model name from manifest.
@@ -82,7 +158,7 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
-                if (!string.IsNullOrWhiteSpace(suggestedName) && _name == "New Model")
+                if (!string.IsNullOrWhiteSpace(suggestedName) && _name == __DEFAULT_MODEL_NAME)
                 {
                     _name = suggestedName;
                 }
@@ -97,7 +173,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     _changeSummary = "Initial submission";
                 }
-                _installPath = DefaultInstallPath();
+                _installPath = ResolveDefaultInstallPath();
             }
             else
             {
@@ -436,7 +512,7 @@ namespace ModelLibrary.Editor.Windows
                 }
                 else
                 {
-                    _changeSummary = "Initial submission";
+                    PrepareForNewSubmission();
                 }
             }
             catch (Exception ex)
@@ -572,6 +648,28 @@ namespace ModelLibrary.Editor.Windows
             }
 
             return InstallPathUtils.BuildInstallPath(_name);
+        }
+
+        /// <summary>
+        /// Resolves the install path to display by default, using validator suggestions
+        /// so the field shows the same path as the "Suggested install path" hint.
+        /// </summary>
+        /// <returns>Default install path for the current form state.</returns>
+        private string ResolveDefaultInstallPath()
+        {
+            string candidate = DefaultInstallPath();
+            InstallPathValidator.ValidationResult validation = InstallPathValidator.Validate(
+                candidate,
+                _name,
+                allowExistingModelContent: false,
+                InstallPathValidator.InstallPathValidationMode.Submission);
+
+            if (!string.IsNullOrWhiteSpace(validation.SuggestedInstallPath))
+            {
+                return validation.SuggestedInstallPath;
+            }
+
+            return candidate;
         }
 
         /// <summary>

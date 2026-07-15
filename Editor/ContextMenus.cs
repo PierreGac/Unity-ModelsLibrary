@@ -37,8 +37,19 @@ namespace ModelLibrary.Editor
                 return;
             }
 
-            // Open the ModelSubmitWindow - it will automatically use the current selection
-            ModelSubmitWindow.Open();
+            // Capture selection before the Model Library window takes focus.
+            string[] selectedGuids = Selection.assetGUIDs;
+            string[] copiedGuids = null;
+            if (selectedGuids != null && selectedGuids.Length > 0)
+            {
+                copiedGuids = new string[selectedGuids.Length];
+                for (int i = 0; i < selectedGuids.Length; i++)
+                {
+                    copiedGuids[i] = selectedGuids[i];
+                }
+            }
+
+            ModelSubmitWindow.Open(resolveMeshDependencies: true, selectedAssetGuids: copiedGuids);
         }
 
         /// <summary>

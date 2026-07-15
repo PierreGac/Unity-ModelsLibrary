@@ -235,7 +235,7 @@ namespace ModelLibrary.Editor.Windows
                 "This is the full path starting with 'Assets/' that users will see in their Project window.\n" +
                 "Example: Assets/Models/MyModel", 
                 MessageType.Info);
-            string displayInstallPath = string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath;
+            string displayInstallPath = string.IsNullOrWhiteSpace(_installPath) ? ResolveDefaultInstallPath() : _installPath;
             InstallPathValidator.ValidationResult installPathValidation = GetInstallPathValidation(displayInstallPath);
             bool hasInstallPathErrors = !installPathValidation.IsValid;
 
@@ -290,13 +290,13 @@ namespace ModelLibrary.Editor.Windows
 
                 if (GUILayout.Button("Reset to Default Path", GUILayout.Width(UIConstants.BUTTON_WIDTH_LARGE)))
                 {
-                    _installPath = DefaultInstallPath();
+                    _installPath = ResolveDefaultInstallPath();
                     SaveDraft();
                 }
 
                 EditorGUILayout.Space(5);
                 EditorGUILayout.LabelField("Current Default Path:", EditorStyles.miniLabel);
-                EditorGUILayout.LabelField(DefaultInstallPath(), EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField(ResolveDefaultInstallPath(), EditorStyles.wordWrappedMiniLabel);
                 EditorGUI.indentLevel--;
             }
         }

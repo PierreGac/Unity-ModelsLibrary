@@ -16,16 +16,25 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Populates the submission asset list from the current Project window selection.
         /// </summary>
-        private void InitializeSelectedAssetsFromProjectSelection()
+        /// <param name="assetGuids">
+        /// Optional GUIDs captured at entry time. When null or empty, uses <see cref="Selection.assetGUIDs"/>.
+        /// </param>
+        private void InitializeSelectedAssetsFromProjectSelection(string[] assetGuids = null)
         {
-            if (Selection.assetGUIDs == null || Selection.assetGUIDs.Length == 0)
+            string[] guidsToUse = assetGuids;
+            if (guidsToUse == null || guidsToUse.Length == 0)
+            {
+                guidsToUse = Selection.assetGUIDs;
+            }
+
+            if (guidsToUse == null || guidsToUse.Length == 0)
             {
                 return;
             }
 
-            for (int i = 0; i < Selection.assetGUIDs.Length; i++)
+            for (int i = 0; i < guidsToUse.Length; i++)
             {
-                TryAddAssetGuid(Selection.assetGUIDs[i], saveDraft: false);
+                TryAddAssetGuid(guidsToUse[i], saveDraft: false);
             }
         }
 
@@ -117,6 +126,28 @@ namespace ModelLibrary.Editor.Windows
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Adds Unity-referenced dependencies for every mesh asset already in the submission list.
+        /// </summary>
+        private void AddDependenciesForAllMeshAssets()
+        {
+            List<string> meshGuids = new List<string>();
+            for (int i = 0; i < _selectedAssetGuids.Count; i++)
+            {
+                string guid = _selectedAssetGuids[i];
+                string meshPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (AssetDependencyResolver.IsMeshAssetPath(meshPath))
+                {
+                    meshGuids.Add(guid);
+                }
+            }
+
+            for (int i = 0; i < meshGuids.Count; i++)
+            {
+                AddDependenciesForMeshAsset(meshGuids[i]);
+            }
         }
 
         /// <summary>

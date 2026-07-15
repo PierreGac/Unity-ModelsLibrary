@@ -80,6 +80,16 @@ namespace ModelLibrary.Editor.Windows
         private void ClearDraft() => EditorPrefs.DeleteKey(__DRAFT_PREF_KEY);
 
         /// <summary>
+        /// Restores the saved draft into the form. This is an explicit user action;
+        /// drafts are not auto-loaded when opening the submit view.
+        /// </summary>
+        public void RestoreSavedDraft()
+        {
+            LoadDraft();
+            Repaint();
+        }
+
+        /// <summary>
         /// Data class for storing draft submission form state.
         /// </summary>
         [System.Serializable]

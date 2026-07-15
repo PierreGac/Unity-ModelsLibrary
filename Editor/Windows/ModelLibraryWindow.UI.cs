@@ -170,7 +170,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         FullRefresh();
                     },
-                    () => NavigateToView(ViewType.Submit));
+                    () => NavigateToSubmitView());
                 return;
             }
 
@@ -199,7 +199,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         FullRefresh();
                     },
-                    () => NavigateToView(ViewType.Submit));
+                    () => NavigateToSubmitView());
                 return;
             }
 
@@ -298,7 +298,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (GUILayout.Button("Submit Model", GUILayout.Width(120), GUILayout.Height(30)))
                         {
-                            NavigateToView(ViewType.Submit);
+                            NavigateToSubmitView();
                         }
                     }
 
@@ -315,7 +315,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         FullRefresh();
                     },
-                    () => NavigateToView(ViewType.Submit));
+                    () => NavigateToSubmitView());
                 return;
             }
 
@@ -483,7 +483,7 @@ namespace ModelLibrary.Editor.Windows
                     if (identityProvider.GetUserRole() == UserRole.Artist)
                     {
                         actionsMenu.AddSeparator(string.Empty);
-                        actionsMenu.AddItem(new GUIContent("Submit Model", "Open the submission form for new models or updates"), false, () => NavigateToView(ViewType.Submit));
+                        actionsMenu.AddItem(new GUIContent("Submit Model", "Open the submission form for new models or updates"), false, () => NavigateToSubmitView());
                     }
                     actionsMenu.ShowAsContext();
                 }

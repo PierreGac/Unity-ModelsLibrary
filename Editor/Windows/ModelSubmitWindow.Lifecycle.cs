@@ -21,7 +21,13 @@ namespace ModelLibrary.Editor.Windows
         /// Prevents opening during play mode.
         /// Now navigates to the Submit view in ModelLibraryWindow instead of opening a separate window.
         /// </summary>
-        public static void Open()
+        /// <param name="resolveMeshDependencies">
+        /// When true, automatically resolves and adds FBX/OBJ mesh dependencies from the current selection.
+        /// </param>
+        /// <param name="selectedAssetGuids">
+        /// Optional asset GUIDs captured at entry time before the Model Library window takes focus.
+        /// </param>
+        public static void Open(bool resolveMeshDependencies = false, string[] selectedAssetGuids = null)
         {
             // Don't open during play mode
             if (EditorApplication.isPlaying)
@@ -47,8 +53,7 @@ namespace ModelLibrary.Editor.Windows
             ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
             if (window != null)
             {
-                window.NavigateToView(ModelLibraryWindow.ViewType.Submit);
-                window.InitializeSubmitState();
+                window.NavigateToSubmitView(resolveMeshDependencies, selectedAssetGuids);
             }
         }
 
@@ -60,20 +65,6 @@ namespace ModelLibrary.Editor.Windows
                 : new Repository.HttpRepository(settings.repositoryRoot);
 
             _service = new ModelLibraryService(repo);
-            LoadDraft();
-            if (_selectedAssetGuids.Count == 0)
-            {
-                InitializeSelectedAssetsFromProjectSelection();
-            }
-
-            if (string.IsNullOrWhiteSpace(_installPath))
-            {
-                _installPath = DefaultInstallPath();
-            }
-
-            // Pre-populate model name from selected assets if available
-            PrePopulateFromSelection();
-
             _ = LoadIndexAsync();
         }
 
@@ -172,6 +163,12 @@ namespace ModelLibrary.Editor.Windows
 
                 if (EditorPrefs.HasKey(__DRAFT_PREF_KEY))
                 {
+                    GUIContent restoreDraftContent = new GUIContent("Restore Draft", "Load the saved draft into the form");
+                    if (GUILayout.Button(restoreDraftContent, GUILayout.Height(25)))
+                    {
+                        RestoreSavedDraft();
+                    }
+
                     GUIContent clearDraftContent = new GUIContent("Clear Draft", "Delete the saved draft and start fresh");
                     if (GUILayout.Button(clearDraftContent, GUILayout.Height(25)))
                     {

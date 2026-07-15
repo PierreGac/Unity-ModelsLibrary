@@ -155,8 +155,18 @@ namespace ModelLibrary.Editor.Windows
         private Vector2 _helpScrollPosition = Vector2.zero;
 
         // ModelSubmitWindow state (for view mode) - using a hidden instance for now
+        /// <summary>View parameter key requesting mesh dependency resolution on submit open.</summary>
+        private const string __RESOLVE_MESH_DEPENDENCIES_PARAM = "resolveMeshDependencies";
+        /// <summary>View parameter key for asset GUIDs captured at submit entry (e.g. context menu).</summary>
+        private const string __SUBMIT_SELECTION_GUIDS_PARAM = "submitSelectionGuids";
         /// <summary>Hidden ModelSubmitWindow instance for reuse.</summary>
         private ModelSubmitWindow _submitWindowInstance;
+        /// <summary>When true, the submit form is reset on the next Submit view draw.</summary>
+        private bool _resetSubmitFormOnNextDraw;
+        /// <summary>When true, mesh dependencies are resolved after assets are populated on reset.</summary>
+        private bool _resolveMeshDependenciesOnNextDraw;
+        /// <summary>Asset GUIDs captured at entry, used on the next submit form reset.</summary>
+        private string[] _submitSelectionGuidsOnNextDraw;
 
         // BatchUploadWindow state (for view mode)
         /// <summary>Selected source directory for batch upload.</summary>
