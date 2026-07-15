@@ -91,7 +91,10 @@ namespace ModelLibrary.Editor.Windows
                     modelName,
                     isUpgrade,
                     InstallPathValidator.InstallPathValidationMode.Import);
-                string chosenInstallPath = defaultInstallPath;
+                string resolvedStoredInstallPath = !string.IsNullOrWhiteSpace(storedPathValidation.SuggestedInstallPath)
+                    ? storedPathValidation.SuggestedInstallPath
+                    : defaultInstallPath;
+                string chosenInstallPath = resolvedStoredInstallPath;
 
                 if (!storedPathValidation.IsValid)
                 {
@@ -108,7 +111,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     int choice = EditorUtility.DisplayDialogComplex(
                         isUpgrade ? "Update Model" : "Import Model",
-                        $"Select an install location for '{meta.identity.name}'.\nStored path: {defaultInstallPath}",
+                        $"Select an install location for '{meta.identity.name}'.\nStored path: {resolvedStoredInstallPath}",
                         "Use Stored Path",
                         "Choose Folder...",
                         "Cancel");
@@ -130,7 +133,7 @@ namespace ModelLibrary.Editor.Windows
                     if (choice == 1)
                     {
                         string custom = _installPathHelper.PromptForInstallPathWithValidation(
-                            defaultInstallPath,
+                            resolvedStoredInstallPath,
                             modelName,
                             isUpgrade);
                         if (string.IsNullOrEmpty(custom))

@@ -54,7 +54,9 @@ namespace ModelLibrary.Editor.Utils
 
             if (storedValidation.IsValid)
             {
-                return storedInstallPath;
+                return !string.IsNullOrWhiteSpace(storedValidation.SuggestedInstallPath)
+                    ? storedValidation.SuggestedInstallPath
+                    : storedInstallPath;
             }
 
             ShowInvalidInstallPathDialog(storedInstallPath, storedValidation.Errors, storedValidation.SuggestedInstallPath, true);

@@ -84,18 +84,34 @@ namespace ModelLibrary.Editor.Utils
                     string absolutePath = Path.GetFullPath(normalizedPath);
                     if (Directory.Exists(absolutePath))
                     {
-                        if (FolderContainsModelContent(absolutePath))
+                        if (allowExistingModelContent)
                         {
-                            result.Errors.Add(
-                                $"Install path '{normalizedPath}' already contains model files. Use a dedicated subfolder per model.");
+                            string resolvedUpdatePath = TryResolveExistingModelInstallPath(
+                                normalizedPath,
+                                sanitizedModelName,
+                                absolutePath);
+                            if (!string.IsNullOrEmpty(resolvedUpdatePath))
+                            {
+                                result.SuggestedInstallPath = resolvedUpdatePath;
+                                result.IsValid = true;
+                                return result;
+                            }
                         }
-
-                        List<string> nestedModelFolders = GetNestedModelFolderNames(absolutePath);
-                        if (nestedModelFolders.Count > 0)
+                        else
                         {
-                            result.Errors.Add(
-                                $"Install path '{normalizedPath}' is a container folder with nested models ({string.Join(", ", nestedModelFolders)}). " +
-                                "Use a dedicated subfolder for this model.");
+                            if (FolderContainsModelContent(absolutePath))
+                            {
+                                result.Errors.Add(
+                                    $"Install path '{normalizedPath}' already contains model files. Use a dedicated subfolder per model.");
+                            }
+
+                            List<string> nestedModelFolders = GetNestedModelFolderNames(absolutePath);
+                            if (nestedModelFolders.Count > 0)
+                            {
+                                result.Errors.Add(
+                                    $"Install path '{normalizedPath}' is a container folder with nested models ({string.Join(", ", nestedModelFolders)}). " +
+                                    "Use a dedicated subfolder for this model.");
+                            }
                         }
                     }
                 }
@@ -122,20 +138,23 @@ namespace ModelLibrary.Editor.Utils
                 return result;
             }
 
-            if (!allowExistingModelContent && FolderContainsModelContent(existingAbsolutePath))
+            if (!allowExistingModelContent)
             {
-                result.Errors.Add(
-                    $"Install path '{normalizedPath}' already contains model files. Choose an empty folder or a new model subfolder.");
-                return FinalizeResult(result);
-            }
+                if (FolderContainsModelContent(existingAbsolutePath))
+                {
+                    result.Errors.Add(
+                        $"Install path '{normalizedPath}' already contains model files. Choose an empty folder or a new model subfolder.");
+                    return FinalizeResult(result);
+                }
 
-            List<string> childModelFolders = GetNestedModelFolderNames(existingAbsolutePath);
-            if (childModelFolders.Count > 0)
-            {
-                result.Errors.Add(
-                    $"Install path '{normalizedPath}' contains nested model folders ({string.Join(", ", childModelFolders)}). " +
-                    "Install paths must point to a single model folder, not a container.");
-                return FinalizeResult(result);
+                List<string> childModelFolders = GetNestedModelFolderNames(existingAbsolutePath);
+                if (childModelFolders.Count > 0)
+                {
+                    result.Errors.Add(
+                        $"Install path '{normalizedPath}' contains nested model folders ({string.Join(", ", childModelFolders)}). " +
+                        "Install paths must point to a single model folder, not a container.");
+                    return FinalizeResult(result);
+                }
             }
 
             result.IsValid = true;
@@ -241,6 +260,28 @@ namespace ModelLibrary.Editor.Utils
 
             string defaultPathForSegment = InstallPathUtils.BuildInstallPath(lastSegment);
             return string.Equals(normalizedPath, defaultPathForSegment, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Resolves the install path for a model update when the stored path points at a parent
+        /// folder that already contains the model as a nested install folder.
+        /// </summary>
+        /// <param name="normalizedPath">Normalized install path relative to Assets/.</param>
+        /// <param name="sanitizedModelName">Sanitized model folder name.</param>
+        /// <param name="absolutePath">Absolute path to the normalized install folder.</param>
+        /// <returns>Resolved install path when the model folder exists on disk; otherwise null.</returns>
+        private static string TryResolveExistingModelInstallPath(
+            string normalizedPath,
+            string sanitizedModelName,
+            string absolutePath)
+        {
+            string nestedModelAbsolutePath = Path.Combine(absolutePath, sanitizedModelName);
+            if (!Directory.Exists(nestedModelAbsolutePath) || !FolderContainsModelContent(nestedModelAbsolutePath))
+            {
+                return null;
+            }
+
+            return PathUtils.SanitizePathSeparator($"{normalizedPath}/{sanitizedModelName}");
         }
 
         private static bool FolderLooksLikeModelLeaf(string installPath)

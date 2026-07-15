@@ -69,7 +69,73 @@ namespace ModelLibrary.Editor.Tests
         }
 
         [Test]
-        public void Validate_Import_RejectsContainerWithNestedModels()
+        public void Validate_Import_AllowsUpdateWhenModelFolderHasSubfoldersWithModelFiles()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
+            string modelPath = Path.Combine(tempRoot, "Assets", "Models", "My_Model");
+            string partsPath = Path.Combine(modelPath, "Parts");
+            Directory.CreateDirectory(partsPath);
+            File.WriteAllText(Path.Combine(modelPath, "My_Model.fbx"), "dummy");
+            File.WriteAllText(Path.Combine(modelPath, ".modelLibrary.meta.json"), "{}");
+            File.WriteAllText(Path.Combine(partsPath, "Part.fbx"), "dummy");
+
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                InstallPathValidator.ValidationResult result =
+                    InstallPathValidator.Validate(
+                        "Assets/Models/My_Model",
+                        MODEL_NAME,
+                        true,
+                        InstallPathValidator.InstallPathValidationMode.Import);
+
+                Assert.IsTrue(result.IsValid, string.Join(", ", result.Errors));
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
+
+        [Test]
+        public void Validate_Import_AllowsUpdateWhenStoredPathPointsToParentOfExistingModelFolder()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
+            string containerPath = Path.Combine(tempRoot, "Assets", "Models");
+            string modelPath = Path.Combine(containerPath, "My_Model");
+            Directory.CreateDirectory(modelPath);
+            File.WriteAllText(Path.Combine(modelPath, "My_Model.fbx"), "dummy");
+            File.WriteAllText(Path.Combine(modelPath, ".modelLibrary.meta.json"), "{}");
+
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                InstallPathValidator.ValidationResult result =
+                    InstallPathValidator.Validate(
+                        "Assets/Models",
+                        MODEL_NAME,
+                        true,
+                        InstallPathValidator.InstallPathValidationMode.Import);
+
+                Assert.IsTrue(result.IsValid, string.Join(", ", result.Errors));
+                Assert.AreEqual("Assets/Models/My_Model", result.SuggestedInstallPath);
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
+
+        [Test]
+        public void Validate_Import_StillRejectsContainerWithNestedModelsForFreshImport()
         {
             string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
             string containerPath = Path.Combine(tempRoot, "Assets", "My Path");
@@ -91,6 +157,39 @@ namespace ModelLibrary.Editor.Tests
                 Assert.IsFalse(result.IsValid);
                 Assert.IsTrue(result.Errors.Exists(error => error.Contains("nested models")));
                 Assert.AreEqual("Assets/My Path/My_Model", result.SuggestedInstallPath);
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
+
+        [Test]
+        public void Validate_Import_StillRejectsModelFolderWithSubfoldersForFreshImport()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
+            string modelPath = Path.Combine(tempRoot, "Assets", "Models", "My_Model");
+            string partsPath = Path.Combine(modelPath, "Parts");
+            Directory.CreateDirectory(partsPath);
+            File.WriteAllText(Path.Combine(modelPath, "My_Model.fbx"), "dummy");
+            File.WriteAllText(Path.Combine(partsPath, "Part.fbx"), "dummy");
+
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                InstallPathValidator.ValidationResult result =
+                    InstallPathValidator.Validate(
+                        "Assets/Models/My_Model",
+                        MODEL_NAME,
+                        false,
+                        InstallPathValidator.InstallPathValidationMode.Import);
+
+                Assert.IsFalse(result.IsValid);
+                Assert.IsTrue(result.Errors.Exists(error => error.Contains("nested model folders")));
             }
             finally
             {
