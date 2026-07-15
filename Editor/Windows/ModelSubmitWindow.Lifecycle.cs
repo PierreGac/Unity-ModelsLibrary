@@ -35,10 +35,10 @@ namespace ModelLibrary.Editor.Windows
 
             // Only allow Artists to submit models
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            if (identityProvider.GetUserRole() != UserRole.Artist)
+            if (identityProvider.GetUserRole() != UserRole.Artist && identityProvider.GetUserRole() != UserRole.Admin)
             {
                 EditorUtility.DisplayDialog("Access Denied",
-                    "Model submission is only available for Artists. Please switch to Artist role in User Settings.",
+                    "Model submission is only available for Artists or Admins. Please switch to Artist role in User Settings.",
                     "OK");
                 return;
             }
@@ -60,13 +60,19 @@ namespace ModelLibrary.Editor.Windows
                 : new Repository.HttpRepository(settings.repositoryRoot);
 
             _service = new ModelLibraryService(repo);
-            _installPath = DefaultInstallPath();
+            LoadDraft();
+            if (_selectedAssetGuids.Count == 0)
+            {
+                InitializeSelectedAssetsFromProjectSelection();
+            }
+
+            if (string.IsNullOrWhiteSpace(_installPath))
+            {
+                _installPath = DefaultInstallPath();
+            }
 
             // Pre-populate model name from selected assets if available
             PrePopulateFromSelection();
-
-            // Try to load draft if available
-            LoadDraft();
 
             _ = LoadIndexAsync();
         }
@@ -85,7 +91,7 @@ namespace ModelLibrary.Editor.Windows
             // Draw notification if present
             DrawNotification();
 
-            EditorGUILayout.HelpBox("Select your model assets in the Project window (FBX, materials, textures), then fill the form.", MessageType.Info);
+            EditorGUILayout.HelpBox("Add model assets on the Assets tab, then fill in the rest of the form.", MessageType.Info);
 
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -179,35 +185,22 @@ namespace ModelLibrary.Editor.Windows
 
             EditorGUILayout.Space();
 
-            // Enhanced submit button validation
-            List<string> validationErrors = GetValidationErrors();
-            bool hasValidationErrors = validationErrors.Count > 0;
-            bool disableSubmit = ShouldDisableSubmit(validationErrors, metadataReady);
-
-            using (new EditorGUI.DisabledScope(disableSubmit))
+            // Submit button — always enabled unless a submission is already in progress.
+            // Validation issues are shown in a dialog when the user clicks Submit.
+            if (_isSubmitting)
             {
-                if (_isSubmitting)
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    using (new EditorGUILayout.HorizontalScope())
+                    if (GUILayout.Button("Cancel", GUILayout.Height(30), GUILayout.Width(100)))
                     {
-                        string buttonText = hasValidationErrors ? "Submit (Fix Issues First)" : "Submit";
-                        if (GUILayout.Button("Cancel", GUILayout.Height(30), GUILayout.Width(100)))
-                        {
-                            _cancelSubmission = true;
-                        }
-                        GUILayout.Label("Submitting...", EditorStyles.centeredGreyMiniLabel);
+                        _cancelSubmission = true;
                     }
+                    GUILayout.Label("Submitting...", EditorStyles.centeredGreyMiniLabel);
                 }
-                else
-                {
-                    string buttonText = hasValidationErrors ? "Submit (Fix Issues First)" : "Submit";
-                    if (UIStyles.DrawPrimaryButton(buttonText, GUILayout.Height(30)))
-                    {
-                        // Clear draft on successful submission
-                        ClearDraft();
-                        _ = Submit();
-                    }
-                }
+            }
+            else if (UIStyles.DrawPrimaryButton("Submit", GUILayout.Height(30)))
+            {
+                _ = Submit();
             }
         }
     }

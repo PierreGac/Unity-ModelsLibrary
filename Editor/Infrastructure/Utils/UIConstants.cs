@@ -96,6 +96,15 @@ namespace ModelLibrary.Editor.Utils
         /// <summary>Alpha used for subtle badge backgrounds.</summary>
         public const float BADGE_BACKGROUND_ALPHA = 0.2f;
 
+        /// <summary>Emoji prefix shown on tag badge buttons.</summary>
+        public const string TAG_BADGE_EMOJI = "🏷️";
+
+        /// <summary>Horizontal padding between tag badge buttons.</summary>
+        public const float TAG_BADGE_HORIZONTAL_PADDING = 4f;
+
+        /// <summary>Maximum height of the existing tags badge scroll area.</summary>
+        public const int EXISTING_TAGS_SCROLL_HEIGHT = 100;
+
         /// <summary>Thumbnail placeholder background color.</summary>
         public static readonly Color COLOR_THUMBNAIL_PLACEHOLDER_BG = new Color(0.25f, 0.25f, 0.3f, 1f);
 

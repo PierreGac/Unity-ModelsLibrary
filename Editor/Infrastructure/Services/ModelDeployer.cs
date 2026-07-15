@@ -31,8 +31,18 @@ namespace ModelLibrary.Editor.Services
         /// <param name="tags">List of tags for categorizing the model.</param>
         /// <param name="installPath">Absolute install path in the Unity project (e.g., "Assets/Models/ModelName").</param>
         /// <param name="idProvider">User identity provider for getting author information.</param>
+        /// <param name="selectedAssetGuids">Asset GUIDs to include in the submission. Falls back to the Project selection when empty.</param>
         /// <returns>Complete ModelMeta object ready for submission.</returns>
-        public static async Task<ModelMeta> BuildMetaFromSelectionAsync(string identityName, string identityId, string version, string description, IEnumerable<string> imagePaths, IEnumerable<string> tags, string installPath, IUserIdentityProvider idProvider)
+        public static async Task<ModelMeta> BuildMetaFromSelectionAsync(
+            string identityName,
+            string identityId,
+            string version,
+            string description,
+            IEnumerable<string> imagePaths,
+            IEnumerable<string> tags,
+            string installPath,
+            IUserIdentityProvider idProvider,
+            IReadOnlyList<string> selectedAssetGuids = null)
         {
             string resolvedId = string.IsNullOrWhiteSpace(identityId) ? Guid.NewGuid().ToString("N") : identityId;
             ModelMeta meta = new ModelMeta
@@ -48,7 +58,19 @@ namespace ModelLibrary.Editor.Services
             };
 
             // Collect selected assets (FBX, textures, materials, etc.) and their dependencies
-            string[] selected = Selection.assetGUIDs;
+            string[] selected;
+            if (selectedAssetGuids != null && selectedAssetGuids.Count > 0)
+            {
+                selected = new string[selectedAssetGuids.Count];
+                for (int i = 0; i < selectedAssetGuids.Count; i++)
+                {
+                    selected[i] = selectedAssetGuids[i];
+                }
+            }
+            else
+            {
+                selected = Selection.assetGUIDs;
+            }
             List<string> relPayload = new List<string>();
             List<string> guids = new List<string>();
             HashSet<string> processedGuids = new HashSet<string>(); // Track processed GUIDs to avoid duplicates

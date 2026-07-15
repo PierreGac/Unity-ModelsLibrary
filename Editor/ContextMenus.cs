@@ -29,10 +29,10 @@ namespace ModelLibrary.Editor
         {
             // Only allow Artists to submit models
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            if (identityProvider.GetUserRole() != UserRole.Artist)
+            if (identityProvider.GetUserRole() != UserRole.Artist && identityProvider.GetUserRole() != UserRole.Admin)
             {
                 EditorUtility.DisplayDialog("Access Denied",
-                    "Model submission is only available for Artists. Please switch to Artist role in User Settings.",
+                    "Model submission is only available for Artists or Admins. Please switch to Artist role in User Settings.",
                     "OK");
                 return;
             }

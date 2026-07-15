@@ -78,44 +78,43 @@ namespace ModelLibrary.Editor.Windows
                     EditorGUILayout.LabelField("Tags", UIStyles.SectionHeader);
                     SimpleUserIdentityProvider identityProviderForTags = new SimpleUserIdentityProvider();
                     bool isArtistForTags = identityProviderForTags.GetUserRole() == UserRole.Artist;
+                    bool isAdminForTags = identityProviderForTags.GetUserRole() == UserRole.Admin;
 
-                    if (isArtistForTags)
+                    if (isArtistForTags || isAdminForTags)
                     {
                         string tagButtonLabel = _editingTags ? "Cancel" : "Edit";
                         if (UIStyles.DrawSecondaryButton(tagButtonLabel, GUILayout.Width(60)))
                         {
+                            if (_editingTags)
+                            {
+                                _newTag = string.Empty;
+                                _tagDuplicateWarning = null;
+                            }
+
                             _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
+                            _tagPickerState.MarkTagsDirty();
                             _editingTags = !_editingTags;
                         }
                     }
                 }
 
+                float tagWrapWidth = TagBadgeDrawer.GetWrapWidth(this);
                 if (_editingTags)
                 {
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        _newTag = EditorGUILayout.TextField("Add Tag", _newTag);
-                        if (UIStyles.DrawSecondaryButton("Add", GUILayout.Width(50)) && !string.IsNullOrWhiteSpace(_newTag))
-                        {
-                            _editableTags.Add(_newTag.Trim());
-                            _newTag = string.Empty;
-                        }
-                    }
-                    for (int i = _editableTags.Count - 1; i >= 0; i--)
-                    {
-                        using (new EditorGUILayout.HorizontalScope())
-                        {
-                            EditorGUILayout.LabelField($"• {_editableTags[i]}");
-                            if (UIStyles.DrawDangerButton("x", GUILayout.Width(24)))
-                            {
-                                _editableTags.RemoveAt(i);
-                            }
-                        }
-                    }
+                    TagBadgeDrawer.DrawTagEditorPanel(
+                        _editableTags,
+                        ref _newTag,
+                        _tagPickerState,
+                        _tagCacheManager.SortedTags,
+                        _isLoadingCatalogTags,
+                        tagWrapWidth,
+                        ref _tagDuplicateWarning,
+                        ref _showAdvancedTagOptions,
+                        () => _tagPickerState.MarkTagsDirty());
                 }
                 else
                 {
-                    EditorGUILayout.LabelField(string.Join(", ", _meta.tags?.values.ToArray() ?? Array.Empty<string>()));
+                    TagBadgeDrawer.DrawReadOnlyBadges(_meta.tags?.values, tagWrapWidth);
                 }
             }
             EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
@@ -123,8 +122,8 @@ namespace ModelLibrary.Editor.Windows
             // Only show Save Metadata Changes button for Artists
             SimpleUserIdentityProvider identityProviderForSave = new SimpleUserIdentityProvider();
             bool isArtistForSave = identityProviderForSave.GetUserRole() == UserRole.Artist;
-
-            if (isArtistForSave)
+            bool isAdminForSave = identityProviderForSave.GetUserRole() == UserRole.Admin;
+            if (isArtistForSave || isAdminForSave)
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -140,7 +139,7 @@ namespace ModelLibrary.Editor.Windows
             }
             else
             {
-                EditorGUILayout.HelpBox("Metadata editing is only available for Artists. Switch to Artist role in User Settings to edit metadata.", MessageType.Info);
+                EditorGUILayout.HelpBox("Metadata editing is only available for Artists or Admins. Switch to Artist role in User Settings to edit metadata.", MessageType.Info);
             }
             EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 

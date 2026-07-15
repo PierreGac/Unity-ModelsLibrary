@@ -44,6 +44,12 @@ namespace ModelLibrary.Editor.Utils
             {
                 normalized = $"Assets/{normalized.TrimStart('/')}";
             }
+
+            if (normalized.Length > StringConstants.ASSETS_PREFIX_LENGTH)
+            {
+                normalized = normalized.TrimEnd('/');
+            }
+
             return normalized;
         }
 

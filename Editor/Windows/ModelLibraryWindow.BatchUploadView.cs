@@ -68,9 +68,9 @@ namespace ModelLibrary.Editor.Windows
         {
             // Check role access - batch upload is restricted to Artists
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            if (identityProvider.GetUserRole() != UserRole.Artist)
+            if (identityProvider.GetUserRole() != UserRole.Artist && identityProvider.GetUserRole() != UserRole.Admin)
             {
-                EditorGUILayout.HelpBox("Batch upload is only available for Artists. Please switch to Artist role in User Settings.", MessageType.Warning);
+                EditorGUILayout.HelpBox("Batch upload is only available for Artists or Admins. Please switch to Artist role in User Settings.", MessageType.Warning);
                 if (GUILayout.Button("Go to Settings", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
                 {
                     NavigateToView(ViewType.Settings);

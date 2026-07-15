@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Services;
+using ModelLibrary.Editor.Utils;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
@@ -50,6 +51,16 @@ namespace ModelLibrary.Editor.Windows
         private List<string> _editableTags = new();
         /// <summary>Text field for adding new tags.</summary>
         private string _newTag = string.Empty;
+        /// <summary>Cached tags from the model catalog used for quick tag selection.</summary>
+        private readonly TagCacheManager _tagCacheManager = new TagCacheManager();
+        /// <summary>Cached IMGUI state for tag picker layout.</summary>
+        private readonly TagPickerState _tagPickerState = new TagPickerState();
+        /// <summary>Whether catalog tags are currently loading.</summary>
+        private bool _isLoadingCatalogTags;
+        /// <summary>Warning message when a duplicate tag add is attempted.</summary>
+        private string _tagDuplicateWarning;
+        /// <summary>Whether the advanced tag options section is expanded.</summary>
+        private bool _showAdvancedTagOptions;
 
         // Notes
         /// <summary>Text field for the new note message.</summary>

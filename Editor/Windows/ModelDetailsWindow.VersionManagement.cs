@@ -554,8 +554,21 @@ namespace ModelLibrary.Editor.Windows
                 EditorUtility.DisplayProgressBar("Importing Model", "Downloading model files...", ProgressBarConstants.PREPARING);
                 (string cacheRoot, ModelMeta meta) = await service.DownloadModelVersionAsync(_modelId, _version);
 
+                InstallPathHelper installPathHelper = new InstallPathHelper();
+                string chosenInstallPath = installPathHelper.ResolveInstallPathForImport(meta, allowExistingModelContent: false);
+                if (string.IsNullOrEmpty(chosenInstallPath))
+                {
+                    EditorUtility.ClearProgressBar();
+                    titleContent.text = "Model Details";
+                    return;
+                }
+
                 EditorUtility.DisplayProgressBar("Importing Model", "Copying files to Assets folder...", ProgressBarConstants.COPYING_IMAGES);
-                string installPath = await ModelProjectImporter.ImportFromCacheAsync(cacheRoot, meta, cleanDestination: true);
+                string installPath = await ModelProjectImporter.ImportFromCacheAsync(
+                    cacheRoot,
+                    meta,
+                    cleanDestination: true,
+                    overrideInstallPath: chosenInstallPath);
 
                 EditorUtility.DisplayProgressBar("Importing Model", "Finalizing import...", ProgressBarConstants.FINALIZING);
                 await Task.Delay(DelayConstants.UI_UPDATE_DELAY_MS); // Brief pause for UI update

@@ -16,6 +16,18 @@ namespace ModelLibrary.Editor.Utils
         private const string OLD_MANIFEST_NAME = "modelLibrary.meta.json";
 
         /// <summary>
+        /// Controls how strictly install paths are validated.
+        /// </summary>
+        public enum InstallPathValidationMode
+        {
+            /// <summary>Format and model-folder naming only; no on-disk folder inspection.</summary>
+            Submission,
+
+            /// <summary>Full validation including on-disk folder content checks used during import.</summary>
+            Import
+        }
+
+        /// <summary>
         /// Result of install path validation including errors and a suggested path.
         /// </summary>
         public sealed class ValidationResult
@@ -36,8 +48,13 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="installPath">Install path relative to the project (must start with Assets/).</param>
         /// <param name="modelName">Model display name used to build the suggested leaf folder.</param>
         /// <param name="allowExistingModelContent">When true, existing model content at the path is allowed (update flow).</param>
+        /// <param name="mode">Validation strictness. Submission skips on-disk checks.</param>
         /// <returns>Validation result with errors and suggested path when invalid.</returns>
-        public static ValidationResult Validate(string installPath, string modelName, bool allowExistingModelContent = false)
+        public static ValidationResult Validate(
+            string installPath,
+            string modelName,
+            bool allowExistingModelContent = false,
+            InstallPathValidationMode mode = InstallPathValidationMode.Submission)
         {
             ValidationResult result = new ValidationResult();
             string normalizedPath = InstallPathUtils.NormalizeInstallPath(installPath);
@@ -50,7 +67,7 @@ namespace ModelLibrary.Editor.Utils
                 return result;
             }
 
-            result.SuggestedInstallPath = BuildSuggestedInstallPath(normalizedPath, sanitizedModelName);
+            result.SuggestedInstallPath = BuildSuggestedInstallPath(normalizedPath, modelName);
 
             List<string> formatErrors = PathUtils.ValidateInstallPath(normalizedPath);
             if (formatErrors.Count > 0)
@@ -60,23 +77,27 @@ namespace ModelLibrary.Editor.Utils
             }
 
             bool endsWithModelName = PathEndsWithFolderName(normalizedPath, sanitizedModelName);
-            string absolutePath = Path.GetFullPath(normalizedPath);
-            bool directoryExists = Directory.Exists(absolutePath);
-
             if (!endsWithModelName)
             {
-                if (directoryExists && FolderContainsModelContent(absolutePath))
+                if (mode == InstallPathValidationMode.Import)
                 {
-                    result.Errors.Add(
-                        $"Install path '{normalizedPath}' already contains model files. Use a dedicated subfolder per model.");
-                }
+                    string absolutePath = Path.GetFullPath(normalizedPath);
+                    if (Directory.Exists(absolutePath))
+                    {
+                        if (FolderContainsModelContent(absolutePath))
+                        {
+                            result.Errors.Add(
+                                $"Install path '{normalizedPath}' already contains model files. Use a dedicated subfolder per model.");
+                        }
 
-                List<string> nestedModelFolders = GetNestedModelFolderNames(absolutePath);
-                if (nestedModelFolders.Count > 0)
-                {
-                    result.Errors.Add(
-                        $"Install path '{normalizedPath}' is a container folder with nested models ({string.Join(", ", nestedModelFolders)}). " +
-                        "Use a dedicated subfolder for this model.");
+                        List<string> nestedModelFolders = GetNestedModelFolderNames(absolutePath);
+                        if (nestedModelFolders.Count > 0)
+                        {
+                            result.Errors.Add(
+                                $"Install path '{normalizedPath}' is a container folder with nested models ({string.Join(", ", nestedModelFolders)}). " +
+                                "Use a dedicated subfolder for this model.");
+                        }
+                    }
                 }
 
                 if (result.Errors.Count == 0)
@@ -88,20 +109,27 @@ namespace ModelLibrary.Editor.Utils
                 return FinalizeResult(result);
             }
 
-            if (!directoryExists)
+            if (mode == InstallPathValidationMode.Submission)
             {
                 result.IsValid = true;
                 return result;
             }
 
-            if (!allowExistingModelContent && FolderContainsModelContent(absolutePath))
+            string existingAbsolutePath = Path.GetFullPath(normalizedPath);
+            if (!Directory.Exists(existingAbsolutePath))
+            {
+                result.IsValid = true;
+                return result;
+            }
+
+            if (!allowExistingModelContent && FolderContainsModelContent(existingAbsolutePath))
             {
                 result.Errors.Add(
                     $"Install path '{normalizedPath}' already contains model files. Choose an empty folder or a new model subfolder.");
                 return FinalizeResult(result);
             }
 
-            List<string> childModelFolders = GetNestedModelFolderNames(absolutePath);
+            List<string> childModelFolders = GetNestedModelFolderNames(existingAbsolutePath);
             if (childModelFolders.Count > 0)
             {
                 result.Errors.Add(
@@ -116,16 +144,31 @@ namespace ModelLibrary.Editor.Utils
 
         /// <summary>
         /// Builds a suggested install path using the parent of the current path and the model name.
+        /// When the current path still uses the default placeholder folder name, the leaf segment
+        /// is replaced instead of appending the new model name.
         /// </summary>
         /// <param name="installPath">Current install path.</param>
-        /// <param name="sanitizedModelName">Sanitized model folder name.</param>
+        /// <param name="modelName">Model display or folder name.</param>
         /// <returns>Suggested install path ending with the model folder name.</returns>
-        public static string BuildSuggestedInstallPath(string installPath, string sanitizedModelName)
+        public static string BuildSuggestedInstallPath(string installPath, string modelName)
         {
+            string sanitizedModelName = InstallPathUtils.SanitizeFolderName(modelName);
             string normalizedPath = InstallPathUtils.NormalizeInstallPath(installPath) ?? InstallPathUtils.BuildInstallPath(sanitizedModelName);
             if (PathEndsWithFolderName(normalizedPath, sanitizedModelName))
             {
                 return normalizedPath;
+            }
+
+            string lastSegment = GetLastPathSegment(normalizedPath);
+            if (IsStaleModelFolderSegment(normalizedPath, lastSegment, sanitizedModelName))
+            {
+                string staleParentPath = GetParentPath(normalizedPath);
+                if (string.IsNullOrEmpty(staleParentPath))
+                {
+                    staleParentPath = "Assets";
+                }
+
+                return PathUtils.SanitizePathSeparator($"{staleParentPath}/{sanitizedModelName}");
             }
 
             string parentPath = normalizedPath;
@@ -160,10 +203,44 @@ namespace ModelLibrary.Editor.Utils
                 return false;
             }
 
+            return string.Equals(GetLastPathSegment(installPath), folderName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetLastPathSegment(string installPath)
+        {
             string sanitized = PathUtils.SanitizePathSeparator(installPath).TrimEnd('/');
             int lastSlash = sanitized.LastIndexOf('/');
-            string lastSegment = lastSlash >= 0 ? sanitized.Substring(lastSlash + 1) : sanitized;
-            return string.Equals(lastSegment, folderName, StringComparison.OrdinalIgnoreCase);
+            return lastSlash >= 0 ? sanitized.Substring(lastSlash + 1) : sanitized;
+        }
+
+        private static string GetParentPath(string installPath)
+        {
+            string sanitized = PathUtils.SanitizePathSeparator(installPath).TrimEnd('/');
+            int lastSlash = sanitized.LastIndexOf('/');
+            if (lastSlash < 0)
+            {
+                return string.Empty;
+            }
+
+            return sanitized.Substring(0, lastSlash);
+        }
+
+        private static bool IsStaleModelFolderSegment(string normalizedPath, string lastSegment, string sanitizedModelName)
+        {
+            if (string.IsNullOrWhiteSpace(lastSegment) ||
+                string.Equals(lastSegment, sanitizedModelName, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string defaultModelFolderName = InstallPathUtils.SanitizeFolderName(StringConstants.DEFAULT_MODEL_NAME);
+            if (string.Equals(lastSegment, defaultModelFolderName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            string defaultPathForSegment = InstallPathUtils.BuildInstallPath(lastSegment);
+            return string.Equals(normalizedPath, defaultPathForSegment, StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool FolderLooksLikeModelLeaf(string installPath)

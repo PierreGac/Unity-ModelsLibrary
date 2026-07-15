@@ -88,6 +88,8 @@ namespace ModelLibrary.Editor.Windows
                 _editedDescription = _meta.description ?? string.Empty;
                 _editableTags = new List<string>(_meta.tags?.values ?? new List<string>());
                 _editingTags = false;
+                _tagDuplicateWarning = null;
+                _tagPickerState.MarkTagsDirty();
 
                 // Track view analytics
                 if (_meta.identity != null && !string.IsNullOrEmpty(_meta.identity.name))
@@ -99,6 +101,7 @@ namespace ModelLibrary.Editor.Windows
 
                 await LoadVersionListAsync();
                 _ = CheckInstallationStatusAsync();
+                _ = LoadCatalogTagsAsync();
             }
             catch (Exception ex)
             {
@@ -342,6 +345,38 @@ namespace ModelLibrary.Editor.Windows
             finally
             {
                 _checkingInstallStatus = false;
+                Repaint();
+            }
+        }
+
+        /// <summary>
+        /// Loads catalog tags from the model index for the tag picker.
+        /// </summary>
+        private async Task LoadCatalogTagsAsync()
+        {
+            if (_service == null)
+            {
+                return;
+            }
+
+            _isLoadingCatalogTags = true;
+            try
+            {
+                ModelIndex index = await _service.GetIndexAsync();
+                _tagCacheManager.UpdateTagCache(index);
+                _tagPickerState.MarkCatalogTagsDirty();
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogError("Load Catalog Tags Failed",
+                    $"Failed to load catalog tags: {ex.Message}",
+                    ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}");
+                _tagCacheManager.UpdateTagCache(null);
+                _tagPickerState.MarkCatalogTagsDirty();
+            }
+            finally
+            {
+                _isLoadingCatalogTags = false;
                 Repaint();
             }
         }

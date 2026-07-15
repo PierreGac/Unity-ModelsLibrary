@@ -85,40 +85,63 @@ namespace ModelLibrary.Editor.Windows
                 EditorUtility.DisplayProgressBar(progressTitle, "Preparing import...", ProgressBarConstants.PREPARING);
 
                 string defaultInstallPath = _installPathHelper.DetermineInstallPath(meta);
+                string modelName = meta.identity?.name ?? "Model";
+                InstallPathValidator.ValidationResult storedPathValidation = InstallPathValidator.Validate(
+                    defaultInstallPath,
+                    modelName,
+                    isUpgrade,
+                    InstallPathValidator.InstallPathValidationMode.Import);
                 string chosenInstallPath = defaultInstallPath;
 
-                int choice = EditorUtility.DisplayDialogComplex(
-                    isUpgrade ? "Update Model" : "Import Model",
-                    $"Select an install location for '{meta.identity.name}'.\nStored path: {defaultInstallPath}",
-                    "Use Stored Path",
-                    "Choose Folder...",
-                    "Cancel");
-
-                if (choice == 2)
+                if (!storedPathValidation.IsValid)
                 {
-                    _importCancellation[id] = true;
-                    cancellationTokenSource.Cancel();
-                    titleContent.text = "Model Library";
-                    return;
-                }
-
-                if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)
-                {
-                    cancellationTokenSource.Cancel();
-                    return;
-                }
-
-                if (choice == 1)
-                {
-                    string custom = _installPathHelper.PromptForInstallPath(defaultInstallPath);
-                    if (string.IsNullOrEmpty(custom))
+                    chosenInstallPath = _installPathHelper.ResolveInstallPathForImport(meta, isUpgrade);
+                    if (string.IsNullOrEmpty(chosenInstallPath))
                     {
                         _importCancellation[id] = true;
                         cancellationTokenSource.Cancel();
                         titleContent.text = "Model Library";
                         return;
                     }
-                    chosenInstallPath = custom;
+                }
+                else
+                {
+                    int choice = EditorUtility.DisplayDialogComplex(
+                        isUpgrade ? "Update Model" : "Import Model",
+                        $"Select an install location for '{meta.identity.name}'.\nStored path: {defaultInstallPath}",
+                        "Use Stored Path",
+                        "Choose Folder...",
+                        "Cancel");
+
+                    if (choice == 2)
+                    {
+                        _importCancellation[id] = true;
+                        cancellationTokenSource.Cancel();
+                        titleContent.text = "Model Library";
+                        return;
+                    }
+
+                    if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)
+                    {
+                        cancellationTokenSource.Cancel();
+                        return;
+                    }
+
+                    if (choice == 1)
+                    {
+                        string custom = _installPathHelper.PromptForInstallPathWithValidation(
+                            defaultInstallPath,
+                            modelName,
+                            isUpgrade);
+                        if (string.IsNullOrEmpty(custom))
+                        {
+                            _importCancellation[id] = true;
+                            cancellationTokenSource.Cancel();
+                            titleContent.text = "Model Library";
+                            return;
+                        }
+                        chosenInstallPath = custom;
+                    }
                 }
 
                 if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)

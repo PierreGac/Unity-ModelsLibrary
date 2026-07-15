@@ -23,12 +23,11 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void PrePopulateFromSelection()
         {
-            if (Selection.assetGUIDs == null || Selection.assetGUIDs.Length == 0)
+            if (_selectedAssetGuids.Count == 0)
             {
                 return;
             }
 
-            // Get valid selected assets
             List<string> validAssets = new List<string>();
             string[] validExtensions = {
                 FileExtensions.FBX,
@@ -41,8 +40,9 @@ namespace ModelLibrary.Editor.Windows
                 FileExtensions.MAT
             };
 
-            foreach (string guid in Selection.assetGUIDs)
+            for (int i = 0; i < _selectedAssetGuids.Count; i++)
             {
+                string guid = _selectedAssetGuids[i];
                 string assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 if (string.IsNullOrEmpty(assetPath) || AssetDatabase.IsValidFolder(assetPath))
                 {
@@ -61,7 +61,6 @@ namespace ModelLibrary.Editor.Windows
                 string firstAsset = validAssets[0];
                 string suggestedName = null;
 
-                // Priority 1: Try to extract model name from file name (for FBX/OBJ files)
                 string fileName = Path.GetFileNameWithoutExtension(firstAsset);
                 string extension = Path.GetExtension(firstAsset).ToLowerInvariant();
                 if ((extension == FileExtensions.FBX || extension == FileExtensions.OBJ) && !string.IsNullOrWhiteSpace(fileName))
@@ -69,36 +68,20 @@ namespace ModelLibrary.Editor.Windows
                     suggestedName = fileName;
                 }
 
-                // Priority 2: Try to extract model name from folder structure
                 if (string.IsNullOrWhiteSpace(suggestedName))
                 {
                     string directory = Path.GetDirectoryName(firstAsset);
                     if (directory != null && directory.StartsWith("Assets/"))
                     {
-                        string relativeDir = directory.Substring(7); // Remove "Assets/" prefix
+                        string relativeDir = directory.Substring(7);
                         string[] parts = relativeDir.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
                         if (parts.Length > 0)
                         {
-                            // Use the last folder name as model name suggestion
                             suggestedName = parts[parts.Length - 1];
                         }
                     }
                 }
 
-                // Priority 3: Try to get name from existing model manifest if asset belongs to an installed model
-                if (string.IsNullOrWhiteSpace(suggestedName))
-                {
-                    string selectedGuid = Selection.assetGUIDs[0];
-                    string modelId = FindModelIdFromSelectedAsset(selectedGuid);
-                    if (!string.IsNullOrEmpty(modelId))
-                    {
-                        // Asset belongs to an existing model - try to get the model name from the index
-                        // Note: This is a synchronous context, so we can't await. Skip index lookup to avoid blocking.
-                        // The name will be suggested from file/folder structure instead.
-                    }
-                }
-
-                // Apply the suggested name if we found one and the name field is still default
                 if (!string.IsNullOrWhiteSpace(suggestedName) && _name == "New Model")
                 {
                     _name = suggestedName;
@@ -134,7 +117,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 ModelIndex index = await _service.GetIndexAsync();
                 _tagCacheManager.UpdateTagCache(index);
-                MarkCatalogTagsDirty();
+                _tagPickerState.MarkCatalogTagsDirty();
                 _existingModels.Clear();
                 if (index?.entries != null)
                 {
@@ -155,7 +138,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 _existingModels.Clear();
                 _tagCacheManager.UpdateTagCache(null);
-                MarkCatalogTagsDirty();
+                _tagPickerState.MarkCatalogTagsDirty();
             }
             finally
             {
@@ -214,7 +197,7 @@ namespace ModelLibrary.Editor.Windows
                 _name = entry.name;
                 _description = _latestSelectedMeta?.description ?? string.Empty;
                 _tags = new List<string>(_latestSelectedMeta?.tags?.values ?? new List<string>());
-                MarkTagsDirty();
+                _tagPickerState.MarkTagsDirty();
                 _installPath = _latestSelectedMeta?.installPath ?? DefaultInstallPath();
                 _version = SuggestNextVersion(entry.latestVersion);
             }
@@ -259,13 +242,14 @@ namespace ModelLibrary.Editor.Windows
                 return; // Prevent duplicate submissions
             }
 
-            // Final validation check (should not happen due to UI validation, but safety net)
+            // Final validation check before starting submission.
             List<string> validationErrors = GetValidationErrors();
             if (validationErrors.Count > 0)
             {
-                ErrorHandler.ShowErrorDialog("Validation Error",
-                    "Please fix the following issues before submitting:\n\n" + string.Join("\n• ", validationErrors),
-                    ErrorHandler.ErrorCategory.Validation);
+                EditorUtility.DisplayDialog(
+                    "Cannot Submit",
+                    "Please fix the following issues before submitting:\n\n• " + string.Join("\n• ", validationErrors),
+                    "OK");
                 return;
             }
 
@@ -338,7 +322,16 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
-                ModelMeta meta = await ModelDeployer.BuildMetaFromSelectionAsync(identityName, identityId, _version, _description, _imageAbsPaths, _tags, finalInstallPath, _idProvider);
+                ModelMeta meta = await ModelDeployer.BuildMetaFromSelectionAsync(
+                    identityName,
+                    identityId,
+                    _version,
+                    _description,
+                    _imageAbsPaths,
+                    _tags,
+                    finalInstallPath,
+                    _idProvider,
+                    _selectedAssetGuids);
                 
                 if (string.IsNullOrWhiteSpace(meta.installPath) || meta.installPath == DefaultInstallPath())
                 {
@@ -418,6 +411,7 @@ namespace ModelLibrary.Editor.Windows
 
                 ShowNotification("Submitted", $"Uploaded to: {remoteRel}");
                 Debug.Log($"Model submitted successfully: {remoteRel}");
+                ClearDraft();
 
                 // Refresh all open ModelLibraryWindow instances to show the new model
                 EditorApplication.delayCall += () =>
@@ -501,7 +495,7 @@ namespace ModelLibrary.Editor.Windows
 
             if (ctrlOrCmd && current.keyCode == KeyCode.Return)
             {
-                if (TrySubmitFromShortcut(metadataReady))
+                if (TrySubmitFromShortcut())
                 {
                     current.Use();
                 }
@@ -515,30 +509,13 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        private bool TrySubmitFromShortcut(bool metadataReady)
+        private bool TrySubmitFromShortcut()
         {
             if (_isSubmitting)
             {
                 return false;
             }
 
-            List<string> validationErrors = GetValidationErrors();
-            bool disableSubmit = ShouldDisableSubmit(validationErrors, metadataReady);
-            if (disableSubmit)
-            {
-                if (validationErrors.Count > 0)
-                {
-                    ShowNotification("Submit Blocked", "Resolve validation errors before submitting.");
-                }
-                else if (_mode == SubmitMode.Update && (!_existingModels.Any() || _isLoadingIndex || _loadingBaseMeta || !metadataReady))
-                {
-                    ShowNotification("Submit Blocked", "Select a valid model and wait for metadata to load.");
-                }
-                Repaint();
-                return false;
-            }
-
-            ClearDraft();
             _ = Submit();
             return true;
         }
@@ -604,16 +581,15 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private string GetDefaultInstallPathFromSelection()
         {
-            string[] selected = Selection.assetGUIDs;
-            if (selected == null || selected.Length == 0)
+            if (_selectedAssetGuids.Count == 0)
             {
                 return null;
             }
 
             string meshFilePath = null;
-            for (int i = 0; i < selected.Length; i++)
+            for (int i = 0; i < _selectedAssetGuids.Count; i++)
             {
-                string guid = selected[i];
+                string guid = _selectedAssetGuids[i];
                 string assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 if (string.IsNullOrEmpty(assetPath) || AssetDatabase.IsValidFolder(assetPath))
                 {
@@ -639,7 +615,8 @@ namespace ModelLibrary.Editor.Windows
                 }
             }
 
-            string firstAssetPath = AssetDatabase.GUIDToAssetPath(selected[0]);
+            string firstGuid = _selectedAssetGuids[0];
+            string firstAssetPath = AssetDatabase.GUIDToAssetPath(firstGuid);
             if (!string.IsNullOrEmpty(firstAssetPath) && firstAssetPath.StartsWith("Assets/"))
             {
                 string currentDir = AssetDatabase.IsValidFolder(firstAssetPath)

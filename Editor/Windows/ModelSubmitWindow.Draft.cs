@@ -26,6 +26,7 @@ namespace ModelLibrary.Editor.Windows
                     tags = new List<string>(_tags),
                     installPath = _installPath,
                     imagePaths = new List<string>(_imageAbsPaths),
+                    assetGuids = new List<string>(_selectedAssetGuids),
                     changeSummary = _changeSummary,
                     mode = _mode
                 };
@@ -59,9 +60,10 @@ namespace ModelLibrary.Editor.Windows
                     _version = draft.version ?? "1.0.0";
                     _description = draft.description ?? string.Empty;
                     _tags = draft.tags ?? new List<string>();
-                    MarkTagsDirty();
+                    _tagPickerState.MarkTagsDirty();
                     _installPath = draft.installPath ?? DefaultInstallPath();
                     _imageAbsPaths = draft.imagePaths ?? new List<string>();
+                    RestoreSelectedAssetGuids(draft.assetGuids);
                     _changeSummary = draft.changeSummary ?? "Initial submission";
                     _mode = draft.mode;
                 }
@@ -89,6 +91,7 @@ namespace ModelLibrary.Editor.Windows
             public List<string> tags;
             public string installPath;
             public List<string> imagePaths;
+            public List<string> assetGuids;
             public string changeSummary;
             public SubmitMode mode;
         }

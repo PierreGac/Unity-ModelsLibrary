@@ -30,6 +30,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 _meta.tags.values = new List<string>(_editableTags);
                 _editingTags = false;
+                _tagDuplicateWarning = null;
             }
 
             string trimmedDescription = string.IsNullOrEmpty(_editedDescription) ? string.Empty : _editedDescription.Trim();

@@ -31,52 +31,6 @@ namespace ModelLibrary.Editor.Windows
             return _wordWrappedTextAreaStyle;
         }
 
-        private static bool _tagBadgeStylesInitialized;
-        private static GUIStyle _existingTagBadgeStyle;
-        private static GUIStyle _existingTagBadgeAddedStyle;
-        private static GUIStyle _selectedTagBadgeStyle;
-
-        /// <summary>
-        /// Initializes cached GUIStyles for tag badge buttons once.
-        /// Creating GUIStyles during OnGUI causes severe hover/repaint slowdowns.
-        /// </summary>
-        private static void EnsureTagBadgeStyles()
-        {
-            if (_tagBadgeStylesInitialized)
-            {
-                return;
-            }
-
-            _tagBadgeStylesInitialized = true;
-
-            _existingTagBadgeStyle = new GUIStyle(UIStyles.TagPill)
-            {
-                alignment = TextAnchor.MiddleCenter,
-                fontStyle = FontStyle.Normal
-            };
-            _existingTagBadgeStyle.normal.textColor = UIConstants.COLOR_LIGHT_BLUE;
-            _existingTagBadgeStyle.hover.textColor = Color.white;
-            _existingTagBadgeStyle.active.textColor = Color.white;
-
-            _existingTagBadgeAddedStyle = new GUIStyle(UIStyles.TagPill)
-            {
-                alignment = TextAnchor.MiddleCenter,
-                fontStyle = FontStyle.Bold
-            };
-            _existingTagBadgeAddedStyle.normal.textColor = UIConstants.COLOR_GREEN;
-            _existingTagBadgeAddedStyle.hover.textColor = UIConstants.COLOR_GREEN;
-            _existingTagBadgeAddedStyle.active.textColor = UIConstants.COLOR_GREEN;
-
-            _selectedTagBadgeStyle = new GUIStyle(UIStyles.TagPill)
-            {
-                alignment = TextAnchor.MiddleCenter,
-                fontStyle = FontStyle.Bold
-            };
-            _selectedTagBadgeStyle.normal.textColor = UIConstants.COLOR_GREEN;
-            _selectedTagBadgeStyle.hover.textColor = UIConstants.COLOR_RED;
-            _selectedTagBadgeStyle.active.textColor = UIConstants.COLOR_RED;
-        }
-
         /// <summary>
         /// Draws the Basic Info tab content (name, version, description, tags).
         /// </summary>
@@ -114,372 +68,141 @@ namespace ModelLibrary.Editor.Windows
 
             EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
             EditorGUILayout.LabelField("Tags", UIStyles.SectionHeader);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                _newTag = EditorGUILayout.TextField("Add Tag", _newTag);
-                if (GUILayout.Button("Add", GUILayout.Width(__BUTTON_WIDTH_MEDIUM)) && !string.IsNullOrWhiteSpace(_newTag))
-                {
-                    TryAddTagToModel(_newTag);
-                    _newTag = string.Empty;
-                }
-            }
-
-            DrawSelectedTagsList();
-            DrawExistingTagsPicker();
-
-            // Advanced tag options (progressive disclosure)
-            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
-            _showAdvancedTagOptions = EditorGUILayout.Foldout(_showAdvancedTagOptions, "Advanced Tag Options", true);
-            if (_showAdvancedTagOptions)
-            {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.HelpBox("Tag management options for power users.", MessageType.None);
-                if (GUILayout.Button("Clear All Tags", GUILayout.Width(UIConstants.BUTTON_WIDTH_MEDIUM)))
-                {
-                    if (EditorUtility.DisplayDialog("Clear All Tags", "Are you sure you want to remove all tags?", "Yes", "No"))
-                    {
-                        _tags.Clear();
-                        MarkTagsDirty();
-                        SaveDraft();
-                    }
-                }
-                EditorGUI.indentLevel--;
-            }
-        }
-
-        /// <summary>
-        /// Draws the tags currently assigned to the model being submitted.
-        /// </summary>
-        private void DrawSelectedTagsList()
-        {
-            if (_tags.Count == 0)
-            {
-                EditorGUILayout.HelpBox("No tags added yet. Pick from existing tags below or type a new one.", MessageType.Info);
-                return;
-            }
-
-            EnsureTagBadgeStyles();
-
-            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
-            EditorGUILayout.LabelField("Selected Tags", EditorStyles.miniBoldLabel);
-
-            int removeIndex = -1;
-            DrawTagBadgeButtons(
+            TagBadgeDrawer.DrawTagEditorPanel(
                 _tags,
-                _selectedTagBadgeStyle,
-                UIConstants.COLOR_GREEN,
-                (int index) => removeIndex = index);
-
-            if (removeIndex >= 0)
-            {
-                _tags.RemoveAt(removeIndex);
-                MarkTagsDirty();
-                SaveDraft();
-            }
-            else
-            {
-                EditorGUILayout.LabelField("Click a selected tag to remove it.", EditorStyles.miniLabel);
-            }
+                ref _newTag,
+                _tagPickerState,
+                _tagCacheManager.SortedTags,
+                _isLoadingIndex,
+                TagBadgeDrawer.GetWrapWidth(this),
+                ref _tagDuplicateWarning,
+                ref _showAdvancedTagOptions,
+                SaveDraft);
         }
 
         /// <summary>
-        /// Returns the viewport width available for wrapping tag badge rows.
-        /// Must be called before entering a scroll view; inside a scroll view the layout
-        /// width is unbounded and wrapping would never occur.
-        /// </summary>
-        private float GetTagBadgeWrapWidth()
-        {
-            const float VERTICAL_SCROLLBAR_WIDTH = 18f;
-            const float LAYOUT_EDGE_PADDING = UIConstants.PADDING_LARGE * 2f;
-
-            float availableWidth = GetHostEditorWindowWidth();
-            availableWidth -= VERTICAL_SCROLLBAR_WIDTH + LAYOUT_EDGE_PADDING;
-            return Mathf.Max(1f, availableWidth);
-        }
-
-        /// <summary>
-        /// Resolves the width of the editor window hosting this UI.
-        /// When rendered inside ModelLibraryWindow the hidden instance position is unset,
-        /// so the parent library window position is used instead.
-        /// </summary>
-        private float GetHostEditorWindowWidth()
-        {
-            if (position.width > 1f)
-            {
-                return position.width;
-            }
-
-            ModelLibraryWindow libraryWindow = GetWindow<ModelLibraryWindow>(false, null, false);
-            if (libraryWindow != null && libraryWindow.position.width > 1f)
-            {
-                return libraryWindow.position.width;
-            }
-
-            return EditorGUIUtility.currentViewWidth;
-        }
-
-        /// <summary>
-        /// Returns whether the next badge should start a new row.
-        /// </summary>
-        /// <param name="currentLineWidth">Width already used on the current row.</param>
-        /// <param name="nextButtonWidth">Width of the next badge button.</param>
-        /// <param name="availableWidth">Total width available for one row.</param>
-        private static bool ShouldWrapTagBadgeRow(float currentLineWidth, float nextButtonWidth, float availableWidth)
-        {
-            if (currentLineWidth <= 0f)
-            {
-                return false;
-            }
-
-            return currentLineWidth + __TAG_BADGE_HORIZONTAL_PADDING + nextButtonWidth > availableWidth;
-        }
-
-        /// <summary>
-        /// Ends the current badge row and starts a new one.
-        /// </summary>
-        /// <param name="currentLineWidth">Current row width tracker to reset.</param>
-        private static void BeginNextTagBadgeRow(ref float currentLineWidth)
-        {
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.BeginHorizontal();
-            currentLineWidth = 0f;
-        }
-
-        /// <summary>
-        /// Draws clickable badges for tags already used in the model catalog.
-        /// </summary>
-        private void DrawExistingTagsPicker()
-        {
-            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
-            EditorGUILayout.LabelField("Existing Tags", EditorStyles.miniBoldLabel);
-            EditorGUILayout.LabelField("Click a tag to add it to this model.", EditorStyles.miniLabel);
-
-            if (_isLoadingIndex)
-            {
-                EditorGUILayout.LabelField("Loading tags from catalog...", EditorStyles.miniLabel);
-                return;
-            }
-
-            if (_tagCacheManager.SortedTags.Count == 0)
-            {
-                EditorGUILayout.HelpBox("No tags found in the catalog yet. Add a new tag above to create one.", MessageType.Info);
-                return;
-            }
-
-            EnsureTagBadgeStyles();
-
-            string tagToAdd = null;
-            float availableWidth = GetTagBadgeWrapWidth();
-            _existingTagsScroll = EditorGUILayout.BeginScrollView(
-                _existingTagsScroll,
-                GUILayout.MaxHeight(__EXISTING_TAGS_SCROLL_HEIGHT));
-
-            EnsureCatalogTagBadgeCache();
-
-            float currentLineWidth = 0f;
-            EditorGUILayout.BeginHorizontal();
-
-            for (int i = 0; i < _catalogTagBadgeCache.Count; i++)
-            {
-                CatalogTagBadgeEntry entry = _catalogTagBadgeCache[i];
-                GUIStyle badgeStyle = entry.AlreadyAdded ? _existingTagBadgeAddedStyle : _existingTagBadgeStyle;
-                Color badgeColor = entry.AlreadyAdded ? UIConstants.COLOR_GREEN : UIConstants.COLOR_LIGHT_BLUE;
-
-                if (ShouldWrapTagBadgeRow(currentLineWidth, entry.ButtonWidth, availableWidth))
-                {
-                    BeginNextTagBadgeRow(ref currentLineWidth);
-                }
-
-                using (new EditorGUI.DisabledScope(entry.AlreadyAdded))
-                {
-                    if (DrawSingleTagBadgeButton(entry.Label, badgeStyle, badgeColor, entry.ButtonWidth) && !entry.AlreadyAdded)
-                    {
-                        tagToAdd = entry.Tag;
-                    }
-                }
-
-                currentLineWidth += entry.ButtonWidth;
-            }
-
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.EndScrollView();
-
-            if (!string.IsNullOrEmpty(tagToAdd))
-            {
-                TryAddTagToModel(tagToAdd);
-            }
-        }
-
-        /// <summary>
-        /// Draws a wrapping row of tag badge buttons from a string list.
-        /// </summary>
-        private void DrawTagBadgeButtons(
-            IReadOnlyList<string> tags,
-            GUIStyle badgeStyle,
-            Color badgeColor,
-            Action<int> onBadgeClicked)
-        {
-            float currentLineWidth = 0f;
-            float availableWidth = GetTagBadgeWrapWidth();
-            EditorGUILayout.BeginHorizontal();
-
-            for (int i = 0; i < tags.Count; i++)
-            {
-                string label = $"{__TAG_BADGE_EMOJI} {tags[i]}";
-                float buttonWidth = badgeStyle.CalcSize(new GUIContent(label)).x + __TAG_BADGE_HORIZONTAL_PADDING;
-
-                if (ShouldWrapTagBadgeRow(currentLineWidth, buttonWidth, availableWidth))
-                {
-                    BeginNextTagBadgeRow(ref currentLineWidth);
-                }
-
-                if (DrawSingleTagBadgeButton(label, badgeStyle, badgeColor, buttonWidth))
-                {
-                    onBadgeClicked?.Invoke(i);
-                }
-
-                currentLineWidth += buttonWidth;
-            }
-
-            EditorGUILayout.EndHorizontal();
-        }
-
-        /// <summary>
-        /// Draws one tag badge button with a tinted background.
-        /// </summary>
-        private static bool DrawSingleTagBadgeButton(string label, GUIStyle badgeStyle, Color badgeColor, float buttonWidth = 0f)
-        {
-            Color originalBackground = GUI.backgroundColor;
-            GUI.backgroundColor = new Color(
-                badgeColor.r,
-                badgeColor.g,
-                badgeColor.b,
-                UIConstants.BADGE_BACKGROUND_ALPHA);
-
-            bool clicked;
-            if (buttonWidth > 0f)
-            {
-                clicked = GUILayout.Button(label, badgeStyle, GUILayout.Width(buttonWidth));
-            }
-            else
-            {
-                clicked = GUILayout.Button(label, badgeStyle, GUILayout.ExpandWidth(false));
-            }
-
-            GUI.backgroundColor = originalBackground;
-            return clicked;
-        }
-
-        /// <summary>
-        /// Marks selected-tag caches dirty after the tag list changes.
-        /// </summary>
-        private void MarkTagsDirty()
-        {
-            _tagsRevision++;
-        }
-
-        /// <summary>
-        /// Marks catalog-tag layout caches dirty after the catalog tag list changes.
-        /// </summary>
-        private void MarkCatalogTagsDirty()
-        {
-            _catalogTagsRevision++;
-        }
-
-        /// <summary>
-        /// Rebuilds the case-insensitive lookup for selected tags when needed.
-        /// </summary>
-        private void EnsureSelectedTagsLookup()
-        {
-            if (_selectedTagsLookupRevision == _tagsRevision)
-            {
-                return;
-            }
-
-            _selectedTagsLookupRevision = _tagsRevision;
-            _selectedTagsLookup.Clear();
-            for (int i = 0; i < _tags.Count; i++)
-            {
-                string tag = _tags[i];
-                if (!string.IsNullOrWhiteSpace(tag))
-                {
-                    _selectedTagsLookup.Add(tag.Trim());
-                }
-            }
-        }
-
-        /// <summary>
-        /// Rebuilds precomputed catalog tag badge layout data when tags or selection change.
-        /// </summary>
-        private void EnsureCatalogTagBadgeCache()
-        {
-            int revisionKey = (_catalogTagsRevision * 397) ^ _tagsRevision;
-            if (_catalogTagBadgeCacheRevision == revisionKey)
-            {
-                return;
-            }
-
-            _catalogTagBadgeCacheRevision = revisionKey;
-            _catalogTagBadgeCache.Clear();
-            EnsureSelectedTagsLookup();
-
-            for (int i = 0; i < _tagCacheManager.SortedTags.Count; i++)
-            {
-                string tag = _tagCacheManager.SortedTags[i];
-                bool alreadyAdded = _selectedTagsLookup.Contains(tag.Trim());
-                GUIStyle badgeStyle = alreadyAdded ? _existingTagBadgeAddedStyle : _existingTagBadgeStyle;
-                string label = string.Concat(__TAG_BADGE_EMOJI, " ", tag);
-                float buttonWidth = badgeStyle.CalcSize(new GUIContent(label)).x + __TAG_BADGE_HORIZONTAL_PADDING;
-
-                CatalogTagBadgeEntry entry = new CatalogTagBadgeEntry
-                {
-                    Tag = tag,
-                    Label = label,
-                    ButtonWidth = buttonWidth,
-                    AlreadyAdded = alreadyAdded
-                };
-                _catalogTagBadgeCache.Add(entry);
-            }
-        }
-
-        /// <summary>
-        /// Adds a tag to the submission list if it is not already present.
-        /// </summary>
-        /// <param name="tag">Tag value to add.</param>
-        private void TryAddTagToModel(string tag)
-        {
-            if (string.IsNullOrWhiteSpace(tag) || IsTagAlreadyOnModel(tag))
-            {
-                return;
-            }
-
-            _tags.Add(tag.Trim());
-            MarkTagsDirty();
-            SaveDraft();
-        }
-
-        /// <summary>
-        /// Checks whether a tag is already on the model submission list.
-        /// </summary>
-        /// <param name="tag">Tag value to check.</param>
-        /// <returns>True when the tag is already selected.</returns>
-        private bool IsTagAlreadyOnModel(string tag)
-        {
-            if (string.IsNullOrWhiteSpace(tag))
-            {
-                return false;
-            }
-
-            EnsureSelectedTagsLookup();
-            return _selectedTagsLookup.Contains(tag.Trim());
-        }
-
-        /// <summary>
-        /// Draws the Assets tab content (install path).
+        /// Draws the Assets tab content (model assets and install path).
         /// </summary>
         private void DrawAssetsTab()
         {
-            EditorGUILayout.LabelField(new GUIContent("Install Path", 
+            EditorGUILayout.LabelField("Model Assets", UIStyles.SectionHeader);
+            EditorGUILayout.HelpBox(
+                "These project assets will be packaged with your submission. Add FBX/OBJ meshes plus related materials and textures.",
+                MessageType.Info);
+
+            DrawAssetDropArea();
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Add from Project Selection", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
+                {
+                    AddAssetsFromProjectSelection();
+                }
+
+                if (GUILayout.Button("Clear Assets", GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE), GUILayout.Width(UIConstants.BUTTON_WIDTH_LARGE)))
+                {
+                    _selectedAssetGuids.Clear();
+                    _selectedAssetGuidLookup.Clear();
+                    _assetPickerObject = null;
+                    SaveDraft();
+                }
+            }
+
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                _assetPickerObject = EditorGUILayout.ObjectField(
+                    new GUIContent("Add Asset", "Pick a project asset or folder to include in the submission"),
+                    _assetPickerObject,
+                    typeof(UnityEngine.Object),
+                    false);
+
+                if (GUILayout.Button("Add", GUILayout.Width(UIConstants.BUTTON_WIDTH_MEDIUM), GUILayout.Height(UIConstants.BUTTON_HEIGHT_LARGE)))
+                {
+                    if (TryAddUnityObject(_assetPickerObject))
+                    {
+                        _assetPickerObject = null;
+                    }
+                }
+            }
+
+            EditorGUILayout.Space(UIConstants.SPACING_SMALL);
+
+            if (_selectedAssetGuids.Count > 0)
+            {
+                EditorGUILayout.LabelField($"Selected Assets ({_selectedAssetGuids.Count}):", EditorStyles.boldLabel);
+                _assetListScrollPosition = EditorGUILayout.BeginScrollView(
+                    _assetListScrollPosition,
+                    GUILayout.Height(__ASSET_LIST_SCROLL_HEIGHT));
+
+                for (int i = 0; i < _selectedAssetGuids.Count; i++)
+                {
+                    string guid = _selectedAssetGuids[i];
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    UnityEngine.Object asset = string.IsNullOrEmpty(assetPath)
+                        ? null
+                        : AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+
+                    using (new EditorGUILayout.HorizontalScope("box"))
+                    {
+                        Texture preview = asset != null
+                            ? AssetPreview.GetMiniThumbnail(asset)
+                            : null;
+
+                        if (preview != null)
+                        {
+                            GUILayout.Label(preview, GUILayout.Width(32), GUILayout.Height(32));
+                        }
+                        else
+                        {
+                            EditorGUI.DrawRect(
+                                GUILayoutUtility.GetRect(32, 32, GUILayout.Width(32), GUILayout.Height(32)),
+                                new Color(0.2f, 0.2f, 0.2f, 1f));
+                        }
+
+                        using (new EditorGUILayout.VerticalScope())
+                        {
+                            string displayName = string.IsNullOrEmpty(assetPath)
+                                ? "(missing asset)"
+                                : Path.GetFileName(assetPath);
+                            EditorGUILayout.LabelField(displayName, EditorStyles.boldLabel);
+                            EditorGUILayout.LabelField(
+                                $"{GetAssetTypeLabel(guid)} • {assetPath}",
+                                EditorStyles.miniLabel);
+                        }
+
+                        GUILayout.FlexibleSpace();
+
+                        if (GUILayout.Button("Remove", GUILayout.Width(70), GUILayout.Height(30)))
+                        {
+                            RemoveSelectedAssetAt(i);
+                            break;
+                        }
+                    }
+
+                    EditorGUILayout.Space(4);
+                }
+
+                EditorGUILayout.EndScrollView();
+
+                if (!SelectedAssetsContainMesh())
+                {
+                    EditorGUILayout.HelpBox(
+                        "Add at least one FBX or OBJ mesh file to the asset list.",
+                        MessageType.Warning);
+                }
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "No assets selected. Use Project selection, drag-and-drop, or the asset picker above.",
+                    MessageType.Info);
+            }
+
+            EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
+
+            EditorGUILayout.LabelField(new GUIContent("Install Path",
                 "The absolute path where the model will be installed in YOUR Unity project.\n" +
                 "Example: Assets/Models/MyModel\n\n" +
                 "This is where users will find the model after importing it into their project."), UIStyles.SectionHeader);
@@ -551,6 +274,73 @@ namespace ModelLibrary.Editor.Windows
                 EditorGUILayout.LabelField("Current Default Path:", EditorStyles.miniLabel);
                 EditorGUILayout.LabelField(DefaultInstallPath(), EditorStyles.wordWrappedMiniLabel);
                 EditorGUI.indentLevel--;
+            }
+        }
+
+        /// <summary>
+        /// Draws a drag-and-drop area for project assets.
+        /// </summary>
+        private void DrawAssetDropArea()
+        {
+            Event currentEvent = Event.current;
+            Rect dropArea = GUILayoutUtility.GetRect(0f, 50f, GUILayout.ExpandWidth(true));
+
+            bool isDragging = currentEvent.type == EventType.DragUpdated || currentEvent.type == EventType.DragPerform;
+            bool isHovering = dropArea.Contains(currentEvent.mousePosition);
+
+            Color originalColor = GUI.color;
+            if (isDragging && isHovering)
+            {
+                GUI.color = new Color(0.5f, 0.8f, 1f, 0.3f);
+            }
+
+            GUI.Box(dropArea, string.Empty, EditorStyles.helpBox);
+            GUI.color = originalColor;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.FlexibleSpace();
+                string dropText = isDragging && isHovering
+                    ? "Drop project assets here"
+                    : "Drag and drop project assets or folders here";
+                EditorGUILayout.LabelField(dropText, EditorStyles.centeredGreyMiniLabel);
+                GUILayout.FlexibleSpace();
+            }
+
+            if (!isHovering)
+            {
+                return;
+            }
+
+            if (currentEvent.type == EventType.DragUpdated)
+            {
+                bool hasValidAssets = DragAndDrop.objectReferences != null && DragAndDrop.objectReferences.Length > 0;
+                DragAndDrop.visualMode = hasValidAssets
+                    ? DragAndDropVisualMode.Copy
+                    : DragAndDropVisualMode.Rejected;
+                currentEvent.Use();
+            }
+            else if (currentEvent.type == EventType.DragPerform)
+            {
+                DragAndDrop.AcceptDrag();
+                currentEvent.Use();
+
+                int addedCount = 0;
+                if (DragAndDrop.objectReferences != null)
+                {
+                    for (int i = 0; i < DragAndDrop.objectReferences.Length; i++)
+                    {
+                        if (TryAddUnityObject(DragAndDrop.objectReferences[i]))
+                        {
+                            addedCount++;
+                        }
+                    }
+                }
+
+                if (addedCount > 0)
+                {
+                    SaveDraft();
+                }
             }
         }
 

@@ -113,23 +113,9 @@ namespace ModelLibrary.Editor.Windows
                 _existingModels.Count.ToString(), "|",
                 selectedModelVersion, "|",
                 _isLoadingIndex.ToString(), "|",
+                _loadingBaseMeta.ToString(), "|",
                 _latestSelectedMeta?.installPath ?? string.Empty, "|",
-                BuildSelectionCacheKey());
-        }
-
-        /// <summary>
-        /// Builds a cache key from the current Unity selection used for asset validation.
-        /// </summary>
-        /// <returns>Selection cache key string.</returns>
-        private static string BuildSelectionCacheKey()
-        {
-            string[] guids = Selection.assetGUIDs;
-            if (guids == null || guids.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            return string.Join(",", guids);
+                BuildSelectedAssetGuidsCacheKey());
         }
 
         /// <summary>
@@ -158,7 +144,11 @@ namespace ModelLibrary.Editor.Windows
             }
 
             _installPathValidationCacheKey = cacheKey;
-            _cachedInstallPathValidation = InstallPathValidator.Validate(installPathToValidate, _name, allowExistingModelContent);
+            _cachedInstallPathValidation = InstallPathValidator.Validate(
+                installPathToValidate,
+                _name,
+                allowExistingModelContent,
+                InstallPathValidator.InstallPathValidationMode.Submission);
             return _cachedInstallPathValidation;
         }
 
@@ -196,9 +186,9 @@ namespace ModelLibrary.Editor.Windows
             List<string> changelogErrors = ChangelogValidator.ValidateChangelog(_changeSummary, isUpdateMode);
             errors.AddRange(changelogErrors);
 
-            if (!HasValidAssetSelection())
+            if (!SelectedAssetsContainMesh())
             {
-                errors.Add("Please select at least one valid model asset (FBX or OBJ file)");
+                errors.Add("Please add at least one FBX or OBJ mesh file to the asset list");
             }
 
             if (_mode == SubmitMode.New)
@@ -215,7 +205,15 @@ namespace ModelLibrary.Editor.Windows
             }
             else if (_mode == SubmitMode.Update)
             {
-                if (_existingModels.Count == 0)
+                if (_isLoadingIndex)
+                {
+                    errors.Add("Model catalog is still loading. Please wait.");
+                }
+                else if (_loadingBaseMeta)
+                {
+                    errors.Add("Model metadata is still loading. Please wait.");
+                }
+                else if (_existingModels.Count == 0)
                 {
                     errors.Add("No existing models available to update");
                 }
@@ -246,51 +244,6 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Checks if the current selection contains at least one valid model asset (FBX or OBJ file).
-        /// </summary>
-        /// <returns>True if at least one valid asset is selected, false otherwise.</returns>
-        private bool HasValidAssetSelection()
-        {
-            if (Selection.assetGUIDs == null || Selection.assetGUIDs.Length == 0)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < Selection.assetGUIDs.Length; i++)
-            {
-                string guid = Selection.assetGUIDs[i];
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (string.IsNullOrEmpty(path) || AssetDatabase.IsValidFolder(path))
-                {
-                    continue;
-                }
-
-                string ext = Path.GetExtension(path).ToLowerInvariant();
-                if (ext == ".fbx" || ext == ".obj")
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private bool ShouldDisableSubmit(List<string> validationErrors, bool metadataReady)
-        {
-            if (_isSubmitting)
-            {
-                return true;
-            }
-
-            if (_mode == SubmitMode.Update && (!_existingModels.Any() || _isLoadingIndex || _loadingBaseMeta || !metadataReady))
-            {
-                return true;
-            }
-
-            return validationErrors.Count > 0;
         }
     }
 }
