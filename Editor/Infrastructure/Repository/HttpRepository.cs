@@ -209,7 +209,8 @@ namespace ModelLibrary.Editor.Repository
             await AsyncProfiler.MeasureAsync("HttpRepository.DownloadFile", () => req.SendWebRequest().ToTask());
             EnsureSuccess(req, "DownloadFile(" + relativePath + ")");
 
-            await File.WriteAllBytesAsync(localAbsolutePath, req.downloadHandler.data);
+            byte[] fileBytes = req.downloadHandler.data ?? Array.Empty<byte>();
+            await Task.Run(() => SafeFileWriter.WriteAllBytes(localAbsolutePath, fileBytes));
         }
 
         public Task<bool> DeleteVersionAsync(string modelId, string version)

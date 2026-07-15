@@ -17,10 +17,31 @@ namespace ModelLibrary.Editor.Utils
         /// Uses installPath from meta, or falls back to a default path built from the model name.
         /// </summary>
         /// <param name="meta">The model metadata containing path information.</param>
+        /// <param name="localInstallMeta">Optional locally installed metadata used to preserve the on-disk install folder during updates.</param>
+        /// <param name="preferredInstallPath">Optional on-disk install path that takes priority over repository metadata.</param>
         /// <returns>The determined install path, normalized to start with "Assets/".</returns>
-        public string DetermineInstallPath(ModelMeta meta)
+        public string DetermineInstallPath(ModelMeta meta, ModelMeta localInstallMeta = null, string preferredInstallPath = null)
         {
-            string modelName = meta?.identity?.name ?? "Model";
+            string modelName = meta?.identity?.name ?? localInstallMeta?.identity?.name ?? "Model";
+
+            if (!string.IsNullOrWhiteSpace(preferredInstallPath))
+            {
+                string preferredPath = InstallPathUtils.NormalizeInstallPath(preferredInstallPath);
+                if (!string.IsNullOrWhiteSpace(preferredPath))
+                {
+                    return preferredPath;
+                }
+            }
+
+            if (localInstallMeta != null && !string.IsNullOrWhiteSpace(localInstallMeta.installPath))
+            {
+                string localPath = InstallPathUtils.NormalizeInstallPath(localInstallMeta.installPath);
+                if (!string.IsNullOrWhiteSpace(localPath))
+                {
+                    return localPath;
+                }
+            }
+
             string candidate;
 
             if (!string.IsNullOrWhiteSpace(meta?.installPath))
@@ -41,11 +62,17 @@ namespace ModelLibrary.Editor.Utils
         /// </summary>
         /// <param name="meta">Model metadata containing the stored install path.</param>
         /// <param name="allowExistingModelContent">When true, existing model content at the path is allowed (update flow).</param>
+        /// <param name="localInstallMeta">Optional locally installed metadata used to preserve the on-disk install folder.</param>
+        /// <param name="preferredInstallPath">Optional on-disk install path that takes priority over repository metadata.</param>
         /// <returns>The resolved install path, or null if the user cancelled.</returns>
-        public string ResolveInstallPathForImport(ModelMeta meta, bool allowExistingModelContent)
+        public string ResolveInstallPathForImport(
+            ModelMeta meta,
+            bool allowExistingModelContent,
+            ModelMeta localInstallMeta = null,
+            string preferredInstallPath = null)
         {
             string modelName = meta?.identity?.name ?? "Model";
-            string storedInstallPath = DetermineInstallPath(meta);
+            string storedInstallPath = DetermineInstallPath(meta, localInstallMeta, preferredInstallPath);
             InstallPathValidator.ValidationResult storedValidation = InstallPathValidator.Validate(
                 storedInstallPath,
                 modelName,

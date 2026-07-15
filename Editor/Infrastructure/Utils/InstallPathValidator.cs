@@ -86,6 +86,13 @@ namespace ModelLibrary.Editor.Utils
                     {
                         if (allowExistingModelContent)
                         {
+                            if (FolderContainsModelContent(absolutePath))
+                            {
+                                result.SuggestedInstallPath = normalizedPath;
+                                result.IsValid = true;
+                                return result;
+                            }
+
                             string resolvedUpdatePath = TryResolveExistingModelInstallPath(
                                 normalizedPath,
                                 sanitizedModelName,
@@ -116,7 +123,7 @@ namespace ModelLibrary.Editor.Utils
                     }
                 }
 
-                if (result.Errors.Count == 0)
+                if (!allowExistingModelContent && result.Errors.Count == 0)
                 {
                     result.Errors.Add(
                         $"Install path must end with the model folder name '{sanitizedModelName}' (e.g. '{result.SuggestedInstallPath}').");

@@ -555,8 +555,23 @@ namespace ModelLibrary.Editor.Windows
                 (string cacheRoot, ModelMeta meta) = await service.DownloadModelVersionAsync(_modelId, _version);
 
                 InstallPathHelper installPathHelper = new InstallPathHelper();
-                string chosenInstallPath = installPathHelper.ResolveInstallPathForImport(meta, allowExistingModelContent: false);
+                ModelMeta localInstallMeta = _isInstalled ? _meta : null;
+                string preferredInstallPath = _isInstalled ? _installPath?.Replace('\\', '/') : null;
+                bool allowExistingModelContent = _hasUpdate || _isInstalled;
+                string chosenInstallPath = installPathHelper.ResolveInstallPathForImport(
+                    meta,
+                    allowExistingModelContent,
+                    localInstallMeta,
+                    preferredInstallPath);
                 if (string.IsNullOrEmpty(chosenInstallPath))
+                {
+                    EditorUtility.ClearProgressBar();
+                    titleContent.text = "Model Details";
+                    return;
+                }
+
+                if (allowExistingModelContent &&
+                    !installPathHelper.ConfirmModelUpdateOverwrite(meta.identity?.name ?? "Model", chosenInstallPath))
                 {
                     EditorUtility.ClearProgressBar();
                     titleContent.text = "Model Details";
@@ -568,7 +583,8 @@ namespace ModelLibrary.Editor.Windows
                     cacheRoot,
                     meta,
                     cleanDestination: true,
-                    overrideInstallPath: chosenInstallPath);
+                    overrideInstallPath: chosenInstallPath,
+                    isUpdate: allowExistingModelContent);
 
                 EditorUtility.DisplayProgressBar("Importing Model", "Finalizing import...", ProgressBarConstants.FINALIZING);
                 await Task.Delay(DelayConstants.UI_UPDATE_DELAY_MS); // Brief pause for UI update

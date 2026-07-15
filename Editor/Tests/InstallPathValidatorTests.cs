@@ -114,6 +114,69 @@ namespace ModelLibrary.Editor.Tests
         }
 
         [Test]
+        public void Validate_Import_AllowsUpdateWhenInstallFolderNameDiffersFromModelName()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
+            string modelPath = Path.Combine(tempRoot, "Assets", "Models", "NewModel");
+            Directory.CreateDirectory(modelPath);
+            File.WriteAllText(Path.Combine(modelPath, "CleaningProducts.fbx"), "dummy");
+            File.WriteAllText(Path.Combine(modelPath, ".modelLibrary.meta.json"), "{}");
+
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                InstallPathValidator.ValidationResult result =
+                    InstallPathValidator.Validate(
+                        "Assets/Models/NewModel",
+                        "CleaningProducts",
+                        true,
+                        InstallPathValidator.InstallPathValidationMode.Import);
+
+                Assert.IsTrue(result.IsValid, string.Join(", ", result.Errors));
+                Assert.AreEqual("Assets/Models/NewModel", result.SuggestedInstallPath);
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
+
+        [Test]
+        public void Validate_Import_StillRejectsOccupiedFolderForFreshImportWhenFolderNameDiffers()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
+            string modelPath = Path.Combine(tempRoot, "Assets", "Models", "NewModel");
+            Directory.CreateDirectory(modelPath);
+            File.WriteAllText(Path.Combine(modelPath, "CleaningProducts.fbx"), "dummy");
+
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                InstallPathValidator.ValidationResult result =
+                    InstallPathValidator.Validate(
+                        "Assets/Models/NewModel",
+                        "CleaningProducts",
+                        false,
+                        InstallPathValidator.InstallPathValidationMode.Import);
+
+                Assert.IsFalse(result.IsValid);
+                Assert.IsTrue(result.Errors.Exists(error => error.Contains("already contains model files")));
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
+
+        [Test]
         public void Validate_Import_AllowsUpdateWhenModelFolderHasSubfoldersWithModelFiles()
         {
             string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));

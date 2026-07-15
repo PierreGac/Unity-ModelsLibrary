@@ -254,6 +254,7 @@ namespace ModelLibrary.Editor.Services
             string allowedCacheBase = EditorPaths.LibraryPath(settings.localCacheRoot);
             PathUtils.AssertInsideRoot(cacheRoot, allowedCacheBase);
 
+            await ClearCacheForModelAsync(id, version);
             Directory.CreateDirectory(cacheRoot);
 
             // Save meta too (for quick access)
@@ -264,7 +265,7 @@ namespace ModelLibrary.Editor.Services
             // Use retry logic for file write to handle locked files
             await RetryFileOperationAsync(async () =>
             {
-                await Task.Run(() => File.WriteAllText(localMetaPath, metaJson));
+                await Task.Run(() => SafeFileWriter.WriteAllText(localMetaPath, metaJson));
             }, maxRetries: 3, initialDelayMs: 200);
 
             // Pull all files present in the repository under id/version (payload, deps, images, etc.)
@@ -461,7 +462,7 @@ namespace ModelLibrary.Editor.Services
 
                 if (Directory.Exists(canonical))
                 {
-                    Directory.Delete(canonical, recursive: true);
+                    await Task.Run(() => SafeFileWriter.DeleteDirectory(canonical));
                 }
             }, maxRetries: 3, initialDelayMs: 500);
         }

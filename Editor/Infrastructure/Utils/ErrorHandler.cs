@@ -138,6 +138,12 @@ namespace ModelLibrary.Editor.Utils
             if (lowerMessage.Contains("access denied") || lowerMessage.Contains("permission") ||
                 exceptionType.Contains("UnauthorizedAccess"))
             {
+                string exceptionPath = exception?.Message ?? string.Empty;
+                if (exceptionPath.IndexOf("ModelLibraryCache", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return "Model Library could not update its local download cache. This is not a repository or install-folder permission issue.";
+                }
+
                 return "You don't have permission to access this file or folder. Please check file permissions or contact your administrator.";
             }
 
@@ -222,9 +228,18 @@ namespace ModelLibrary.Editor.Utils
             // Add specific guidance based on exception details
             if (exception != null)
             {
-                string exceptionMessage = exception.Message?.ToLowerInvariant() ?? "";
+                string exceptionMessage = exception.Message ?? string.Empty;
+                string lowerExceptionMessage = exceptionMessage.ToLowerInvariant();
                 
-                if (exceptionMessage.Contains("timeout"))
+                if (exceptionMessage.IndexOf("ModelLibraryCache", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return "• Close other Model Library windows or 3D previews that may be using the same model\n" +
+                           "• Retry the update after a few seconds\n" +
+                           "• Delete the folder shown in Technical Details under Library/ModelLibraryCache and retry\n" +
+                           "• Ensure antivirus or sync tools are not locking files in the project's Library folder";
+                }
+
+                if (lowerExceptionMessage.Contains("timeout"))
                 {
                     baseGuidance += "\n• The server may be slow or overloaded - try again in a few moments";
                 }

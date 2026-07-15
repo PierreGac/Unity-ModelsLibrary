@@ -84,12 +84,29 @@ namespace ModelLibrary.Editor.Windows
 
                 EditorUtility.DisplayProgressBar(progressTitle, "Preparing import...", ProgressBarConstants.PREPARING);
 
-                string defaultInstallPath = _installPathHelper.DetermineInstallPath(meta);
+                ModelMeta localInstallMeta = null;
+                string preferredInstallPath = null;
+                if (_localInstallCache.TryGetValue(id, out ModelMeta cachedLocalMeta) && cachedLocalMeta != null)
+                {
+                    localInstallMeta = cachedLocalMeta;
+                }
+                else if (_manifestCache.TryGetValue(id, out ModelMeta cachedManifestMeta) && cachedManifestMeta != null)
+                {
+                    localInstallMeta = cachedManifestMeta;
+                }
+
+                if (localInstallMeta != null && !string.IsNullOrWhiteSpace(localInstallMeta.installPath))
+                {
+                    preferredInstallPath = localInstallMeta.installPath;
+                }
+
+                string defaultInstallPath = _installPathHelper.DetermineInstallPath(meta, localInstallMeta, preferredInstallPath);
                 string modelName = meta.identity?.name ?? "Model";
+                bool allowExistingModelContent = isUpgrade || localInstallMeta != null;
                 InstallPathValidator.ValidationResult storedPathValidation = InstallPathValidator.Validate(
                     defaultInstallPath,
                     modelName,
-                    isUpgrade,
+                    allowExistingModelContent,
                     InstallPathValidator.InstallPathValidationMode.Import);
                 string resolvedStoredInstallPath = !string.IsNullOrWhiteSpace(storedPathValidation.SuggestedInstallPath)
                     ? storedPathValidation.SuggestedInstallPath
@@ -98,7 +115,11 @@ namespace ModelLibrary.Editor.Windows
 
                 if (!storedPathValidation.IsValid)
                 {
-                    chosenInstallPath = _installPathHelper.ResolveInstallPathForImport(meta, isUpgrade);
+                    chosenInstallPath = _installPathHelper.ResolveInstallPathForImport(
+                        meta,
+                        allowExistingModelContent,
+                        localInstallMeta,
+                        preferredInstallPath);
                     if (string.IsNullOrEmpty(chosenInstallPath))
                     {
                         _importCancellation[id] = true;
@@ -107,7 +128,7 @@ namespace ModelLibrary.Editor.Windows
                         return;
                     }
                 }
-                else if (isUpgrade)
+                else if (isUpgrade || localInstallMeta != null)
                 {
                     chosenInstallPath = resolvedStoredInstallPath;
                 }
@@ -139,7 +160,7 @@ namespace ModelLibrary.Editor.Windows
                         string custom = _installPathHelper.PromptForInstallPathWithValidation(
                             resolvedStoredInstallPath,
                             modelName,
-                            isUpgrade);
+                            allowExistingModelContent);
                         if (string.IsNullOrEmpty(custom))
                         {
                             _importCancellation[id] = true;
@@ -151,7 +172,7 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
 
-                if (isUpgrade && !_installPathHelper.ConfirmModelUpdateOverwrite(modelName, chosenInstallPath))
+                if (allowExistingModelContent && !_installPathHelper.ConfirmModelUpdateOverwrite(modelName, chosenInstallPath))
                 {
                     _importCancellation[id] = true;
                     cancellationTokenSource.Cancel();
