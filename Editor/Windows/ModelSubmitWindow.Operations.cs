@@ -482,6 +482,14 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
+                LocalInstallSyncResult syncResult = null;
+                if (_mode == SubmitMode.Update && !string.IsNullOrEmpty(identityId))
+                {
+                    EditorUtility.DisplayProgressBar(progressTitle, "Syncing local install...", 0.95f);
+                    syncResult = await LocalInstallSyncService.SyncAfterUpdateSubmitAsync(meta, temp, identityId);
+                    Debug.Log($"[ModelSubmitWindow] Post-submit local sync: {syncResult.Reason}");
+                }
+
                 EditorUtility.DisplayProgressBar(progressTitle, "Complete", 1.0f);
                 await Task.Delay(100); // Brief pause to show completion
 
@@ -490,6 +498,9 @@ namespace ModelLibrary.Editor.Windows
                 ClearDraft();
 
                 // Refresh all open ModelLibraryWindow instances to show the new model
+                bool syncApplied = syncResult != null && syncResult.Applied;
+                string syncedModelId = identityId;
+                ModelMeta syncedMeta = meta;
                 EditorApplication.delayCall += () =>
                 {
                     ModelLibraryWindow[] openWindows = Resources.FindObjectsOfTypeAll<ModelLibraryWindow>();
@@ -498,6 +509,11 @@ namespace ModelLibrary.Editor.Windows
                         ModelLibraryWindow window = openWindows[i];
                         if (window != null)
                         {
+                            if (syncApplied && !string.IsNullOrEmpty(syncedModelId) && syncedMeta != null)
+                            {
+                                window.UpdateLocalInstallCache(syncedModelId, syncedMeta);
+                            }
+
                             // Refresh index and manifest cache to show the newly submitted model
                             window.RefreshIndex();
                         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using ModelLibrary.Data;
+using ModelLibrary.Editor;
 using UnityEditor;
 using UnityEngine;
 
@@ -58,7 +59,7 @@ namespace ModelLibrary.Editor.Utils
 
                 try
                 {
-                    if (AssetDatabase.DeleteAsset(assetPath))
+                    if (TryDeleteAssetOrFile(assetPath))
                     {
                         deletedCount++;
                     }
@@ -225,23 +226,14 @@ namespace ModelLibrary.Editor.Utils
             }
         }
 
-        private static void TryAddPathUnderInstall(HashSet<string> paths, string installPath, string candidatePath)
-        {
-            if (string.IsNullOrWhiteSpace(candidatePath))
-            {
-                return;
-            }
-
-            string sanitized = PathUtils.SanitizePathSeparator(candidatePath);
-            if (!IsPathUnderInstallFolder(sanitized, installPath))
-            {
-                return;
-            }
-
-            paths.Add(sanitized);
-        }
-
-        private static bool IsPathUnderInstallFolder(string assetPath, string installPath)
+        /// <summary>
+        /// Returns true when <paramref name="assetPath"/> is the install folder itself
+        /// or a file/folder nested under it.
+        /// </summary>
+        /// <param name="assetPath">Project-relative asset path.</param>
+        /// <param name="installPath">Project-relative install folder path.</param>
+        /// <returns>True when the asset path is under the install folder.</returns>
+        public static bool IsPathUnderInstallFolder(string assetPath, string installPath)
         {
             if (string.IsNullOrWhiteSpace(assetPath) || string.IsNullOrWhiteSpace(installPath))
             {
@@ -258,6 +250,83 @@ namespace ModelLibrary.Editor.Utils
 
             string prefix = normalizedInstall + "/";
             return normalizedAsset.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Deletes a project path via AssetDatabase, falling back to filesystem delete
+        /// when Unity does not track the file (e.g. dot-prefixed manifests).
+        /// Exposed for unit testing filesystem fallback without requiring AssetDatabase.
+        /// </summary>
+        /// <param name="assetPath">Project-relative path to delete.</param>
+        /// <returns>True when the path was deleted.</returns>
+        public static bool TryDeleteAssetOrFile(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return false;
+            }
+
+            if (AssetDatabase.DeleteAsset(assetPath))
+            {
+                return true;
+            }
+
+            return TryDeleteFileOnDisk(assetPath);
+        }
+
+        /// <summary>
+        /// Deletes a file on disk when AssetDatabase cannot remove it (dot-prefixed manifests).
+        /// </summary>
+        /// <param name="assetPath">Project-relative or absolute file path.</param>
+        /// <returns>True when the file existed and was deleted.</returns>
+        public static bool TryDeleteFileOnDisk(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return false;
+            }
+
+            string absolutePath = Path.GetFullPath(assetPath);
+            if (!File.Exists(absolutePath))
+            {
+                return false;
+            }
+
+            try
+            {
+                File.SetAttributes(absolutePath, FileAttributes.Normal);
+                File.Delete(absolutePath);
+
+                string metaPath = absolutePath + FileExtensions.META;
+                if (File.Exists(metaPath))
+                {
+                    File.SetAttributes(metaPath, FileAttributes.Normal);
+                    File.Delete(metaPath);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[InstalledModelAssetCleaner] Filesystem delete failed for '{assetPath}': {ex.Message}");
+                return false;
+            }
+        }
+
+        private static void TryAddPathUnderInstall(HashSet<string> paths, string installPath, string candidatePath)
+        {
+            if (string.IsNullOrWhiteSpace(candidatePath))
+            {
+                return;
+            }
+
+            string sanitized = PathUtils.SanitizePathSeparator(candidatePath);
+            if (!IsPathUnderInstallFolder(sanitized, installPath))
+            {
+                return;
+            }
+
+            paths.Add(sanitized);
         }
 
         private static bool AssetExistsAtPath(string assetPath)

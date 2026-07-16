@@ -117,5 +117,51 @@ namespace ModelLibrary.Editor.Tests
                 }
             }
         }
+
+        [Test]
+        public void TryDeleteFileOnDisk_RemovesDotPrefixedManifest()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstalledModelAssetCleaner_" + System.Guid.NewGuid().ToString("N"));
+            string installPath = Path.Combine(tempRoot, "Assets", "Models", "Ship");
+            Directory.CreateDirectory(installPath);
+
+            string previousCwd = Directory.GetCurrentDirectory();
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                string manifestRelative = "Assets/Models/Ship/.modelLibrary.meta.json";
+                string manifestAbsolute = Path.Combine(installPath, ".modelLibrary.meta.json");
+                File.WriteAllText(manifestAbsolute, "{}");
+                Assert.IsTrue(File.Exists(manifestAbsolute));
+
+                bool deleted = InstalledModelAssetCleaner.TryDeleteFileOnDisk(manifestRelative);
+
+                Assert.IsTrue(deleted);
+                Assert.IsFalse(File.Exists(manifestAbsolute));
+            }
+            finally
+            {
+                Directory.SetCurrentDirectory(previousCwd);
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
+
+        [Test]
+        public void IsPathUnderInstallFolder_AcceptsNestedAndRejectsSibling()
+        {
+            Assert.IsTrue(InstalledModelAssetCleaner.IsPathUnderInstallFolder(
+                "Assets/Models/Ship/Ship.fbx",
+                "Assets/Models/Ship"));
+            Assert.IsTrue(InstalledModelAssetCleaner.IsPathUnderInstallFolder(
+                "Assets/Models/Ship",
+                "Assets/Models/Ship"));
+            Assert.IsFalse(InstalledModelAssetCleaner.IsPathUnderInstallFolder(
+                "Assets/Models/Other/Ship.fbx",
+                "Assets/Models/Ship"));
+        }
     }
 }
