@@ -555,14 +555,23 @@ namespace ModelLibrary.Editor.Windows
                 (string cacheRoot, ModelMeta meta) = await service.DownloadModelVersionAsync(_modelId, _version);
 
                 InstallPathHelper installPathHelper = new InstallPathHelper();
-                ModelMeta localInstallMeta = _isInstalled ? _meta : null;
-                string preferredInstallPath = _isInstalled ? _installPath?.Replace('\\', '/') : null;
+                ModelMeta localInstallMeta = null;
+                if (_isInstalled && !string.IsNullOrWhiteSpace(_installPath))
+                {
+                    localInstallMeta = InstalledModelAssetCleaner.TryLoadLocalManifest(_installPath);
+                    if (localInstallMeta == null)
+                    {
+                        localInstallMeta = new ModelMeta { installPath = _installPath.Replace('\\', '/') };
+                    }
+                }
+
+                // New version meta.installPath is the source of truth; do not prefer local path on update.
                 bool allowExistingModelContent = _hasUpdate || _isInstalled;
                 string chosenInstallPath = installPathHelper.ResolveInstallPathForImport(
                     meta,
                     allowExistingModelContent,
                     localInstallMeta,
-                    preferredInstallPath);
+                    preferredInstallPath: null);
                 if (string.IsNullOrEmpty(chosenInstallPath))
                 {
                     EditorUtility.ClearProgressBar();
@@ -578,13 +587,22 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
+                string oldInstallPath = localInstallMeta != null ? localInstallMeta.installPath : null;
+                bool installPathChanged = InstalledModelAssetCleaner.HasInstallPathChanged(oldInstallPath, chosenInstallPath);
+                bool cleanDestination = !installPathChanged;
+
                 EditorUtility.DisplayProgressBar("Importing Model", "Copying files to Assets folder...", ProgressBarConstants.COPYING_IMAGES);
                 string installPath = await ModelProjectImporter.ImportFromCacheAsync(
                     cacheRoot,
                     meta,
-                    cleanDestination: true,
+                    cleanDestination: cleanDestination,
                     overrideInstallPath: chosenInstallPath,
                     isUpdate: allowExistingModelContent);
+
+                if (installPathChanged && localInstallMeta != null)
+                {
+                    InstalledModelAssetCleaner.DeleteAssetsFromManifest(localInstallMeta);
+                }
 
                 EditorUtility.DisplayProgressBar("Importing Model", "Finalizing import...", ProgressBarConstants.FINALIZING);
                 await Task.Delay(DelayConstants.UI_UPDATE_DELAY_MS); // Brief pause for UI update

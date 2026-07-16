@@ -79,9 +79,9 @@ namespace ModelLibrary.Editor.Utils
             bool endsWithModelName = PathEndsWithFolderName(normalizedPath, sanitizedModelName);
             if (!endsWithModelName)
             {
+                string absolutePath = Path.GetFullPath(normalizedPath);
                 if (mode == InstallPathValidationMode.Import)
                 {
-                    string absolutePath = Path.GetFullPath(normalizedPath);
                     if (Directory.Exists(absolutePath))
                     {
                         if (allowExistingModelContent)
@@ -120,6 +120,16 @@ namespace ModelLibrary.Editor.Utils
                                     "Use a dedicated subfolder for this model.");
                             }
                         }
+                    }
+                }
+                else if (mode == InstallPathValidationMode.Submission)
+                {
+                    // Allow the folder that already contains the mesh being submitted,
+                    // even when the leaf folder name does not match the model display name.
+                    if (Directory.Exists(absolutePath) && FolderContainsModelContent(absolutePath))
+                    {
+                        result.IsValid = true;
+                        return result;
                     }
                 }
 

@@ -85,7 +85,6 @@ namespace ModelLibrary.Editor.Windows
                 EditorUtility.DisplayProgressBar(progressTitle, "Preparing import...", ProgressBarConstants.PREPARING);
 
                 ModelMeta localInstallMeta = null;
-                string preferredInstallPath = null;
                 if (_localInstallCache.TryGetValue(id, out ModelMeta cachedLocalMeta) && cachedLocalMeta != null)
                 {
                     localInstallMeta = cachedLocalMeta;
@@ -95,12 +94,8 @@ namespace ModelLibrary.Editor.Windows
                     localInstallMeta = cachedManifestMeta;
                 }
 
-                if (localInstallMeta != null && !string.IsNullOrWhiteSpace(localInstallMeta.installPath))
-                {
-                    preferredInstallPath = localInstallMeta.installPath;
-                }
-
-                string defaultInstallPath = _installPathHelper.DetermineInstallPath(meta, localInstallMeta, preferredInstallPath);
+                // New version meta.installPath is the source of truth; do not prefer local path on update.
+                string defaultInstallPath = _installPathHelper.DetermineInstallPath(meta, localInstallMeta, preferredInstallPath: null);
                 string modelName = meta.identity?.name ?? "Model";
                 bool allowExistingModelContent = isUpgrade || localInstallMeta != null;
                 InstallPathValidator.ValidationResult storedPathValidation = InstallPathValidator.Validate(
@@ -119,7 +114,7 @@ namespace ModelLibrary.Editor.Windows
                         meta,
                         allowExistingModelContent,
                         localInstallMeta,
-                        preferredInstallPath);
+                        preferredInstallPath: null);
                     if (string.IsNullOrEmpty(chosenInstallPath))
                     {
                         _importCancellation[id] = true;
@@ -186,8 +181,17 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
+                string oldInstallPath = localInstallMeta != null ? localInstallMeta.installPath : null;
+                bool installPathChanged = InstalledModelAssetCleaner.HasInstallPathChanged(oldInstallPath, chosenInstallPath);
+                bool cleanDestination = !installPathChanged;
+
                 EditorUtility.DisplayProgressBar(progressTitle, "Copying files to Assets folder...", ProgressBarConstants.COPYING);
-                await ModelProjectImporter.ImportFromCacheAsync(root, meta, true, chosenInstallPath, isUpgrade, cancellationTokenSource.Token);
+                await ModelProjectImporter.ImportFromCacheAsync(root, meta, cleanDestination, chosenInstallPath, isUpgrade, cancellationTokenSource.Token);
+
+                if (installPathChanged && localInstallMeta != null)
+                {
+                    InstalledModelAssetCleaner.DeleteAssetsFromManifest(localInstallMeta);
+                }
 
                 if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)
                 {

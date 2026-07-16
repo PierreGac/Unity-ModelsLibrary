@@ -429,5 +429,66 @@ namespace ModelLibrary.Editor.Tests
 
             Assert.AreEqual("Assets/Models/fghfghfgh", suggested);
         }
+
+        [Test]
+        public void Validate_Submission_AcceptsMeshParentFolderWhenLeafDoesNotMatchModelName()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
+            string weaponsPath = Path.Combine(tempRoot, "Assets", "Art", "Weapons");
+            Directory.CreateDirectory(weaponsPath);
+            File.WriteAllText(Path.Combine(weaponsPath, "Sword.fbx"), "dummy");
+
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                InstallPathValidator.ValidationResult result =
+                    InstallPathValidator.Validate(
+                        "Assets/Art/Weapons",
+                        "Sword",
+                        false,
+                        InstallPathValidator.InstallPathValidationMode.Submission);
+
+                Assert.IsTrue(result.IsValid, string.Join(", ", result.Errors));
+                Assert.AreEqual("Assets/Art/Sword", result.SuggestedInstallPath);
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
+
+        [Test]
+        public void Validate_Submission_StillRejectsNonMeshFolderWhenLeafDoesNotMatchModelName()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
+            string emptyPath = Path.Combine(tempRoot, "Assets", "Art", "EmptyFolder");
+            Directory.CreateDirectory(emptyPath);
+
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                InstallPathValidator.ValidationResult result =
+                    InstallPathValidator.Validate(
+                        "Assets/Art/EmptyFolder",
+                        "Sword",
+                        false,
+                        InstallPathValidator.InstallPathValidationMode.Submission);
+
+                Assert.IsFalse(result.IsValid);
+                Assert.IsTrue(result.Errors.Exists(error => error.Contains("must end with the model folder name")));
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
     }
 }

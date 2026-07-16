@@ -14,11 +14,12 @@ namespace ModelLibrary.Editor.Utils
     {
         /// <summary>
         /// Determines the install path for a model based on its metadata.
-        /// Uses installPath from meta, or falls back to a default path built from the model name.
+        /// Prefers the repository/new version <see cref="ModelMeta.installPath"/> as the source of truth,
+        /// then falls back to a locally installed path, then a default path from the model name.
         /// </summary>
-        /// <param name="meta">The model metadata containing path information.</param>
-        /// <param name="localInstallMeta">Optional locally installed metadata used to preserve the on-disk install folder during updates.</param>
-        /// <param name="preferredInstallPath">Optional on-disk install path that takes priority over repository metadata.</param>
+        /// <param name="meta">The model metadata containing path information (new/downloaded version).</param>
+        /// <param name="localInstallMeta">Optional locally installed metadata used when the new meta has no installPath.</param>
+        /// <param name="preferredInstallPath">Optional path from an explicit user folder pick on fresh import; not used to preserve local path on update.</param>
         /// <returns>The determined install path, normalized to start with "Assets/".</returns>
         public string DetermineInstallPath(ModelMeta meta, ModelMeta localInstallMeta = null, string preferredInstallPath = null)
         {
@@ -33,6 +34,15 @@ namespace ModelLibrary.Editor.Utils
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(meta?.installPath))
+            {
+                string metaPath = InstallPathUtils.NormalizeInstallPath(meta.installPath);
+                if (!string.IsNullOrWhiteSpace(metaPath))
+                {
+                    return metaPath;
+                }
+            }
+
             if (localInstallMeta != null && !string.IsNullOrWhiteSpace(localInstallMeta.installPath))
             {
                 string localPath = InstallPathUtils.NormalizeInstallPath(localInstallMeta.installPath);
@@ -42,18 +52,7 @@ namespace ModelLibrary.Editor.Utils
                 }
             }
 
-            string candidate;
-
-            if (!string.IsNullOrWhiteSpace(meta?.installPath))
-            {
-                candidate = meta.installPath;
-            }
-            else
-            {
-                candidate = InstallPathUtils.BuildInstallPath(modelName);
-            }
-
-            return InstallPathUtils.NormalizeInstallPath(candidate) ?? InstallPathUtils.BuildInstallPath(modelName);
+            return InstallPathUtils.BuildInstallPath(modelName);
         }
 
         /// <summary>
@@ -62,8 +61,8 @@ namespace ModelLibrary.Editor.Utils
         /// </summary>
         /// <param name="meta">Model metadata containing the stored install path.</param>
         /// <param name="allowExistingModelContent">When true, existing model content at the path is allowed (update flow).</param>
-        /// <param name="localInstallMeta">Optional locally installed metadata used to preserve the on-disk install folder.</param>
-        /// <param name="preferredInstallPath">Optional on-disk install path that takes priority over repository metadata.</param>
+        /// <param name="localInstallMeta">Optional locally installed metadata used when the new meta has no installPath.</param>
+        /// <param name="preferredInstallPath">Optional path from an explicit user folder pick on fresh import.</param>
         /// <returns>The resolved install path, or null if the user cancelled.</returns>
         public string ResolveInstallPathForImport(
             ModelMeta meta,

@@ -651,8 +651,9 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Resolves the install path to display by default, using validator suggestions
-        /// so the field shows the same path as the "Suggested install path" hint.
+        /// Resolves the install path to display by default.
+        /// Keeps a valid selection-derived path (FBX/OBJ parent folder) as-is;
+        /// only falls back to the validator suggestion when the candidate is invalid.
         /// </summary>
         /// <returns>Default install path for the current form state.</returns>
         private string ResolveDefaultInstallPath()
@@ -664,6 +665,11 @@ namespace ModelLibrary.Editor.Windows
                 allowExistingModelContent: false,
                 InstallPathValidator.InstallPathValidationMode.Submission);
 
+            if (validation.IsValid && !string.IsNullOrWhiteSpace(candidate))
+            {
+                return InstallPathUtils.NormalizeInstallPath(candidate) ?? candidate;
+            }
+
             if (!string.IsNullOrWhiteSpace(validation.SuggestedInstallPath))
             {
                 return validation.SuggestedInstallPath;
@@ -674,8 +680,8 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>
         /// Gets the default install path for model submission based on selected assets.
-        /// Prioritizes finding the model root folder (containing FBX/OBJ files) rather than
-        /// using subfolders like Materials. Walks up directory tree if needed to find model root.
+        /// Uses the parent folder of the selected FBX/OBJ (exact path, not rewritten).
+        /// Falls back to walking up from the first selected asset to find a mesh root folder.
         /// </summary>
         private string GetDefaultInstallPathFromSelection()
         {
@@ -705,17 +711,20 @@ namespace ModelLibrary.Editor.Windows
             if (!string.IsNullOrEmpty(meshFilePath))
             {
                 string directory = Path.GetDirectoryName(meshFilePath);
-                if (!string.IsNullOrEmpty(directory) && directory.StartsWith("Assets/"))
+                if (!string.IsNullOrEmpty(directory))
                 {
                     string installPath = PathUtils.SanitizePathSeparator(directory);
-                    Debug.Log($"[ModelSubmitWindow] Found mesh file, using directory as install path: {installPath}");
-                    return InstallPathValidator.BuildSuggestedInstallPath(installPath, _name);
+                    if (installPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Debug.Log($"[ModelSubmitWindow] Found mesh file, using directory as install path: {installPath}");
+                        return installPath;
+                    }
                 }
             }
 
             string firstGuid = _selectedAssetGuids[0];
             string firstAssetPath = AssetDatabase.GUIDToAssetPath(firstGuid);
-            if (!string.IsNullOrEmpty(firstAssetPath) && firstAssetPath.StartsWith("Assets/"))
+            if (!string.IsNullOrEmpty(firstAssetPath) && firstAssetPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
             {
                 string currentDir = AssetDatabase.IsValidFolder(firstAssetPath)
                     ? firstAssetPath
@@ -723,11 +732,11 @@ namespace ModelLibrary.Editor.Windows
 
                 if (!string.IsNullOrEmpty(currentDir))
                 {
-                    string searchDir = currentDir;
+                    string searchDir = PathUtils.SanitizePathSeparator(currentDir);
                     const int MAX_DIRECTORY_WALK_DEPTH = 5;
                     int depth = 0;
 
-                    while (!string.IsNullOrEmpty(searchDir) && searchDir.StartsWith("Assets/") && depth < MAX_DIRECTORY_WALK_DEPTH)
+                    while (!string.IsNullOrEmpty(searchDir) && searchDir.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase) && depth < MAX_DIRECTORY_WALK_DEPTH)
                     {
                         string[] filesInDir = Directory.GetFiles(searchDir, "*.*", SearchOption.TopDirectoryOnly);
                         bool hasMeshFiles = false;
@@ -743,9 +752,8 @@ namespace ModelLibrary.Editor.Windows
 
                         if (hasMeshFiles)
                         {
-                            string installPath = PathUtils.SanitizePathSeparator(searchDir);
-                            Debug.Log($"[ModelSubmitWindow] Found model root directory (contains mesh files): {installPath}");
-                            return InstallPathValidator.BuildSuggestedInstallPath(installPath, _name);
+                            Debug.Log($"[ModelSubmitWindow] Found model root directory (contains mesh files): {searchDir}");
+                            return searchDir;
                         }
 
                         string parentDir = Path.GetDirectoryName(searchDir);
@@ -753,15 +761,15 @@ namespace ModelLibrary.Editor.Windows
                         {
                             break;
                         }
-                        searchDir = parentDir;
+                        searchDir = PathUtils.SanitizePathSeparator(parentDir);
                         depth++;
                     }
 
-                    string fallbackDir = currentDir;
-                    if (fallbackDir.StartsWith("Assets/"))
+                    string fallbackDir = PathUtils.SanitizePathSeparator(currentDir);
+                    if (fallbackDir.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
                     {
                         string[] subfoldersToExclude = { "Materials", "Textures", "Prefabs", "Scripts", "Animations" };
-                        string relativePortion = fallbackDir[7..];
+                        string relativePortion = fallbackDir.Substring("Assets/".Length);
                         string[] pathParts = relativePortion.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
 
                         if (pathParts.Length > 1 && subfoldersToExclude.Contains(pathParts[pathParts.Length - 1], StringComparer.OrdinalIgnoreCase))
@@ -774,7 +782,7 @@ namespace ModelLibrary.Editor.Windows
                             Debug.Log($"[ModelSubmitWindow] Using directory of selected asset as install path: {fallbackDir}");
                         }
 
-                        return InstallPathValidator.BuildSuggestedInstallPath($"Assets/{relativePortion}", _name);
+                        return PathUtils.SanitizePathSeparator($"Assets/{relativePortion}");
                     }
                 }
             }

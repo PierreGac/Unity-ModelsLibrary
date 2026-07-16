@@ -152,14 +152,23 @@ namespace ModelLibrary.Editor.Tests
         [Test]
         public void TestUpdateProcessHandlesExistingDirectory()
         {
-            // Test that update process can handle existing directories
-            string destPath = "Assets/Models/TestModel";
-            bool isUpdate = true;
+            // Same-path updates clean the destination; path-changed updates leave the new
+            // folder intact and selectively delete assets from the old manifest instead.
+            string oldPath = "Assets/Models/TestModel";
+            string samePath = "Assets/Models/TestModel";
+            string newPath = "Assets/Art/TestModel";
 
-            // Simulate the logic that would be used in ImportFromCacheAsync
-            bool shouldCleanDestination = !isUpdate; // Only clean for new imports, not updates
+            bool samePathChanged = InstalledModelAssetCleaner.HasInstallPathChanged(oldPath, samePath);
+            bool differentPathChanged = InstalledModelAssetCleaner.HasInstallPathChanged(oldPath, newPath);
 
-            Assert.IsFalse(shouldCleanDestination, "Update process should not clean existing directory");
+            Assert.IsFalse(samePathChanged, "Same install path should not be treated as a migration");
+            Assert.IsTrue(differentPathChanged, "Different install path should trigger migration cleanup");
+
+            bool cleanDestinationForSamePath = !samePathChanged;
+            bool cleanDestinationForPathChange = !differentPathChanged;
+
+            Assert.IsTrue(cleanDestinationForSamePath, "Same-path update should clean the destination folder");
+            Assert.IsFalse(cleanDestinationForPathChange, "Path-changed update should not wipe the new destination folder");
         }
 
         [Test]
