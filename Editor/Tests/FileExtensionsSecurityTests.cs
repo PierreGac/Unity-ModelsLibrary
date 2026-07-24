@@ -1,4 +1,4 @@
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using ModelLibrary.Editor;
 
 namespace ModelLibrary.Editor.Tests

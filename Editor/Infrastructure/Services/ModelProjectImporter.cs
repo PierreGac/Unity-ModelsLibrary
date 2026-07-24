@@ -1,4 +1,4 @@
-
+﻿
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -48,8 +48,8 @@ namespace ModelLibrary.Editor.Services
             // Ensure destination is a directory, not a file
             if (File.Exists(destAbs))
             {
-                ErrorLogger.LogError("Invalid Destination Path", 
-                    $"Destination path points to an existing file: {destAbs}. Converting to directory path.", 
+                ErrorLogger.LogError("Invalid Destination Path",
+                    $"Destination path points to an existing file: {destAbs}. Converting to directory path.",
                     ErrorHandler.ErrorCategory.FileSystem, null, $"Destination: {destAbs}");
                 destAbs = Path.Combine(Path.GetDirectoryName(destAbs), Path.GetFileNameWithoutExtension(destAbs));
                 destRel = PathUtils.SanitizePathSeparator(destAbs.Replace(Path.GetFullPath("Assets"), "Assets"));
@@ -101,19 +101,19 @@ namespace ModelLibrary.Editor.Services
                             File.Copy(srcMeta, targetMeta, overwrite: true);
                             importedFiles.Add(targetMeta);
                         }
-                        
+
                         cancellationToken.ThrowIfCancellationRequested();
                     }
                     catch (Exception ex)
                     {
-                        ErrorLogger.LogError("Copy Payload File Failed", 
-                            $"Failed to copy payload file {file} to {target}: {ex.Message}", 
+                        ErrorLogger.LogError("Copy Payload File Failed",
+                            $"Failed to copy payload file {file} to {target}: {ex.Message}",
                             ErrorHandler.CategorizeException(ex), ex, $"Source: {file}, Target: {target}");
                         throw;
                     }
                 }
             }
-            
+
             // Track destination directory
             if (!importedDirectories.Contains(destAbs))
             {
@@ -155,13 +155,13 @@ namespace ModelLibrary.Editor.Services
                             File.Copy(srcMeta, targetMeta, overwrite: true);
                             importedFiles.Add(targetMeta);
                         }
-                        
+
                         cancellationToken.ThrowIfCancellationRequested();
                     }
                     catch (Exception ex)
                     {
-                        ErrorLogger.LogError("Copy Dependency File Failed", 
-                            $"Failed to copy dependency file {file} to {target}: {ex.Message}", 
+                        ErrorLogger.LogError("Copy Dependency File Failed",
+                            $"Failed to copy dependency file {file} to {target}: {ex.Message}",
                             ErrorHandler.CategorizeException(ex), ex, $"Source: {file}, Target: {target}");
                         throw;
                     }
@@ -356,8 +356,8 @@ namespace ModelLibrary.Editor.Services
                 catch (Exception ex)
                 {
                     // Best effort cleanup - will overwrite existing files during copy
-                    ErrorLogger.LogError("Clean Destination Failed", 
-                        $"Failed to clean destination: {path}", 
+                    ErrorLogger.LogError("Clean Destination Failed",
+                        $"Failed to clean destination: {path}",
                         ErrorHandler.CategorizeException(ex), ex, $"Path: {path}");
                 }
             }
@@ -686,6 +686,3 @@ namespace ModelLibrary.Editor.Services
         }
     }
 }
-
-
-

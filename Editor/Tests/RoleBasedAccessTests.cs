@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using ModelLibrary.Editor.Identity;
 using NUnit.Framework;
 using UnityEngine;
@@ -24,7 +24,7 @@ namespace ModelLibrary.Editor.Tests
 
             // Test identity provider role retrieval
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            
+
             // Get current role (may be default)
             UserRole currentRole = identityProvider.GetUserRole();
             Assert.IsTrue(Enum.IsDefined(typeof(UserRole), currentRole), "Current role should be a valid UserRole value");
@@ -62,7 +62,7 @@ namespace ModelLibrary.Editor.Tests
 
             // Test that Submit Model button visibility is role-dependent
             bool shouldShowSubmitButton = currentRole == UserRole.Artist;
-            
+
             if (currentRole == UserRole.Artist)
             {
                 Assert.IsTrue(shouldShowSubmitButton, "Submit button should be visible for Artists");
@@ -74,7 +74,7 @@ namespace ModelLibrary.Editor.Tests
 
             // Test that metadata editing is role-dependent
             bool canEditMetadata = currentRole == UserRole.Artist;
-            
+
             if (currentRole == UserRole.Artist)
             {
                 Assert.IsTrue(canEditMetadata, "Artists should be able to edit metadata");
@@ -86,7 +86,7 @@ namespace ModelLibrary.Editor.Tests
 
             // Test that version deletion is role-dependent
             bool canDeleteVersion = currentRole == UserRole.Artist;
-            
+
             if (currentRole == UserRole.Artist)
             {
                 Assert.IsTrue(canDeleteVersion, "Artists should be able to delete versions");
@@ -98,7 +98,7 @@ namespace ModelLibrary.Editor.Tests
 
             // Test that batch upload is role-dependent
             bool canBatchUpload = currentRole == UserRole.Artist;
-            
+
             if (currentRole == UserRole.Artist)
             {
                 Assert.IsTrue(canBatchUpload, "Artists should be able to use batch upload");
@@ -120,7 +120,7 @@ namespace ModelLibrary.Editor.Tests
 
             // Test right-click submit menu item visibility
             bool canAccessSubmitMenu = currentRole == UserRole.Artist;
-            
+
             if (currentRole == UserRole.Artist)
             {
                 Assert.IsTrue(canAccessSubmitMenu, "Artists should see Submit Model context menu item");
@@ -145,7 +145,7 @@ namespace ModelLibrary.Editor.Tests
         public void TestRoleSwitching()
         {
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            
+
             // Test that role can be retrieved
             UserRole initialRole = identityProvider.GetUserRole();
             Assert.IsTrue(Enum.IsDefined(typeof(UserRole), initialRole), "Initial role should be valid");
@@ -160,4 +160,3 @@ namespace ModelLibrary.Editor.Tests
         }
     }
 }
-

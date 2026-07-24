@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using ModelLibrary.Data;
 
@@ -72,4 +72,3 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-

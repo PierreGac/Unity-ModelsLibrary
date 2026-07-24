@@ -1,4 +1,4 @@
-using ModelLibrary.Editor.Repository;
+﻿using ModelLibrary.Editor.Repository;
 using ModelLibrary.Editor.Services;
 using ModelLibrary.Editor.Settings;
 using ModelLibrary.Editor.Utils;
@@ -118,4 +118,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

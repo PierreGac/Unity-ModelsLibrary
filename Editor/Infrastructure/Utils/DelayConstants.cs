@@ -1,4 +1,4 @@
-namespace ModelLibrary.Editor.Utils
+﻿namespace ModelLibrary.Editor.Utils
 {
     /// <summary>
     /// Constants for delay values used in async operations.
@@ -13,4 +13,3 @@ namespace ModelLibrary.Editor.Utils
         public const int LONG_DELAY_MS = 500;
     }
 }
-

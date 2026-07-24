@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -131,7 +131,7 @@ namespace ModelLibrary.Editor.Services
                     // Create temporary version folder
                     string tempRoot = Path.Combine(Path.GetTempPath(), $"BatchUpload_{Guid.NewGuid():N}");
                     Directory.CreateDirectory(tempRoot);
-                    
+
                     try
                     {
                         // Materialize the version folder structure
@@ -149,10 +149,10 @@ namespace ModelLibrary.Editor.Services
                     finally
                     {
                         // Cleanup temp folder
-                        try 
-                        { 
-                            Directory.Delete(tempRoot, true); 
-                        } 
+                        try
+                        {
+                            Directory.Delete(tempRoot, true);
+                        }
                         catch (Exception cleanupEx)
                         {
                             // Log cleanup failure but don't throw - upload may have succeeded
@@ -186,7 +186,7 @@ namespace ModelLibrary.Editor.Services
         private async Task<ModelMeta> BuildMetaFromFolderAsync(BatchUploadItem item)
         {
             string[] files = Directory.GetFiles(item.folderPath, "*.*", SearchOption.AllDirectories);
-            
+
             List<string> payloadPaths = new List<string>();
             List<string> imagePaths = new List<string>();
 
@@ -194,13 +194,13 @@ namespace ModelLibrary.Editor.Services
             {
                 string ext = Path.GetExtension(file).ToLowerInvariant();
                 string relativePath = file.Substring(item.folderPath.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                
+
                 if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ || ext == FileExtensions.MAT)
                 {
                     payloadPaths.Add($"payload/{Path.GetFileName(file)}");
                 }
-                else if (ext == FileExtensions.PNG || ext == FileExtensions.JPG || ext == FileExtensions.JPEG || 
-                         ext == FileExtensions.TGA || ext == FileExtensions.PSD)
+                else if (ext == FileExtensions.PNG || ext == FileExtensions.JPG || ext == FileExtensions.JPEG ||
+                    ext == FileExtensions.TGA || ext == FileExtensions.PSD)
                 {
                     imagePaths.Add(file);
                 }
@@ -302,4 +302,3 @@ namespace ModelLibrary.Editor.Services
         }
     }
 }
-

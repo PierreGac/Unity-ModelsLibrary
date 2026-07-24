@@ -1,4 +1,4 @@
-using ModelLibrary.Editor.Repository;
+﻿using ModelLibrary.Editor.Repository;
 using ModelLibrary.Editor.Settings;
 
 namespace ModelLibrary.Editor.Utils
@@ -35,4 +35,3 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-

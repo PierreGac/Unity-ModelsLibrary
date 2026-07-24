@@ -148,6 +148,19 @@ See `Editor/Infrastructure/Repository/` for the File System and HTTP implementat
 - Cache folders can leave access-denied or stale entries after VCS discard / version delete / 3D preview before import — delete the affected cache folder under `Library/ModelLibraryCache` and retry
 - Submitting models without usable assets is not fully blocked yet
 
+## Contributing
+
+Install [pre-commit](https://pre-commit.com/) hooks so commits enforce `.editorconfig` (and staged C# style via `dotnet format`):
+
+```bash
+pip install pre-commit
+python -m pre_commit install
+```
+
+On Windows, prefer `python -m pre_commit …` if `pre-commit` is not on your PATH (common with `pip --user`).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, hook details, and coding standards.
+
 ## License and links
 
 - [LICENSE](LICENSE) (MIT)

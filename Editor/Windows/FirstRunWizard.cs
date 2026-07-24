@@ -78,7 +78,7 @@ namespace ModelLibrary.Editor.Windows
 
                 SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
                 string userName = identityProvider.GetUserName();
-                
+
                 // Check if username is set and not default/anonymous
                 if (string.IsNullOrWhiteSpace(userName) || userName == "anonymous")
                 {
@@ -145,7 +145,7 @@ namespace ModelLibrary.Editor.Windows
                     ErrorLogger.LogError("Show Wizard Failed",
                         $"Failed to show first-run wizard: {ex.Message}",
                         ErrorHandler.CategorizeException(ex), ex);
-                    
+
                     // Fallback: show error dialog
                     EditorUtility.DisplayDialog("Configuration Required",
                         "The Model Library needs to be configured, but the wizard could not be opened.\n\n" +
@@ -229,7 +229,7 @@ namespace ModelLibrary.Editor.Windows
                 ErrorLogger.LogError("Save Configuration Failed",
                     $"Failed to save configuration: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex);
-                
+
                 EditorUtility.DisplayDialog("Save Failed",
                     $"Failed to save configuration: {ex.Message}\n\nPlease try again.",
                     "OK");
@@ -559,5 +559,3 @@ namespace ModelLibrary.Editor.Windows
         private void DrawBullet(string text) => EditorGUILayout.LabelField("• " + text, EditorStyles.wordWrappedLabel);
     }
 }
-
-

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -151,7 +151,7 @@ namespace ModelLibrary.Editor.Windows
 
             _previewUtil = new PreviewUtility3D();
             _hadFocus = focusedWindow == this;
-            
+
             // Subscribe to EditorApplication.update to detect focus changes
             if (!_subscribedToUpdate)
             {
@@ -159,14 +159,14 @@ namespace ModelLibrary.Editor.Windows
                 _subscribedToUpdate = true;
             }
         }
-        
+
         /// <summary>
         /// Called every frame by EditorApplication.update to detect focus changes.
         /// </summary>
         private void OnEditorUpdate()
         {
             bool hasFocus = focusedWindow == this;
-            
+
             // If we just regained focus, reload textures and force repaint
             if (!_hadFocus && hasFocus)
             {
@@ -175,7 +175,7 @@ namespace ModelLibrary.Editor.Windows
                     Repaint();
                 }
             }
-            
+
             _hadFocus = hasFocus;
         }
 
@@ -191,7 +191,7 @@ namespace ModelLibrary.Editor.Windows
                 EditorApplication.update -= OnEditorUpdate;
                 _subscribedToUpdate = false;
             }
-            
+
             CleanupPreviewResources();
         }
 
@@ -508,11 +508,11 @@ namespace ModelLibrary.Editor.Windows
                         // Check if this is a normal map texture and configure it accordingly
                         string textureNameLower = Path.GetFileNameWithoutExtension(textureFile).ToLowerInvariant();
                         bool isNormalMap = textureNameLower.Contains("normal") ||
-                                          textureNameLower.Contains("bump") ||
-                                          textureNameLower.Contains("nrm") ||
-                                          textureNameLower.Contains("_n") ||
-                                          textureNameLower.EndsWith("_normal") ||
-                                          textureNameLower.EndsWith("_bump");
+                            textureNameLower.Contains("bump") ||
+                            textureNameLower.Contains("nrm") ||
+                            textureNameLower.Contains("_n") ||
+                            textureNameLower.EndsWith("_normal") ||
+                            textureNameLower.EndsWith("_bump");
 
                         if (isNormalMap)
                         {
@@ -604,11 +604,11 @@ namespace ModelLibrary.Editor.Windows
 
                                     // Check if this is a normal map property (used for configuration)
                                     bool isNormalMapProperty = propName.Contains("Bump") ||
-                                                               propName.Contains("Normal") ||
-                                                               propName == "_BumpMap" ||
-                                                               propName == "_NormalMap" ||
-                                                               propName == "_DetailNormalMap" ||
-                                                               propName == "_BumpTex";
+                                        propName.Contains("Normal") ||
+                                        propName == "_BumpMap" ||
+                                        propName == "_NormalMap" ||
+                                        propName == "_DetailNormalMap" ||
+                                        propName == "_BumpTex";
 
                                     // If still not found by exact name, try matching by property name and common texture naming patterns
                                     if (matchingTex == null && loadedTextures.Count > 0)
@@ -666,7 +666,7 @@ namespace ModelLibrary.Editor.Windows
                                             _materialTextureMappings[loadedMat] = new Dictionary<string, string>();
                                         }
                                         _materialTextureMappings[loadedMat][propName] = matchingTex.name;
-                                        
+
                                         // Configure texture as normal map if this is a normal map property
                                         if (isNormalMapProperty)
                                         {
@@ -863,10 +863,10 @@ namespace ModelLibrary.Editor.Windows
                     "• Cache folder is in use\n\n" +
                     "The cache folder may need to be manually deleted:\n" +
                     (_cacheRoot != null ? _cacheRoot : "Cache path unknown");
-                
+
                 ErrorHandler.ShowError("Access Denied - 3D Preview", errorMessage, ex);
                 ErrorLogger.LogError("Load Meshes Failed", $"Access denied: {ex.Message}", ErrorHandler.ErrorCategory.FileSystem, ex, $"ModelId: {_modelId}, Version: {_version}, CacheRoot: {_cacheRoot}");
-                
+
                 // Attempt to clean up cache if it's in a bad state
                 if (_cacheRoot != null)
                 {
@@ -874,7 +874,7 @@ namespace ModelLibrary.Editor.Windows
                 }
             }
             catch (IOException ex) when (ex.Message.IndexOf("access denied", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                         ex.Message.IndexOf("being used by another process", StringComparison.OrdinalIgnoreCase) >= 0)
+                ex.Message.IndexOf("being used by another process", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 string errorMessage = $"File access error while loading meshes for 3D preview. This may occur if:\n" +
                     "• Files are locked by another process\n" +
@@ -882,10 +882,10 @@ namespace ModelLibrary.Editor.Windows
                     "• Cache folder is in use\n\n" +
                     "The cache folder may need to be manually deleted:\n" +
                     (_cacheRoot != null ? _cacheRoot : "Cache path unknown");
-                
+
                 ErrorHandler.ShowError("File Access Error - 3D Preview", errorMessage, ex);
                 ErrorLogger.LogError("Load Meshes Failed", $"File access error: {ex.Message}", ErrorHandler.ErrorCategory.FileSystem, ex, $"ModelId: {_modelId}, Version: {_version}, CacheRoot: {_cacheRoot}");
-                
+
                 // Attempt to clean up cache if it's in a bad state
                 if (_cacheRoot != null)
                 {
@@ -895,7 +895,7 @@ namespace ModelLibrary.Editor.Windows
             catch (Exception ex)
             {
                 ErrorLogger.LogError("Load Meshes Failed", $"Failed to load meshes: {ex.Message}", ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}, Version: {_version}, CacheRoot: {_cacheRoot}");
-                
+
                 // Attempt to clean up cache on any error to prevent locked state
                 if (_cacheRoot != null)
                 {
@@ -944,7 +944,7 @@ namespace ModelLibrary.Editor.Windows
             string modelName = _meta?.identity?.name ?? "Unknown Model";
             string version = _meta?.version ?? "Unknown";
             UIStyles.DrawPageHeader(modelName, $"Version: {version}");
-            
+
             // Display asset paths
             using (EditorGUILayout.VerticalScope infoScope = UIStyles.BeginCard())
             {
@@ -1005,7 +1005,7 @@ namespace ModelLibrary.Editor.Windows
             // Reload textures if they became null (e.g., after losing focus)
             // Do this before rendering so textures are ready
             bool texturesReloaded = ReloadTexturesIfNeeded();
-            
+
             // If textures were reloaded, force a repaint on the next frame to ensure preview updates
             if (texturesReloaded && Event.current.type == EventType.Repaint)
             {
@@ -1142,7 +1142,7 @@ namespace ModelLibrary.Editor.Windows
                     // Try to find mappings by checking all materials - material instance might be different object
                     foreach (KeyValuePair<Material, Dictionary<string, string>> kvp in _materialTextureMappings)
                     {
-                        if (kvp.Key != null && kvp.Key.shader == meshInfo.material.shader && 
+                        if (kvp.Key != null && kvp.Key.shader == meshInfo.material.shader &&
                             kvp.Key.name == meshInfo.material.name)
                         {
                             textureMappings = kvp.Value;
@@ -1152,7 +1152,7 @@ namespace ModelLibrary.Editor.Windows
                         }
                     }
                 }
-                
+
                 // If we still don't have mappings, try to rebuild them by checking all texture properties
                 if (textureMappings == null && meshInfo.material.shader != null)
                 {
@@ -1179,7 +1179,7 @@ namespace ModelLibrary.Editor.Windows
                             }
                         }
                     }
-                    
+
                     if (textureMappings.Count > 0)
                     {
                         _materialTextureMappings[meshInfo.material] = textureMappings;
@@ -1198,7 +1198,7 @@ namespace ModelLibrary.Editor.Windows
                     string texName = mapping.Value;
 
                     Texture currentTex = meshInfo.material.GetTexture(propName);
-                    
+
                     // If texture is null but we have a path, reload it
                     if (currentTex == null && _texturePaths.TryGetValue(texName, out string texturePath))
                     {
@@ -1207,10 +1207,10 @@ namespace ModelLibrary.Editor.Windows
                         {
                             continue;
                         }
-                        
+
                         // Force asset database refresh first to ensure assets are loaded
                         AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
-                        
+
                         Texture2D reloadedTex = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
                         if (reloadedTex != null)
                         {
@@ -1218,13 +1218,13 @@ namespace ModelLibrary.Editor.Windows
                             {
                                 // Store old texture for comparison
                                 Texture oldTex = meshInfo.material.GetTexture(propName);
-                                
+
                                 // Set texture and force update
                                 meshInfo.material.SetTexture(propName, reloadedTex);
-                                
+
                                 // Force Unity to recognize the material change
                                 UnityEditorInternal.InternalEditorUtility.SetIsInspectorExpanded(meshInfo.material, false);
-                                
+
                                 // Verify the texture was actually set
                                 Texture verifyTex = meshInfo.material.GetTexture(propName);
                                 if (verifyTex != null && verifyTex == reloadedTex)
@@ -1233,14 +1233,14 @@ namespace ModelLibrary.Editor.Windows
                                     EditorUtility.SetDirty(meshInfo.material);
                                     needsRepaint = true;
                                     reloadedCount++;
-                                    
+
                                     // Force preview utility to re-render by invalidating any cached state
                                     if (_previewUtil != null)
                                     {
                                         // Trigger a repaint to force re-render with new texture
                                         EditorApplication.delayCall += () => Repaint();
                                     }
-                                    
+
                                     Debug.Log($"[ModelPreview3DWindow] Successfully reloaded texture '{texName}' for property '{propName}' on material '{meshInfo.material.name}'");
                                 }
                                 else
@@ -1269,7 +1269,7 @@ namespace ModelLibrary.Editor.Windows
                 Repaint();
                 return true;
             }
-            
+
             return false;
         }
 
@@ -1300,5 +1300,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-
-

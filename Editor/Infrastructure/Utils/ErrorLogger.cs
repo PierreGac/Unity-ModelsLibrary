@@ -54,8 +54,8 @@ namespace ModelLibrary.Editor.Utils
         /// </summary>
         public static void LogError(string title, string message, Exception exception = null)
         {
-            ErrorHandler.ErrorCategory category = exception != null 
-                ? ErrorHandler.CategorizeException(exception) 
+            ErrorHandler.ErrorCategory category = exception != null
+                ? ErrorHandler.CategorizeException(exception)
                 : ErrorHandler.ErrorCategory.Unknown;
             LogError(title, message, category, exception);
         }
@@ -149,7 +149,7 @@ namespace ModelLibrary.Editor.Utils
             try
             {
                 string[] lines = File.ReadAllLines(logPath);
-                
+
                 // Parse each line (simple format: [Timestamp] [Category] Title: Message | ...)
                 foreach (string line in lines)
                 {
@@ -212,7 +212,7 @@ namespace ModelLibrary.Editor.Utils
                 if (messageStart > 0 && messageStart < line.Length)
                 {
                     string remainder = line.Substring(messageStart);
-                    
+
                     // Split by " | " to get parts
                     string[] parts = remainder.Split(new[] { " | " }, StringSplitOptions.None);
                     string titleAndMessage = parts[0];
@@ -301,4 +301,3 @@ namespace ModelLibrary.Editor.Utils
         public string Context;
     }
 }
-

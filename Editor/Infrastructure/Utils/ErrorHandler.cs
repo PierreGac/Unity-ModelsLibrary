@@ -83,9 +83,9 @@ namespace ModelLibrary.Editor.Utils
         {
             // Translate technical error messages to user-friendly language
             string userFriendlyMessage = TranslateErrorMessage(message, exception);
-            
+
             string guidance = GetCategoryGuidance(category, exception);
-            
+
             string fullMessage = userFriendlyMessage;
             if (!string.IsNullOrEmpty(guidance))
             {
@@ -109,7 +109,7 @@ namespace ModelLibrary.Editor.Utils
             string exceptionType = exception?.GetType().Name ?? "";
 
             // Connection errors
-            if (lowerMessage.Contains("connection") || lowerMessage.Contains("timeout") || 
+            if (lowerMessage.Contains("connection") || lowerMessage.Contains("timeout") ||
                 lowerMessage.Contains("unreachable") || lowerMessage.Contains("network") ||
                 exceptionType.Contains("Http") || exceptionType.Contains("Web"))
             {
@@ -230,13 +230,13 @@ namespace ModelLibrary.Editor.Utils
             {
                 string exceptionMessage = exception.Message ?? string.Empty;
                 string lowerExceptionMessage = exceptionMessage.ToLowerInvariant();
-                
+
                 if (exceptionMessage.IndexOf("ModelLibraryCache", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return "• Close other Model Library windows or 3D previews that may be using the same model\n" +
-                           "• Retry the update after a few seconds\n" +
-                           "• Delete the folder shown in Technical Details under Library/ModelLibraryCache and retry\n" +
-                           "• Ensure antivirus or sync tools are not locking files in the project's Library folder";
+                            "• Retry the update after a few seconds\n" +
+                            "• Delete the folder shown in Technical Details under Library/ModelLibraryCache and retry\n" +
+                            "• Ensure antivirus or sync tools are not locking files in the project's Library folder";
                 }
 
                 if (lowerExceptionMessage.Contains("timeout"))
@@ -271,7 +271,7 @@ namespace ModelLibrary.Editor.Utils
         private static void ShowDetailedErrorDialog(string title, string message, Exception exception)
         {
             string details = $"Error: {message}";
-            
+
             if (exception != null)
             {
                 details += $"\n\nException Type: {exception.GetType().FullName}";
@@ -302,33 +302,33 @@ namespace ModelLibrary.Editor.Utils
             string exceptionType = exception.GetType().Name;
             string message = exception.Message != null ? exception.Message.ToLowerInvariant() : "";
 
-            if (exceptionType.Contains("FileNotFound") || exceptionType.Contains("DirectoryNotFound") || 
+            if (exceptionType.Contains("FileNotFound") || exceptionType.Contains("DirectoryNotFound") ||
                 exceptionType.Contains("IOException") || exceptionType.Contains("UnauthorizedAccess"))
             {
                 return ErrorCategory.FileSystem;
             }
 
-            if (exceptionType.Contains("Http") || exceptionType.Contains("Web") || 
-                exceptionType.Contains("Network") || message.Contains("connection") || 
+            if (exceptionType.Contains("Http") || exceptionType.Contains("Web") ||
+                exceptionType.Contains("Network") || message.Contains("connection") ||
                 message.Contains("timeout") || message.Contains("unreachable"))
             {
                 return ErrorCategory.Connection;
             }
 
-            if (exceptionType.Contains("Argument") || exceptionType.Contains("Invalid") || 
-                exceptionType.Contains("Validation") || message.Contains("invalid") || 
+            if (exceptionType.Contains("Argument") || exceptionType.Contains("Invalid") ||
+                exceptionType.Contains("Validation") || message.Contains("invalid") ||
                 message.Contains("required"))
             {
                 return ErrorCategory.Validation;
             }
 
-            if (exceptionType.Contains("Unauthorized") || exceptionType.Contains("Forbidden") || 
+            if (exceptionType.Contains("Unauthorized") || exceptionType.Contains("Forbidden") ||
                 message.Contains("permission") || message.Contains("access denied"))
             {
                 return ErrorCategory.Permission;
             }
 
-            if (message.Contains("configuration") || message.Contains("settings") || 
+            if (message.Contains("configuration") || message.Contains("settings") ||
                 message.Contains("not configured"))
             {
                 return ErrorCategory.Configuration;
@@ -397,4 +397,3 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-

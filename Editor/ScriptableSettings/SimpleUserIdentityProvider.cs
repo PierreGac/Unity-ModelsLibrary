@@ -13,12 +13,12 @@ namespace ModelLibrary.Editor.Identity
         /// Developer role - can browse, import, and leave feedback notes.
         /// </summary>
         Developer,
-        
+
         /// <summary>
         /// Artist/Modeler role - can browse, import, submit models, and manage versions.
         /// </summary>
         Artist,
-        
+
         /// <summary>
         /// Administrator role - full access including analytics, version deletion, and system management.
         /// </summary>
@@ -107,6 +107,3 @@ namespace ModelLibrary.Editor.Identity
         }
     }
 }
-
-
-

@@ -51,4 +51,3 @@ namespace ModelLibrary.Editor.Services
         }
     }
 }
-

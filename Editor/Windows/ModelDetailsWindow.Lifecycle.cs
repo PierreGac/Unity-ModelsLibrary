@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -48,7 +48,7 @@ namespace ModelLibrary.Editor.Windows
                     { "version", version }
                 };
                 window.NavigateToView(ModelLibraryWindow.ViewType.ModelDetails, parameters);
-                
+
                 // Update counts and window title to reflect read state changes
                 window.UpdateNotesCount();
                 window.UpdateUpdateCount();
@@ -77,8 +77,8 @@ namespace ModelLibrary.Editor.Windows
                 _meta = await _service.GetMetaAsync(_modelId, _version);
                 if (_meta == null)
                 {
-                    ErrorLogger.LogError("Load Model Failed", 
-                        $"Failed to load model metadata for {_modelId} version {_version}", 
+                    ErrorLogger.LogError("Load Model Failed",
+                        $"Failed to load model metadata for {_modelId} version {_version}",
                         ErrorHandler.ErrorCategory.Connection, null, $"ModelId: {_modelId}, Version: {_version}");
                     Repaint();
                     return;
@@ -105,8 +105,8 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Load Model Failed", 
-                    $"Failed to load model: {ex.Message}", 
+                ErrorLogger.LogError("Load Model Failed",
+                    $"Failed to load model: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}, Version: {_version}");
                 Repaint();
             }
@@ -142,8 +142,8 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Load Version List Failed", 
-                    $"Failed to load version list for {_modelId}: {ex.Message}", 
+                ErrorLogger.LogError("Load Version List Failed",
+                    $"Failed to load version list for {_modelId}: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}");
                 _availableVersions.Clear();
                 _isLatestVersion = false;
@@ -282,7 +282,7 @@ namespace ModelLibrary.Editor.Windows
                                 string sanitizedName = InstallPathUtils.SanitizeFolderName(cachedEntry.name);
                                 Debug.Log($"[ModelDetailsWindow] Sanitized name {sanitizedName} / entry name {cachedEntry.name} for {_modelId}");
                                 matchesModel = string.Equals(fbxNameFromFolder, sanitizedName, StringComparison.OrdinalIgnoreCase) ||
-                                              string.Equals(fbxNameFromFolder, cachedEntry.name, StringComparison.OrdinalIgnoreCase);
+                                    string.Equals(fbxNameFromFolder, cachedEntry.name, StringComparison.OrdinalIgnoreCase);
 
 
                                 Debug.Log($"[ModelDetailsWindow] Old manifest format detected at {manifestPath}: folder={folderName}, fbxName={fbxNameFromFolder}, version={meta.version}, modelName={cachedEntry.name}, sanitized={sanitizedName}, matches={matchesModel}");
@@ -335,8 +335,8 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Check Installation Status Failed", 
-                    $"Failed to check installation status: {ex.Message}", 
+                ErrorLogger.LogError("Check Installation Status Failed",
+                    $"Failed to check installation status: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"ModelId: {_modelId}");
                 _isInstalled = false;
                 _installedVersion = null;
@@ -382,4 +382,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

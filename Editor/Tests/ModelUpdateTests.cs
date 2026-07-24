@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -438,12 +438,12 @@ namespace ModelLibrary.Editor.Tests
         {
             // Test edge cases in version comparison
             string[] versions = { "0.0.0", "0.0.1", "0.1.0", "1.0.0", "1.0.1", "1.1.0", "2.0.0" };
-            
+
             for (int i = 0; i < versions.Length - 1; i++)
             {
                 string v1 = versions[i];
                 string v2 = versions[i + 1];
-                
+
                 if (SemVer.TryParse(v1, out SemVer parsed1) && SemVer.TryParse(v2, out SemVer parsed2))
                 {
                     int comparison = parsed2.CompareTo(parsed1);

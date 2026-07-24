@@ -1,4 +1,4 @@
-namespace ModelLibrary.Editor.Utils
+﻿namespace ModelLibrary.Editor.Utils
 {
     /// <summary>
     /// Constants for progress bar values used throughout the editor.
@@ -31,4 +31,3 @@ namespace ModelLibrary.Editor.Utils
         public const float COMPLETE = 1.0f;
     }
 }
-

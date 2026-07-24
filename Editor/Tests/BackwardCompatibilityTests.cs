@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -43,7 +43,7 @@ namespace ModelLibrary.Editor.Tests
 
                 // Use absolute path to Assets folder in temp directory to avoid searching Unity's actual Assets folder
                 string assetsPath = Path.Combine(tempTestDir, "Assets");
-                
+
                 List<string> foundManifests = new List<string>();
                 foreach (string manifestPath in Directory.EnumerateFiles(assetsPath, "modelLibrary.meta.json", SearchOption.AllDirectories))
                 {
@@ -94,7 +94,7 @@ namespace ModelLibrary.Editor.Tests
 
                 // Use absolute path to Assets folder in temp directory to avoid searching Unity's actual Assets folder
                 string assetsPath = Path.Combine(tempTestDir, "Assets");
-                
+
                 // Search for new naming first (priority)
                 List<string> foundManifests = new List<string>();
                 foreach (string manifestPath in Directory.EnumerateFiles(assetsPath, ".modelLibrary.meta.json", SearchOption.AllDirectories))
@@ -188,10 +188,10 @@ namespace ModelLibrary.Editor.Tests
 
                 // Use absolute path to Assets folder in temp directory to avoid searching Unity's actual Assets folder
                 string assetsPath = Path.Combine(tempTestDir, "Assets");
-                
+
                 // Simulate ModelScanService.FindLocalVersionAsync logic
                 List<string> manifestPaths = new List<string>();
-                
+
                 foreach (string manifestPath in Directory.EnumerateFiles(assetsPath, ".modelLibrary.meta.json", SearchOption.AllDirectories))
                 {
                     manifestPaths.Add(manifestPath);
@@ -235,10 +235,10 @@ namespace ModelLibrary.Editor.Tests
 
                 // Use absolute path to Assets folder in temp directory to avoid searching Unity's actual Assets folder
                 string assetsPath = Path.Combine(tempTestDir, "Assets");
-                
+
                 // Simulate CheckInstallationStatusAsync logic
                 List<string> manifestPaths = new List<string>();
-                
+
                 foreach (string manifestPath in Directory.EnumerateFiles(assetsPath, ".modelLibrary.meta.json", SearchOption.AllDirectories))
                 {
                     manifestPaths.Add(manifestPath);
@@ -272,7 +272,7 @@ namespace ModelLibrary.Editor.Tests
             try
             {
                 string testGuid = "12345678901234567890123456789012";
-                
+
                 // Create manifest file with old naming
                 string oldManifestFile = Path.Combine(assetsTestDir, "modelLibrary.meta.json");
                 ModelMeta meta = new ModelMeta
@@ -285,10 +285,10 @@ namespace ModelLibrary.Editor.Tests
 
                 // Use absolute path to Assets folder in temp directory to avoid searching Unity's actual Assets folder
                 string assetsPath = Path.Combine(tempTestDir, "Assets");
-                
+
                 // Simulate FindModelIdFromGuid logic
                 List<string> manifestPaths = new List<string>();
-                
+
                 foreach (string manifestPath in Directory.EnumerateFiles(assetsPath, ".modelLibrary.meta.json", SearchOption.AllDirectories))
                 {
                     manifestPaths.Add(manifestPath);
@@ -306,7 +306,7 @@ namespace ModelLibrary.Editor.Tests
                     {
                         string json = File.ReadAllText(manifestPath);
                         ModelMeta loadedMeta = JsonUtility.FromJson<ModelMeta>(json);
-                        
+
                         if (loadedMeta != null && loadedMeta.assetGuids != null && loadedMeta.assetGuids.Contains(testGuid))
                         {
                             foundModelId = loadedMeta.identity?.id;
@@ -331,4 +331,3 @@ namespace ModelLibrary.Editor.Tests
         }
     }
 }
-

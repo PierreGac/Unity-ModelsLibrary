@@ -31,7 +31,7 @@ namespace ModelLibrary.Data
     /// The complete metadata for a model version - this is the <see cref="MODEL_JSON"/> file stored with each version.
     /// This is the central data structure that describes everything about a model: what files it contains,
     /// who made it, when, what it looks like, and any feedback from users.
-    /// 
+    ///
     /// This file is stored at: &lt;repository&gt;/&lt;modelId&gt;/&lt;version&gt;/model.json
     /// </summary>
     [Serializable]
@@ -184,4 +184,3 @@ namespace ModelLibrary.Data
         public int triangleCount = 0;
     }
 }
-

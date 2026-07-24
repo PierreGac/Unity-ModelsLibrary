@@ -63,7 +63,7 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="type">Type of notification (affects color and icon).</param>
         /// <param name="onClickAction">Optional action to execute when notification is clicked.</param>
         /// <param name="actionButtonText">Optional text for an action button.</param>
-        public static void Show(string title, string message, NotificationType type = NotificationType.Info, 
+        public static void Show(string title, string message, NotificationType type = NotificationType.Info,
             Action onClickAction = null, string actionButtonText = null)
         {
             NotificationData notification = new NotificationData
@@ -125,7 +125,7 @@ namespace ModelLibrary.Editor.Utils
             if (_currentNotification != null)
             {
                 float elapsed = (float)(DateTime.Now - _notificationStartTime).TotalSeconds;
-                
+
                 if (!_isAnimatingIn && !_isAnimatingOut && elapsed >= __NotificationDuration)
                 {
                     DismissNotification();
@@ -134,7 +134,7 @@ namespace ModelLibrary.Editor.Utils
                 {
                     _animationProgress += Time.deltaTime / __AnimationDuration;
                     _animationProgress = Mathf.Clamp01(_animationProgress);
-                    
+
                     if (_animationProgress >= 1f)
                     {
                         _isAnimatingIn = false;
@@ -201,7 +201,7 @@ namespace ModelLibrary.Editor.Utils
             // Calculate position and size
             float width = 400f;
             float height = CalculateNotificationHeight(_currentNotification);
-            
+
             // Update window size
             Vector2 size = new Vector2(width, height);
             if (position.size != size)
@@ -214,7 +214,7 @@ namespace ModelLibrary.Editor.Utils
             Rect mainWindowRect = EditorGUIUtility.GetMainWindowPosition();
             float x = mainWindowRect.xMax - width - 20f;
             float y = mainWindowRect.yMin + 20f;
-            
+
             // Update position if window is not already positioned
             if (Mathf.Abs(position.x - x) > 1f || Mathf.Abs(position.y - y) > 1f)
             {
@@ -305,7 +305,7 @@ namespace ModelLibrary.Editor.Utils
                 fontSize = 11
             };
             float messageHeight = messageStyle.CalcHeight(new GUIContent(notification.message), 380f);
-            
+
             if (!string.IsNullOrEmpty(notification.actionButtonText))
             {
                 messageHeight += 35f;
@@ -349,4 +349,3 @@ namespace ModelLibrary.Editor.Utils
         public static void ShowInfo(string title, string message, Action onClickAction = null) => Show(title, message, NotificationType.Info, onClickAction);
     }
 }
-

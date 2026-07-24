@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using ModelLibrary.Data;
@@ -253,4 +253,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

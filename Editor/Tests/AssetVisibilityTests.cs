@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using ModelLibrary.Editor.Utils;
 using NUnit.Framework;
@@ -295,4 +295,3 @@ namespace ModelLibrary.Editor.Tests
         }
     }
 }
-

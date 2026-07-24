@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using ModelLibrary.Editor.Repository;
@@ -87,4 +87,3 @@ namespace ModelLibrary.Editor.Services
         }
     }
 }
-

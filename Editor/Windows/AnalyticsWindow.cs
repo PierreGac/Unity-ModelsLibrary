@@ -58,11 +58,11 @@ namespace ModelLibrary.Editor.Windows
             // Check if user has access (Admin or Artist)
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
             UserRole role = identityProvider.GetUserRole();
-            
+
             if (role != UserRole.Admin && role != UserRole.Artist)
             {
-                EditorUtility.DisplayDialog("Access Denied", 
-                    "Analytics access is restricted to Administrators and Artists.", 
+                EditorUtility.DisplayDialog("Access Denied",
+                    "Analytics access is restricted to Administrators and Artists.",
                     "OK");
                 return;
             }
@@ -114,8 +114,8 @@ namespace ModelLibrary.Editor.Windows
 
                 if (GUILayout.Button("Clear Data", UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_MEDIUM)))
                 {
-                    if (EditorUtility.DisplayDialog("Clear Analytics", 
-                        "Are you sure you want to clear all analytics data? This cannot be undone.", 
+                    if (EditorUtility.DisplayDialog("Clear Analytics",
+                        "Are you sure you want to clear all analytics data? This cannot be undone.",
                         "Clear", "Cancel"))
                     {
                         AnalyticsService.ClearAnalytics();
@@ -317,4 +317,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

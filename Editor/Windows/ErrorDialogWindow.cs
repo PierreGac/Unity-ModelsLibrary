@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using ModelLibrary.Editor.Utils;
 using UnityEditor;
@@ -35,7 +35,7 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Shows an error dialog with retry option and "don't show again" checkbox.
         /// </summary>
-        public static void Show(string title, string message, ErrorHandler.ErrorCategory category, 
+        public static void Show(string title, string message, ErrorHandler.ErrorCategory category,
             Exception exception, Action retryAction)
         {
             // Check if this error is suppressed
@@ -76,7 +76,7 @@ namespace ModelLibrary.Editor.Windows
 
             // Title
             EditorGUILayout.LabelField(_title, UIStyles.TitleLabel);
-            
+
             EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
 
             // Message (scrollable)
@@ -148,7 +148,7 @@ namespace ModelLibrary.Editor.Windows
                         }
                         catch (Exception retryEx)
                         {
-                            ErrorHandler.ShowErrorWithRetry(_title, $"Retry failed: {retryEx.Message}", 
+                            ErrorHandler.ShowErrorWithRetry(_title, $"Retry failed: {retryEx.Message}",
                                 null, retryEx);
                         }
                     }
@@ -246,4 +246,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

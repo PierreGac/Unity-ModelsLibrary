@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -109,17 +109,17 @@ namespace ModelLibrary.Editor.Repository
             // Check for common network authentication error codes
             // Extract the low 16 bits of HResult which contain the Windows error code
             int errorCode = ex.HResult & 0xFFFF;
-            
+
             // Check for known network authentication error codes
-            bool isKnownErrorCode = errorCode == ERROR_ACCESS_DENIED || 
-                                    errorCode == ERROR_LOGON_FAILURE || 
+            bool isKnownErrorCode = errorCode == ERROR_ACCESS_DENIED ||
+                                    errorCode == ERROR_LOGON_FAILURE ||
                                     errorCode == ERROR_BAD_NETPATH;
-            
+
             // Also check error message for common authentication-related phrases
             string message = ex.Message ?? string.Empty;
             bool hasAuthMessage = message.IndexOf("access denied", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                  message.IndexOf("logon failure", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                  message.IndexOf("network path", StringComparison.OrdinalIgnoreCase) >= 0;
+                message.IndexOf("logon failure", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                message.IndexOf("network path", StringComparison.OrdinalIgnoreCase) >= 0;
 
             return isKnownErrorCode || hasAuthMessage;
         }
@@ -319,7 +319,7 @@ namespace ModelLibrary.Editor.Repository
 
             // If the index file doesn't exist, return an empty index (new repository)
             UnityEngine.Debug.Log($"Loading index from {path}");
-            
+
             try
             {
                 // For network paths, verify accessibility before attempting to read
@@ -365,7 +365,7 @@ namespace ModelLibrary.Editor.Repository
                 {
                     throw new UnauthorizedAccessException($"Network authentication required for repository: {Root}. Please verify your credentials and network connection.", ex);
                 }
-                
+
                 // For other exceptions on network paths, check if we can access the path
                 // If we can't access it, it's likely an authentication issue
                 if (!CanAccessNetworkPath(path))
@@ -376,7 +376,7 @@ namespace ModelLibrary.Editor.Repository
                         "• VPN connection is active (if required)\n" +
                         "• Network path is accessible", ex);
                 }
-                
+
                 // Re-throw if it's not an authentication issue
                 throw;
             }
@@ -599,8 +599,8 @@ namespace ModelLibrary.Editor.Repository
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Delete Version Failed", 
-                    $"Failed to delete version {modelId}/{version}: {ex.Message}", 
+                ErrorLogger.LogError("Delete Version Failed",
+                    $"Failed to delete version {modelId}/{version}: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}, Version: {version}");
                 return false;
             }
@@ -662,8 +662,8 @@ namespace ModelLibrary.Editor.Repository
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Delete Model Failed", 
-                    $"Failed to delete model {modelId}: {ex.Message}", 
+                ErrorLogger.LogError("Delete Model Failed",
+                    $"Failed to delete model {modelId}: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}");
                 return false;
             }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -466,13 +466,13 @@ namespace ModelLibrary.Editor.Windows
             _localInstallCache[modelId] = meta;
             _manifestCache[modelId] = meta;
             _negativeCache.Remove(modelId);
-            
+
             // Ensure manifest cache is marked as initialized
             if (!_manifestCacheInitialized)
             {
                 _manifestCacheInitialized = true;
             }
-            
+
             // Recompute the update badge from the cache we just changed.
             _ = CheckForUpdatesAsync();
 
@@ -507,7 +507,7 @@ namespace ModelLibrary.Editor.Windows
             try
             {
                 EditorUtility.DisplayProgressBar("Refreshing Manifest Cache", "Refreshing AssetDatabase...", 0f);
-                
+
                 // Ensure AssetDatabase is refreshed before scanning to pick up newly imported files
                 // This is critical for discovering newly imported models
                 AssetDatabase.Refresh();
@@ -515,7 +515,7 @@ namespace ModelLibrary.Editor.Windows
                 // File.WriteAllText() may not immediately flush to disk, and AssetDatabase.Refresh()
                 // may need time to process the new files
                 await Task.Delay(250); // 250ms delay to allow file system and AssetDatabase to settle
-                
+
                 // Yield to main thread before Unity API calls
                 await Task.Yield();
 
@@ -523,7 +523,7 @@ namespace ModelLibrary.Editor.Windows
 
                 // Move file enumeration to background thread to avoid blocking
                 List<string> manifestPaths = await ManifestDiscoveryUtility.DiscoverAllManifestFilesAsync("Assets");
-                
+
                 // Yield to main thread before Unity API calls
                 await Task.Yield();
 
@@ -532,7 +532,7 @@ namespace ModelLibrary.Editor.Windows
 
                 // Load index once to match old manifests by name
                 ModelIndex index = await _service.GetIndexAsync();
-                
+
                 // Yield to main thread before Unity API calls
                 await Task.Yield();
 
@@ -569,7 +569,7 @@ namespace ModelLibrary.Editor.Windows
                     try
                     {
                         string json = await File.ReadAllTextAsync(manifestPath);
-                        
+
                         ModelMeta parsed = JsonUtil.FromJson<ModelMeta>(json);
                         if (parsed == null)
                         {
@@ -661,8 +661,8 @@ namespace ModelLibrary.Editor.Windows
                 foreach (KeyValuePair<string, ModelMeta> entry in existingCache)
                 {
                     // Only keep entries that have a valid model ID and aren't already in the cache
-                    if (!string.IsNullOrEmpty(entry.Key) && 
-                        entry.Value != null && 
+                    if (!string.IsNullOrEmpty(entry.Key) &&
+                        entry.Value != null &&
                         entry.Value.identity != null &&
                         !string.IsNullOrEmpty(entry.Value.identity.id) &&
                         !_manifestCache.ContainsKey(entry.Key))
@@ -734,4 +734,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

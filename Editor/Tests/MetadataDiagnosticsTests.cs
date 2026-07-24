@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.RegularExpressions;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Utils;
@@ -20,7 +20,7 @@ namespace ModelLibrary.Editor.Tests
             // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
             // Unity doesn't import files starting with dot, so they're not in the AssetDatabase
             System.Collections.Generic.List<string> manifestPaths = new System.Collections.Generic.List<string>();
-            
+
             // Search for new naming convention (.modelLibrary.meta.json) first, then old naming for backward compatibility
             foreach (string manifestPath in System.IO.Directory.EnumerateFiles("Assets", ".modelLibrary.meta.json", System.IO.SearchOption.AllDirectories))
             {
@@ -31,7 +31,7 @@ namespace ModelLibrary.Editor.Tests
             {
                 manifestPaths.Add(manifestPath);
             }
-            
+
             string[] manifestFiles = manifestPaths.ToArray();
 
             Debug.Log($"[MetadataDiagnostics] Found {manifestFiles.Length} manifest files in project");
@@ -45,7 +45,7 @@ namespace ModelLibrary.Editor.Tests
             // We need to expect error logs that may occur when scanning real project files
             // Since we can't predict which errors will occur, we'll use LogAssert.Expect with Regex patterns
             // to match any of the possible error messages that might be logged.
-            
+
             // Track which errors we expect to see
             bool expectEmptyIdError = false;
             bool expectNullIdentityError = false;

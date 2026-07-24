@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -154,7 +154,7 @@ namespace ModelLibrary.Editor.Tests
                     string absolutePath = Path.GetFullPath(firstAsset);
                     string assetsPath = Path.GetFullPath("Assets").Replace('\\', '/');
                     string relativePath = firstAsset;
-                    
+
                     // Convert to relative if needed
                     if (Path.IsPathRooted(firstAsset))
                     {
@@ -164,7 +164,7 @@ namespace ModelLibrary.Editor.Tests
                             relativePath = "Assets/" + normalizedAssetPath.Substring(assetsPath.Length).TrimStart('/');
                         }
                     }
-                    
+
                     string directory = Path.GetDirectoryName(relativePath);
                     string suggestedName = null;
 
@@ -242,7 +242,7 @@ namespace ModelLibrary.Editor.Tests
                 // Use absolute path to Assets folder to avoid searching Unity's actual Assets folder
                 // Don't change current directory - use absolute paths throughout
                 string assetsPath = Path.Combine(tempTestDir, "Assets");
-                
+
                 // Don't call AssetDatabase.Refresh() - it can block and is not needed for file system enumeration
 
                 // Test Priority 3: existing model manifest
@@ -281,7 +281,7 @@ namespace ModelLibrary.Editor.Tests
                 Assert.IsNotNull(modelId, "Should find model ID from manifest");
                 Assert.AreEqual("test-model", modelId, "Model ID should match");
                 Assert.AreEqual("Existing Model Name", suggestedName, "Should extract name from existing model manifest");
-                
+
                 // Cleanup
                 if (Directory.Exists(tempRepoPath))
                 {
@@ -472,7 +472,7 @@ namespace ModelLibrary.Editor.Tests
             }
 
             List<string> manifestPaths = new List<string>();
-            
+
             foreach (string manifestPath in Directory.EnumerateFiles(assetsRoot, ".modelLibrary.meta.json", SearchOption.AllDirectories))
             {
                 manifestPaths.Add(manifestPath);
@@ -494,7 +494,7 @@ namespace ModelLibrary.Editor.Tests
                 {
                     string json = File.ReadAllText(manifestPath);
                     ModelMeta meta = JsonUtility.FromJson<ModelMeta>(json);
-                    
+
                     if (meta != null && meta.assetGuids != null && meta.assetGuids.Contains(assetGuid))
                     {
                         return meta.identity?.id;
@@ -510,4 +510,3 @@ namespace ModelLibrary.Editor.Tests
         }
     }
 }
-

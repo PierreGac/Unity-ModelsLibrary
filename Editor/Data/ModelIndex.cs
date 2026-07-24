@@ -7,7 +7,7 @@ namespace ModelLibrary.Data
     /// The global registry of all models in the repository - this is the "models_index.json" file.
     /// This is a lightweight index that contains just enough information to browse and search models
     /// without having to load the full metadata for each model. Think of it like a table of contents.
-    /// 
+    ///
     /// This file is stored at: &lt;repository&gt;/models_index.json
     /// </summary>
     [Serializable]
@@ -95,5 +95,3 @@ namespace ModelLibrary.Data
         public Dictionary<string, List<string>> versions = new Dictionary<string, List<string>>();
     }
 }
-
-

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -94,13 +94,13 @@ namespace ModelLibrary.Editor.Windows
                 {
                     GUIStyle searchBadgeStyle = new GUIStyle(UIStyles.TagPill);
                     searchBadgeStyle.normal.textColor = UIConstants.COLOR_LIGHT_BLUE;
-                    
+
                     string searchText = searchQuery.Trim();
                     if (searchText.Length > 30)
                     {
                         searchText = searchText.Substring(0, 27) + "...";
                     }
-                    
+
                     Color originalColor = GUI.backgroundColor;
                     GUI.backgroundColor = new Color(UIConstants.COLOR_LIGHT_BLUE.r, UIConstants.COLOR_LIGHT_BLUE.g, UIConstants.COLOR_LIGHT_BLUE.b, UIConstants.BADGE_BACKGROUND_ALPHA);
                     GUILayout.Label($"🔍 {searchText}", searchBadgeStyle);
@@ -113,13 +113,13 @@ namespace ModelLibrary.Editor.Windows
                 {
                     GUIStyle tagBadgeStyle = new GUIStyle(UIStyles.TagPill);
                     tagBadgeStyle.normal.textColor = UIConstants.COLOR_GREEN;
-                    
+
                     string tagPreview = string.Join(", ", selectedTags.Take(2));
                     if (selectedTags.Count > 2)
                     {
                         tagPreview += $" (+{selectedTags.Count - 2})";
                     }
-                    
+
                     Color originalColor = GUI.backgroundColor;
                     GUI.backgroundColor = new Color(UIConstants.COLOR_GREEN.r, UIConstants.COLOR_GREEN.g, UIConstants.COLOR_GREEN.b, UIConstants.BADGE_BACKGROUND_ALPHA);
                     GUILayout.Label($"🏷️ {tagPreview}", tagBadgeStyle);
@@ -170,7 +170,7 @@ namespace ModelLibrary.Editor.Windows
                 GUIStyle notesBadgeStyle = new GUIStyle(GUI.skin.label);
                 notesBadgeStyle.normal.textColor = new Color(0.3f, 0.7f, 1f); // Light blue
                 notesBadgeStyle.fontStyle = FontStyle.Bold;
-                
+
                 // Try multiple icon names for better compatibility
                 GUIContent notesIcon = EditorGUIUtility.IconContent("console.infoicon");
                 if (notesIcon == null || notesIcon.image == null)
@@ -207,7 +207,7 @@ namespace ModelLibrary.Editor.Windows
                 GUIStyle updateBadgeStyle = new GUIStyle(GUI.skin.label);
                 updateBadgeStyle.normal.textColor = Color.yellow;
                 updateBadgeStyle.fontStyle = FontStyle.Bold;
-                
+
                 // Try multiple icon names for better compatibility
                 GUIContent updateIcon = EditorGUIUtility.IconContent("d_Refresh");
                 if (updateIcon == null || updateIcon.image == null)
@@ -266,4 +266,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

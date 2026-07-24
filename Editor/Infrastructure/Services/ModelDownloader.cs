@@ -31,6 +31,3 @@ namespace ModelLibrary.Editor.Services
             => _service.DownloadModelVersionAsync(id, version);
     }
 }
-
-
-

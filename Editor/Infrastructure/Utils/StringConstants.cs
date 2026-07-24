@@ -1,4 +1,4 @@
-namespace ModelLibrary.Editor.Utils
+﻿namespace ModelLibrary.Editor.Utils
 {
     /// <summary>
     /// Constants for string length limits and common string values.
@@ -25,4 +25,3 @@ namespace ModelLibrary.Editor.Utils
         public const string DEFAULT_INSTALL_PATH = "Assets/Models/NewModel";
     }
 }
-

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using ModelLibrary.Editor.Utils;
 
 namespace ModelLibrary.Editor.Utils
@@ -35,4 +35,3 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-

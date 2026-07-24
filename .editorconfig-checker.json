@@ -1,0 +1,26 @@
+{
+    "$schema": "https://raw.githubusercontent.com/editorconfig-checker/editorconfig-checker/v3.8.0/.editorconfig-checker.schema.json",
+    "Verbose": false,
+    "Debug": false,
+    "IgnoreDefaults": false,
+    "Exclude": [
+        "\\.meta$",
+        "\\.zip$",
+        "Editor\\.zip$",
+        "\\.png$",
+        "\\.jpe?g$",
+        "\\.gif$",
+        "\\.fbx$",
+        "\\.obj$",
+        "\\.unitypackage$"
+    ],
+    "Disable": {
+        "EndOfLine": false,
+        "Indentation": false,
+        "IndentSize": false,
+        "InsertFinalNewline": false,
+        "TrimTrailingWhitespace": false,
+        "MaxLineLength": true,
+        "Charset": false
+    }
+}

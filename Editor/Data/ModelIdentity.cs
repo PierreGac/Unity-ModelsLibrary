@@ -16,7 +16,7 @@ namespace ModelLibrary.Data
         /// Format: 32-character hex string (e.g., "a1b2c3d4e5f6789012345678901234567890abcd")
         /// </summary>
         public string id;
-        
+
         /// <summary>
         /// Human-readable name for the model (e.g., "Medieval Sword", "Sci-Fi Spaceship").
         /// This can be updated between versions but should remain recognizable.
@@ -25,5 +25,3 @@ namespace ModelLibrary.Data
         public string name;
     }
 }
-
-

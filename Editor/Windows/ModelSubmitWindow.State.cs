@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
@@ -154,5 +154,3 @@ namespace ModelLibrary.Editor.Windows
         private readonly Dictionary<string, Texture2D> _previewTextureCache = new Dictionary<string, Texture2D>();
     }
 }
-
-

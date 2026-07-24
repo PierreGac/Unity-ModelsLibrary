@@ -95,7 +95,7 @@ namespace ModelLibrary.Editor.Services
         /// <param name="modelVersion">Version of the model.</param>
         /// <param name="modelName">Name of the model.</param>
         /// <param name="metadata">Optional metadata dictionary.</param>
-        public static void RecordEvent(string eventType, string modelId, string modelVersion = null, 
+        public static void RecordEvent(string eventType, string modelId, string modelVersion = null,
             string modelName = null, Dictionary<string, string> metadata = null)
         {
             AnalyticsData data = LoadAnalytics();
@@ -227,7 +227,7 @@ namespace ModelLibrary.Editor.Services
             AnalyticsData data = LoadAnalytics();
             long startTicks = startTime.Ticks;
             long endTicks = endTime.Ticks;
-            
+
             return data.events
                 .Where(e => e.timestamp >= startTicks && e.timestamp <= endTicks)
                 .OrderByDescending(e => e.timestamp)
@@ -252,4 +252,3 @@ namespace ModelLibrary.Editor.Services
         public DateTime lastAccessed;
     }
 }
-

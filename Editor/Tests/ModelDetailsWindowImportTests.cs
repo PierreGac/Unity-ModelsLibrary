@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Repository;
@@ -112,4 +112,3 @@ namespace ModelLibrary.Editor.Tests
         }
     }
 }
-

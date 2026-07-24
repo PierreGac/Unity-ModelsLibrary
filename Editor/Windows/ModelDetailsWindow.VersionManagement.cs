@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
@@ -132,7 +132,7 @@ namespace ModelLibrary.Editor.Windows
                 Debug.LogError("[ModelDetailsWindow] Cannot confirm deletion: metadata is null");
                 return false;
             }
-            
+
             string modelName = _meta.identity.name ?? "Unknown Model";
             bool confirmed = EditorUtility.DisplayDialog(
                 "Delete Version",
@@ -169,7 +169,7 @@ namespace ModelLibrary.Editor.Windows
                 Debug.LogError("[ModelDetailsWindow] Cannot confirm deletion: metadata is null");
                 return false;
             }
-            
+
             string modelName = _meta.identity.name ?? "Unknown Model";
             bool confirmed = EditorUtility.DisplayDialog(
                 "Delete Model",
@@ -297,7 +297,7 @@ namespace ModelLibrary.Editor.Windows
 
 
                 bool deleted = await _service.DeleteVersionAsync(_modelId, _version);
-                
+
                 if (!deleted)
                 {
                     EditorUtility.ClearProgressBar();
@@ -326,12 +326,12 @@ namespace ModelLibrary.Editor.Windows
                 string deletedVersion = version;
                 string modelNameForDelayCall = modelName;
                 string modelIdToOpen = _modelId;
-                
+
                 // Get next available version from refreshed list
                 string nextVersion = _availableVersions != null && _availableVersions.Count > 0
                     ? _availableVersions.FirstOrDefault(v => !string.Equals(v, _version, StringComparison.OrdinalIgnoreCase))
                     : null;
-                
+
                 bool hasOtherVersions = !string.IsNullOrEmpty(nextVersion) && _availableVersions != null && _availableVersions.Count > 0;
 
                 // Schedule all UI operations on the main thread to avoid blocking
@@ -373,7 +373,7 @@ namespace ModelLibrary.Editor.Windows
                                     $"Failed to open next version '{nextVersion}' after deletion: {openEx.Message}",
                                     ErrorHandler.CategorizeException(openEx), openEx,
                                     $"ModelId: {modelIdToOpen}, NextVersion: {nextVersion}");
-                                
+
                                 // Show error but don't block - deletion succeeded
                                 EditorUtility.DisplayDialog("Warning",
                                     $"Version deleted successfully, but failed to open next version '{nextVersion}': {openEx.Message}",
@@ -424,7 +424,7 @@ namespace ModelLibrary.Editor.Windows
                 Debug.LogError("[ModelDetailsWindow] Cannot confirm removal: metadata is null");
                 return false;
             }
-            
+
             string modelName = _meta.identity.name ?? "Unknown Model";
             return EditorUtility.DisplayDialog(
                 "Remove from Project",
@@ -456,7 +456,7 @@ namespace ModelLibrary.Editor.Windows
                 // Delete the install directory using AssetDatabase
                 // The install path should already be relative to project root (e.g., "Assets/Models/ModelName")
                 string relativePath = _installPath.Replace('\\', '/');
-                
+
                 // Ensure path starts with "Assets/" for AssetDatabase
                 if (!relativePath.StartsWith("Assets/"))
                 {
@@ -626,7 +626,7 @@ namespace ModelLibrary.Editor.Windows
                         {
                             manifestPath = System.IO.Path.Combine(installPath, "modelLibrary.meta.json");
                         }
-                        
+
                         if (System.IO.File.Exists(manifestPath))
                         {
                             try
@@ -689,4 +689,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

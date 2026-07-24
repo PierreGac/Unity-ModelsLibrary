@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -214,10 +214,10 @@ namespace ModelLibrary.Editor.Tests
 
                 // Use absolute path to Assets folder in temp directory to avoid searching Unity's actual Assets folder
                 string assetsPath = Path.Combine(tempTestDir, "Assets");
-                
+
                 // Simulate manifest file discovery during version operations
                 List<string> manifestPaths = new List<string>();
-                
+
                 // Search for new naming convention first
                 foreach (string manifestPath in Directory.EnumerateFiles(assetsPath, ".modelLibrary.meta.json", SearchOption.AllDirectories))
                 {
@@ -242,4 +242,3 @@ namespace ModelLibrary.Editor.Tests
         }
     }
 }
-

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
@@ -190,7 +190,7 @@ namespace ModelLibrary.Editor.Windows
 
             // Connection Status and Test
             EditorGUILayout.LabelField("Connection Status", EditorStyles.boldLabel);
-            
+
             // Status indicator
             using (new EditorGUILayout.HorizontalScope("box"))
             {
@@ -209,13 +209,13 @@ namespace ModelLibrary.Editor.Windows
                     // Show status with icon
                     string statusIcon = _settingsConnectionTestSuccess ? "✓" : "✗";
                     Color statusColor = _settingsConnectionTestSuccess ? Color.green : Color.red;
-                    
+
                     GUIStyle statusStyle = new GUIStyle(EditorStyles.miniLabel);
                     statusStyle.normal.textColor = statusColor;
                     statusStyle.fontStyle = FontStyle.Bold;
-                    
+
                     GUILayout.Label(statusIcon, statusStyle, GUILayout.Width(20));
-                    
+
                     if (_settingsConnectionTestSuccess)
                     {
                         string statusText = $"Connected ({_settingsLastModelCount} models)";
@@ -252,7 +252,7 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
             }
-            
+
             // Show detailed result if available
             if (!string.IsNullOrEmpty(_settingsConnectionTestResult) && !_settingsTestingConnection)
             {
@@ -464,7 +464,7 @@ namespace ModelLibrary.Editor.Windows
                 // Try to load the index as a connection test
                 // This verifies both connectivity and that the repository structure is correct
                 ModelIndex index = await repo.LoadIndexAsync();
-                
+
                 if (index != null && index.entries != null)
                 {
                     _settingsConnectionTestSuccess = true;
@@ -519,7 +519,7 @@ namespace ModelLibrary.Editor.Windows
                 _settingsHasUnsavedChanges = false;
 
                 EditorUtility.DisplayDialog("Settings Saved", "All settings have been saved successfully.", "OK");
-                
+
                 // Refresh this window to reflect saved state
                 Repaint();
             }
@@ -531,4 +531,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

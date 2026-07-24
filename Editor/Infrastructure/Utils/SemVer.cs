@@ -7,12 +7,12 @@ namespace ModelLibrary.Editor.Utils
     /// Minimal Semantic Versioning (SemVer) implementation supporting MAJOR.MINOR.PATCH format.
     /// This is used to compare model versions and determine which is newer.
     /// Does not implement prerelease/build metadata - just the core version numbers.
-    /// 
+    ///
     /// SemVer rules:
     /// - MAJOR: Increment for breaking changes (incompatible API changes)
     /// - MINOR: Increment for new features (backward compatible)
     /// - PATCH: Increment for bug fixes (backward compatible)
-    /// 
+    ///
     /// Examples: "1.0.0", "1.2.3", "2.0.0"
     /// </summary>
     public readonly struct SemVer : IComparable<SemVer>
@@ -112,6 +112,3 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-
-
-

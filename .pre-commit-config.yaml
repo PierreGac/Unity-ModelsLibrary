@@ -1,0 +1,54 @@
+# Pre-commit hooks for Models Library.
+# Install: pip install pre-commit && python -m pre_commit install
+# Run all: python -m pre_commit run --all-files
+# Docs: CONTRIBUTING.md
+
+default_language_version:
+  python: python3
+
+exclude: |
+  (?x)^(
+    Editor\.zip|
+    .*\.zip|
+    .*\.png|
+    .*\.jpg|
+    .*\.jpeg|
+    .*\.gif|
+    .*\.fbx|
+    .*\.obj|
+    .*\.unitypackage
+  )$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.meta$
+      - id: end-of-file-fixer
+        exclude: \.meta$
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+        # VS Code settings use JSONC (comments); strict JSON decode fails there.
+        exclude: ^\.vscode/settings\.json$
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
+    rev: 3.6.1
+    hooks:
+      - id: editorconfig-checker
+        name: editorconfig-checker
+        alias: ec
+
+  - repo: local
+    hooks:
+      - id: dotnet-format
+        name: dotnet format (EditorConfig C# style)
+        entry: python scripts/dotnet_format_verify.py
+        language: python
+        types: ["c#"]
+        pass_filenames: true
+        require_serial: true

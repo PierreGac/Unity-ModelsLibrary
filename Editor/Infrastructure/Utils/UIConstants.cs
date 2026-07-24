@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace ModelLibrary.Editor.Utils
 {
@@ -212,4 +212,3 @@ namespace ModelLibrary.Editor.Utils
         public const int FONT_SIZE_MUTED = 11;
     }
 }
-

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using ModelLibrary.Data;
@@ -207,7 +207,7 @@ namespace ModelLibrary.Editor.Tests
         {
             string tagsToAdd = "tag1, tag2, tag3";
             string[] tags = tagsToAdd.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            
+
             for (int i = 0; i < tags.Length; i++)
             {
                 tags[i] = tags[i].Trim();
@@ -225,7 +225,7 @@ namespace ModelLibrary.Editor.Tests
         {
             List<string> existingTags = new List<string> { "tag1", "tag2", "tag3" };
             string tagsToRemove = "tag2";
-            
+
             existingTags.RemoveAll(t => string.Equals(t, tagsToRemove, StringComparison.OrdinalIgnoreCase));
 
             Assert.AreEqual(2, existingTags.Count, "Should remove one tag");
@@ -239,11 +239,11 @@ namespace ModelLibrary.Editor.Tests
         public void TestBulkTagAddAndRemove()
         {
             List<string> tags = new List<string> { "tag1", "tag2" };
-            
+
             // Add tags
             tags.Add("tag3");
             tags.Add("tag4");
-            
+
             // Remove tags
             tags.RemoveAll(t => string.Equals(t, "tag2", StringComparison.OrdinalIgnoreCase));
 
@@ -323,13 +323,13 @@ namespace ModelLibrary.Editor.Tests
                 // Simulate ScanDirectoryForModels logic
                 List<BatchUploadService.BatchUploadItem> items = new List<BatchUploadService.BatchUploadItem>();
                 string[] subdirectories = Directory.GetDirectories(tempTestDir);
-                
+
                 for (int i = 0; i < subdirectories.Length; i++)
                 {
                     string subdir = subdirectories[i];
                     string[] modelFiles = Directory.GetFiles(subdir, "*.*", SearchOption.TopDirectoryOnly);
                     bool hasModelFiles = false;
-                    
+
                     for (int j = 0; j < modelFiles.Length; j++)
                     {
                         string ext = Path.GetExtension(modelFiles[j]).ToLowerInvariant();
@@ -339,7 +339,7 @@ namespace ModelLibrary.Editor.Tests
                             break;
                         }
                     }
-                    
+
                     if (hasModelFiles)
                     {
                         string folderName = Path.GetFileName(subdir);
@@ -476,11 +476,11 @@ namespace ModelLibrary.Editor.Tests
         public void TestBulkSelectionModeToggle()
         {
             bool bulkSelectionMode = false;
-            
+
             // Toggle on
             bulkSelectionMode = true;
             Assert.IsTrue(bulkSelectionMode, "Bulk selection mode should be enabled");
-            
+
             // Toggle off
             bulkSelectionMode = false;
             Assert.IsFalse(bulkSelectionMode, "Bulk selection mode should be disabled");
@@ -495,9 +495,8 @@ namespace ModelLibrary.Editor.Tests
             // Test that keyboard shortcuts can trigger bulk selection
             // In actual implementation, this would test Event.current.keyCode handling
             bool canToggleWithKeyboard = true; // Simulated
-            
+
             Assert.IsTrue(canToggleWithKeyboard, "Should support keyboard shortcuts for bulk selection");
         }
     }
 }
-

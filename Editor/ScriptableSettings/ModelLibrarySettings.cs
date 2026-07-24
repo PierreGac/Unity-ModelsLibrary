@@ -28,12 +28,12 @@ namespace ModelLibrary.Editor.Settings
         {
             // Try to load from Resources first (works in both Editor and Runtime)
             ModelLibrarySettings asset = Resources.Load<ModelLibrarySettings>(kResourcePath);
-            
+
             if (asset == null)
             {
                 // Create new instance
                 asset = CreateInstance<ModelLibrarySettings>();
-                
+
                 // In Editor, save to Resources folder
                 string dir = System.IO.Path.GetDirectoryName(kAssetPath);
                 if (!System.IO.Directory.Exists(dir))
@@ -44,11 +44,8 @@ namespace ModelLibrary.Editor.Settings
                 AssetDatabase.CreateAsset(asset, kAssetPath);
                 AssetDatabase.SaveAssets();
             }
-            
+
             return asset;
         }
     }
 }
-
-
-

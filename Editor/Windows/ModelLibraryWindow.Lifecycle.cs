@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -586,12 +586,12 @@ namespace ModelLibrary.Editor.Windows
                             browser.CloseWindow();
                         }
                         else if (window is ModelDetailsWindow
-                                 || window is ModelSubmitWindow
-                                 || window is ModelPreview3DWindow
-                                 || window is BatchUploadWindow
-                                 || window is AnalyticsWindow
-                                 || window is ModelVersionComparisonWindow
-                                 || window is ModelBulkTagWindow)
+                            || window is ModelSubmitWindow
+                            || window is ModelPreview3DWindow
+                            || window is BatchUploadWindow
+                            || window is AnalyticsWindow
+                            || window is ModelVersionComparisonWindow
+                            || window is ModelBulkTagWindow)
                         {
                             window.Close();
                         }
@@ -713,4 +713,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

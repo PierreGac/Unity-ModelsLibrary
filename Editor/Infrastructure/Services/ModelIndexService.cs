@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -100,8 +100,8 @@ namespace ModelLibrary.Editor.Services
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Enumerate Versions Failed", 
-                    $"Failed to enumerate versions for {modelId}: {ex.Message}", 
+                ErrorLogger.LogError("Enumerate Versions Failed",
+                    $"Failed to enumerate versions for {modelId}: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}");
             }
 
@@ -203,10 +203,9 @@ namespace ModelLibrary.Editor.Services
 
             // Save the updated index to the repository
             await AsyncProfiler.MeasureAsync("Service.SaveIndex", async () => await _repo.SaveIndexAsync(index));
-            
+
             // Update cache to reflect changes
             _indexCache = index;
         }
     }
 }
-

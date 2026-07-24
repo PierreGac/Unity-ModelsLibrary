@@ -106,4 +106,3 @@ namespace ModelLibrary.Editor.Utils
         public static string BuildInstallPath(string modelName) => $"Assets/Models/{SanitizeFolderName(modelName)}";
     }
 }
-

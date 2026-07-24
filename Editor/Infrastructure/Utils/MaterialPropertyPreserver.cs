@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace ModelLibrary.Editor.Utils
 {
@@ -22,10 +22,10 @@ namespace ModelLibrary.Editor.Utils
         private const string PROPERTY_METALLIC_GLOSS_MAP = "_MetallicGlossMap";
         private const string PROPERTY_ENVIRONMENT_REFLECTIONS = "_EnvironmentReflections";
         private const string PROPERTY_GLOSSY_REFLECTIONS = "_GlossyReflections";
-        
+
         // Shader keywords
         private const string KEYWORD_ALPHATEST_ON = "_ALPHATEST_ON";
-        
+
         // Workflow mode values
         private const float WORKFLOW_MODE_SPECULAR = 0f;
         private const float WORKFLOW_MODE_METALLIC = 1f;
@@ -236,4 +236,3 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-

@@ -154,7 +154,7 @@ namespace ModelLibrary.Editor
         public static bool IsAcceptablePayloadExtension(string fileExtension)
         {
             return IsAllowedPayloadExtension(fileExtension)
-                   && !IsNotAllowedFileExtension(fileExtension);
+                && !IsNotAllowedFileExtension(fileExtension);
         }
     }
 }

@@ -24,13 +24,13 @@ namespace ModelLibrary.Editor.Utils
 
             // Replace backslashes with forward slashes
             string sanitized = path.Replace('\\', '/');
-            
+
             // Remove double slashes (but preserve the first slash if path starts with /)
             while (sanitized.Contains("//"))
             {
                 sanitized = sanitized.Replace("//", "/");
             }
-            
+
             return sanitized;
         }
 
@@ -202,7 +202,7 @@ namespace ModelLibrary.Editor.Utils
 
             // Check if path ends with "Materials" (case-insensitive)
             return normalizedPath.EndsWith("/Materials", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(normalizedPath, "Materials", StringComparison.OrdinalIgnoreCase);
+                string.Equals(normalizedPath, "Materials", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -393,7 +393,7 @@ namespace ModelLibrary.Editor.Utils
             {
                 // Also accept the case where path == root exactly (no trailing separator).
                 if (!string.Equals(fullPath, fullRoot.TrimEnd(Path.DirectorySeparatorChar),
-                                   StringComparison.OrdinalIgnoreCase))
+                    StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException(
                         $"Refusing path outside allowed root.\nPath: {fullPath}\nRoot: {fullRoot}");

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
@@ -84,7 +84,7 @@ namespace ModelLibrary.Editor.Services
             lock (_cacheLock)
             {
                 return !string.IsNullOrEmpty(modelId)
-                       && _updateCache.TryGetValue(modelId, out ModelUpdateInfo info)
+                    && _updateCache.TryGetValue(modelId, out ModelUpdateInfo info)
                     ? info
                     : null;
             }

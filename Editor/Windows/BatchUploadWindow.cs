@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -31,7 +31,7 @@ namespace ModelLibrary.Editor.Windows
         /// Word-wrapped text area style for automatic line wrapping.
         /// </summary>
         private static GUIStyle _wordWrappedTextAreaStyle;
-        
+
         /// <summary>
         /// Gets or creates the word-wrapped text area style.
         /// </summary>
@@ -269,4 +269,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

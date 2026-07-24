@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using ModelLibrary.Data;
 using UnityEditor;
@@ -107,5 +107,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-
-

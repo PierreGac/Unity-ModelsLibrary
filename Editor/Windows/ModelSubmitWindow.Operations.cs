@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -281,10 +281,10 @@ namespace ModelLibrary.Editor.Windows
             {
                 // Log the error but don't show a dialog - this is a background operation
                 // The UI will show that no base metadata is available
-                ErrorLogger.LogError("Load Base Meta Failed", 
-                    $"Failed to load base metadata for model update: {ex.Message}", 
-                    ErrorHandler.CategorizeException(ex), 
-                    ex, 
+                ErrorLogger.LogError("Load Base Meta Failed",
+                    $"Failed to load base metadata for model update: {ex.Message}",
+                    ErrorHandler.CategorizeException(ex),
+                    ex,
                     $"ModelId: {entry?.id}, Version: {entry?.latestVersion}");
                 _latestSelectedMeta = null;
             }
@@ -347,24 +347,24 @@ namespace ModelLibrary.Editor.Windows
             {
                 if (_existingModels == null || _existingModels.Count == 0)
                 {
-                    ErrorHandler.ShowErrorDialog("Validation Error", 
-                        "No existing models available for update. Please switch to 'New Model' mode.", 
+                    ErrorHandler.ShowErrorDialog("Validation Error",
+                        "No existing models available for update. Please switch to 'New Model' mode.",
                         ErrorHandler.ErrorCategory.Validation);
                     _isSubmitting = false;
                     return;
                 }
-                
+
                 ModelIndex.Entry entry = _existingModels[Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1)];
-                
+
                 if (entry == null)
                 {
-                    ErrorHandler.ShowErrorDialog("Validation Error", 
-                        "Selected model entry is invalid. Please select a different model.", 
+                    ErrorHandler.ShowErrorDialog("Validation Error",
+                        "Selected model entry is invalid. Please select a different model.",
                         ErrorHandler.ErrorCategory.Validation);
                     _isSubmitting = false;
                     return;
                 }
-                
+
                 identityId = entry.id;
                 identityName = entry.name ?? _name; // Fallback to current name if entry.name is null
                 previousVersion = entry.latestVersion;
@@ -378,12 +378,12 @@ namespace ModelLibrary.Editor.Windows
             // Validate and normalize paths before submission
             // Ensure paths are not empty or using default values (which indicates they weren't properly set)
             string finalInstallPath = string.IsNullOrWhiteSpace(_installPath) ? DefaultInstallPath() : _installPath.Trim();
-            
+
             if (finalInstallPath == DefaultInstallPath())
             {
                 Debug.LogWarning($"[ModelSubmitWindow] Install path using default value. Consider setting a custom path.");
             }
-            
+
             #if UNITY_EDITOR && DEVELOPMENT_BUILD
             Debug.Log($"[ModelSubmitWindow] Submitting with installPath: '{finalInstallPath}'");
             #endif
@@ -408,7 +408,7 @@ namespace ModelLibrary.Editor.Windows
                     finalInstallPath,
                     _idProvider,
                     _selectedAssetGuids);
-                
+
                 if (string.IsNullOrWhiteSpace(meta.installPath) || meta.installPath == DefaultInstallPath())
                 {
                     Debug.LogWarning($"[ModelSubmitWindow] Meta installPath was not set correctly. Expected: '{finalInstallPath}', Got: '{meta.installPath}'");
@@ -454,8 +454,8 @@ namespace ModelLibrary.Editor.Windows
                     catch (Exception ex)
                     {
                         string fileName = Path.GetFileName(abs);
-                        ErrorLogger.LogError("Copy Image Failed", 
-                            $"Failed to copy image '{fileName}': {ex.Message}", 
+                        ErrorLogger.LogError("Copy Image Failed",
+                            $"Failed to copy image '{fileName}': {ex.Message}",
                             ErrorHandler.CategorizeException(ex), ex, $"ImagePath: {abs}, ImageIndex: {imageIndex}/{_imageAbsPaths.Count}");
                         throw new Exception($"Failed to copy image '{fileName}': {ex.Message}");
                     }
@@ -551,15 +551,15 @@ namespace ModelLibrary.Editor.Windows
                 _cancelSubmission = false;
                 if (!string.IsNullOrEmpty(temp))
                 {
-                    try 
-                    { 
-                        Directory.Delete(temp, true); 
-                    } 
+                    try
+                    {
+                        Directory.Delete(temp, true);
+                    }
                     catch (Exception cleanupEx)
                     {
                         // Log cleanup failure but don't throw - submission may have succeeded
-                        ErrorLogger.LogError("Cleanup Temp Directory Failed", 
-                            $"Failed to clean up temporary directory: {cleanupEx.Message}", 
+                        ErrorLogger.LogError("Cleanup Temp Directory Failed",
+                            $"Failed to clean up temporary directory: {cleanupEx.Message}",
                             ErrorHandler.CategorizeException(cleanupEx), cleanupEx, $"TempPath: {temp}");
                     }
                 }
@@ -640,7 +640,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     string json = File.ReadAllText(manifestPath);
                     ModelMeta meta = JsonUtility.FromJson<ModelMeta>(json);
-                    
+
                     if (meta != null && meta.assetGuids != null && meta.assetGuids.Contains(assetGuid))
                     {
                         return meta.identity?.id;
@@ -808,5 +808,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-
-

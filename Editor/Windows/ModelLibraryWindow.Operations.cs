@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -203,7 +203,7 @@ namespace ModelLibrary.Editor.Windows
                 await Task.Delay(DelayConstants.UI_UPDATE_DELAY_MS);
 
                 InvalidateLocalInstallCache(id);
-                
+
                 // Read the manifest file we just created and add it to the cache
                 // This ensures the cache is immediately updated with the actual file content
                 // Use new naming convention (.modelLibrary.meta.json) with fallback for old files
@@ -234,8 +234,8 @@ namespace ModelLibrary.Editor.Windows
                     }
                     catch (Exception ex)
                     {
-                        ErrorLogger.LogError("Read Manifest Failed", 
-                            $"Failed to read manifest file {manifestPath}: {ex.Message}. Using provided meta.", 
+                        ErrorLogger.LogError("Read Manifest Failed",
+                            $"Failed to read manifest file {manifestPath}: {ex.Message}. Using provided meta.",
                             ErrorHandler.CategorizeException(ex), ex, $"ManifestPath: {manifestPath}, ModelId: {id}");
                         // Fallback to the meta we have
                         _localInstallCache[id] = meta;
@@ -248,19 +248,19 @@ namespace ModelLibrary.Editor.Windows
                     _localInstallCache[id] = meta;
                     _manifestCache[id] = meta;
                 }
-                
+
                 _negativeCache.Remove(id);
-                
+
                 // Ensure manifest cache is marked as initialized so TryGetLocalInstall can use it
                 if (!_manifestCacheInitialized)
                 {
                     _manifestCacheInitialized = true;
                 }
-                
+
                 // Force a repaint to update the UI immediately with the new cache state
                 // This ensures the browser view shows the model as installed right away
                 Repaint();
-                
+
                 // Trigger a background refresh of the manifest cache to ensure it's up to date
                 // This will pick up any other manifest files and ensure consistency
                 // Use delayCall to avoid clearing the cache we just added
@@ -428,8 +428,8 @@ namespace ModelLibrary.Editor.Windows
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogError("Bulk Import Failed", 
-                        $"Failed to import model {modelId}: {ex.Message}", 
+                    ErrorLogger.LogError("Bulk Import Failed",
+                        $"Failed to import model {modelId}: {ex.Message}",
                         ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}, Progress: {current}/{total}");
                     failCount++;
                 }
@@ -495,8 +495,8 @@ namespace ModelLibrary.Editor.Windows
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogger.LogError("Bulk Update Failed", 
-                        $"Failed to update model {modelId}: {ex.Message}", 
+                    ErrorLogger.LogError("Bulk Update Failed",
+                        $"Failed to update model {modelId}: {ex.Message}",
                         ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}, Progress: {current}/{total}");
                     failCount++;
                 }
@@ -590,8 +590,8 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Save Import History Failed", 
-                    $"Failed to save import history: {ex.Message}", 
+                ErrorLogger.LogError("Save Import History Failed",
+                    $"Failed to save import history: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex);
             }
         }
@@ -613,11 +613,10 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Load Import History Failed", 
-                    $"Failed to load import history: {ex.Message}", 
+                ErrorLogger.LogError("Load Import History Failed",
+                    $"Failed to load import history: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex);
             }
         }
     }
 }
-

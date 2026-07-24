@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using ModelLibrary.Editor.Identity;
@@ -439,7 +439,7 @@ namespace ModelLibrary.Editor.Windows
                 ErrorLogger.LogError("Save Configuration Failed",
                     $"Failed to save configuration: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex);
-                
+
                 EditorUtility.DisplayDialog("Save Failed",
                     $"Failed to save configuration: {ex.Message}\n\nPlease try again.",
                     "OK");
@@ -447,4 +447,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

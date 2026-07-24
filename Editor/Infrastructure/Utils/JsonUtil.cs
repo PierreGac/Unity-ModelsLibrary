@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor.Utils
     /// Utility class for JSON serialization/deserialization using Unity's JsonUtility.
     /// This provides a consistent interface for converting our data models to/from JSON format.
     /// Unity's JsonUtility is fast and lightweight, but has some limitations compared to other JSON libraries.
-    /// 
+    ///
     /// For robust deserialization that handles schema changes, use the versioned methods.
     /// </summary>
     public static class JsonUtil
@@ -60,6 +60,3 @@ namespace ModelLibrary.Editor.Utils
         public static ModelMeta FromJsonModelMeta(string json) => FromJsonWithMigration<ModelMeta>(json);
     }
 }
-
-
-

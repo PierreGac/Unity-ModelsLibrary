@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -33,8 +33,8 @@ namespace ModelLibrary.Editor.Windows
                 return false;
             }
 
-            return _existingModels.Any(entry => 
-                entry != null && 
+            return _existingModels.Any(entry =>
+                entry != null &&
                 !string.IsNullOrEmpty(entry.name) &&
                 string.Equals(entry.name.Trim(), trimmedName, StringComparison.OrdinalIgnoreCase));
         }
@@ -247,5 +247,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-
-

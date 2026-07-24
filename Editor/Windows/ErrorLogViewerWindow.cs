@@ -81,8 +81,8 @@ namespace ModelLibrary.Editor.Windows
 
                 if (GUILayout.Button("Clear Log", UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_SMALL)))
                 {
-                    if (EditorUtility.DisplayDialog("Clear Error Log", 
-                        "Are you sure you want to clear all error log entries? This cannot be undone.", 
+                    if (EditorUtility.DisplayDialog("Clear Error Log",
+                        "Are you sure you want to clear all error log entries? This cannot be undone.",
                         "Clear", "Cancel"))
                     {
                         ErrorLogger.ClearLog();
@@ -94,12 +94,12 @@ namespace ModelLibrary.Editor.Windows
 
                 if (GUILayout.Button("Clear Suppressions", UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_BUTTON_WIDTH_LARGE)))
                 {
-                    if (EditorUtility.DisplayDialog("Clear Suppressed Errors", 
-                        "This will re-enable all error dialogs that were previously suppressed. Continue?", 
+                    if (EditorUtility.DisplayDialog("Clear Suppressed Errors",
+                        "This will re-enable all error dialogs that were previously suppressed. Continue?",
                         "Clear", "Cancel"))
                     {
                         ErrorDialogWindow.ClearSuppressions();
-                        EditorUtility.DisplayDialog("Suppressions Cleared", 
+                        EditorUtility.DisplayDialog("Suppressions Cleared",
                             "All suppressed error dialogs have been re-enabled.", "OK");
                     }
                 }
@@ -115,7 +115,7 @@ namespace ModelLibrary.Editor.Windows
                     }
                     else
                     {
-                        EditorUtility.DisplayDialog("Log File Not Found", 
+                        EditorUtility.DisplayDialog("Log File Not Found",
                             $"The log file does not exist yet:\n{logPath}", "OK");
                     }
                 }
@@ -168,8 +168,8 @@ namespace ModelLibrary.Editor.Windows
             if (_filteredEntries.Count == 0)
             {
                 EditorGUILayout.HelpBox(
-                    _allEntries.Count == 0 
-                        ? "No error log entries found. The log file may be empty or not exist yet." 
+                    _allEntries.Count == 0
+                        ? "No error log entries found. The log file may be empty or not exist yet."
                         : "No entries match the current filters.",
                     MessageType.Info);
                 return;
@@ -237,7 +237,7 @@ namespace ModelLibrary.Editor.Windows
                     EditorGUILayout.Space(2);
                     string exceptionKey = $"exception_{entry.GetHashCode()}";
                     bool showException = EditorPrefs.GetBool(exceptionKey, false);
-                    bool newShowException = EditorGUILayout.Foldout(showException, 
+                    bool newShowException = EditorGUILayout.Foldout(showException,
                         $"Exception: {entry.ExceptionType}", true);
                     if (newShowException != showException)
                     {
@@ -247,7 +247,7 @@ namespace ModelLibrary.Editor.Windows
                     if (newShowException)
                     {
                         EditorGUI.indentLevel++;
-                        
+
                         if (!string.IsNullOrEmpty(entry.ExceptionMessage))
                         {
                             EditorGUILayout.LabelField($"Message: {entry.ExceptionMessage}", EditorStyles.wordWrappedMiniLabel);
@@ -257,7 +257,7 @@ namespace ModelLibrary.Editor.Windows
                         {
                             EditorGUILayout.Space(2);
                             EditorGUILayout.LabelField("Stack Trace:", EditorStyles.miniLabel);
-                            EditorGUILayout.TextArea(entry.StackTrace, EditorStyles.wordWrappedMiniLabel, 
+                            EditorGUILayout.TextArea(entry.StackTrace, EditorStyles.wordWrappedMiniLabel,
                                 GUILayout.Height(100));
                         }
 

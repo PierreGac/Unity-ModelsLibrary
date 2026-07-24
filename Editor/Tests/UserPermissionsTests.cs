@@ -1,4 +1,4 @@
-using ModelLibrary.Editor.Identity;
+﻿using ModelLibrary.Editor.Identity;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -18,7 +18,7 @@ namespace ModelLibrary.Editor.Tests
         public void TestDeveloperRolePermissions()
         {
             UserRole role = UserRole.Developer;
-            
+
             bool canBrowse = true; // Developers can always browse
             bool canSubmit = role == UserRole.Artist || role == UserRole.Admin;
             bool canDeleteVersion = role == UserRole.Artist || role == UserRole.Admin;
@@ -37,7 +37,7 @@ namespace ModelLibrary.Editor.Tests
         public void TestArtistRolePermissions()
         {
             UserRole role = UserRole.Artist;
-            
+
             bool canBrowse = true;
             bool canSubmit = role == UserRole.Artist || role == UserRole.Admin;
             bool canDeleteVersion = role == UserRole.Artist || role == UserRole.Admin;
@@ -60,7 +60,7 @@ namespace ModelLibrary.Editor.Tests
         public void TestAdminRolePermissions()
         {
             UserRole role = UserRole.Admin;
-            
+
             bool canBrowse = true;
             bool canSubmit = role == UserRole.Artist || role == UserRole.Admin;
             bool canDeleteVersion = role == UserRole.Artist || role == UserRole.Admin;
@@ -216,7 +216,7 @@ namespace ModelLibrary.Editor.Tests
         {
             SimpleUserIdentityProvider provider = new SimpleUserIdentityProvider();
             UserRole originalRole = provider.GetUserRole();
-            
+
             // Change role to a different role to ensure it changes
             UserRole targetRole = originalRole == UserRole.Artist ? UserRole.Developer : UserRole.Artist;
             provider.SetUserRole(targetRole);
@@ -303,4 +303,3 @@ namespace ModelLibrary.Editor.Tests
         }
     }
 }
-

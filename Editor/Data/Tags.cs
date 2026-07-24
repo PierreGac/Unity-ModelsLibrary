@@ -19,5 +19,3 @@ namespace ModelLibrary.Data
         public List<string> values = new List<string>();
     }
 }
-
-

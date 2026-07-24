@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -96,7 +96,7 @@ namespace ModelLibrary.Editor.Utils
                 // Clear all versions for this model
                 string notesPrefix = __NOTES_READ_PREF_KEY_PREFIX + modelId + "@";
                 string updateKey = GetUpdateReadKey(modelId);
-                
+
                 // Note: EditorPrefs doesn't support enumeration, so we can't easily clear all versions
                 // This would require maintaining a list of keys, which is complex
                 // For now, we'll clear the update key and let individual versions be cleared as needed
@@ -131,4 +131,3 @@ namespace ModelLibrary.Editor.Utils
         }
     }
 }
-

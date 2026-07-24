@@ -1,4 +1,4 @@
-
+﻿
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -172,8 +172,8 @@ namespace ModelLibrary.Editor.Services
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Delete Version Failed", 
-                    $"Error deleting version {version} of model {modelId}: {ex.Message}", 
+                ErrorLogger.LogError("Delete Version Failed",
+                    $"Error deleting version {version} of model {modelId}: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}, Version: {version}");
                 return false;
             }
@@ -216,8 +216,8 @@ namespace ModelLibrary.Editor.Services
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogError("Delete Model Failed", 
-                    $"Error deleting model {modelId}: {ex.Message}", 
+                ErrorLogger.LogError("Delete Model Failed",
+                    $"Error deleting model {modelId}: {ex.Message}",
                     ErrorHandler.CategorizeException(ex), ex, $"ModelId: {modelId}");
                 return false;
             }
@@ -261,7 +261,7 @@ namespace ModelLibrary.Editor.Services
             // Use dot prefix to hide from Unity Project window
             string localMetaPath = Path.Combine(cacheRoot, "." + ModelMeta.MODEL_JSON);
             string metaJson = JsonUtil.ToJson(meta);
-            
+
             // Use retry logic for file write to handle locked files
             await RetryFileOperationAsync(async () =>
             {
@@ -483,14 +483,14 @@ namespace ModelLibrary.Editor.Services
             {
                 throw new ArgumentNullException(nameof(operation));
             }
-            
+
             if (maxRetries < 1)
             {
                 throw new ArgumentException("maxRetries must be at least 1", nameof(maxRetries));
             }
 
             Exception lastException = null;
-            
+
             for (int attempt = 0; attempt < maxRetries; attempt++)
             {
                 try
@@ -502,7 +502,7 @@ namespace ModelLibrary.Editor.Services
                 {
                     // Store exception for potential re-throw if all retries fail
                     lastException = ex;
-                    
+
                     // Exponential backoff: delay increases with each attempt (500ms, 1000ms, 2000ms, etc.)
                     int delayMs = initialDelayMs * (int)Math.Pow(2, attempt);
                     await Task.Delay(delayMs);
@@ -511,7 +511,7 @@ namespace ModelLibrary.Editor.Services
                 {
                     // Store exception for potential re-throw if all retries fail
                     lastException = ex;
-                    
+
                     // Exponential backoff for access denied errors
                     int delayMs = initialDelayMs * (int)Math.Pow(2, attempt);
                     await Task.Delay(delayMs);
@@ -522,13 +522,13 @@ namespace ModelLibrary.Editor.Services
                     throw;
                 }
             }
-            
+
             // All retries exhausted - throw the last exception we encountered
             if (lastException != null)
             {
                 throw lastException;
             }
-            
+
             // This should never be reached, but included for safety
             throw new InvalidOperationException($"Operation failed after {maxRetries} attempts with no exception captured.");
         }
@@ -571,5 +571,3 @@ namespace ModelLibrary.Editor.Services
         }
     }
 }
-
-

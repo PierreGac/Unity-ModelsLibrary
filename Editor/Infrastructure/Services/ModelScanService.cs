@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -302,9 +302,9 @@ namespace ModelLibrary.Editor.Services
         private static bool IsUpdateAvailable(string localVersion, string remoteVersion)
         {
             return !string.IsNullOrEmpty(localVersion)
-                   && SemVer.TryParse(localVersion, out SemVer local)
-                   && SemVer.TryParse(remoteVersion, out SemVer remote)
-                   && remote.CompareTo(local) > 0;
+                && SemVer.TryParse(localVersion, out SemVer local)
+                && SemVer.TryParse(remoteVersion, out SemVer remote)
+                && remote.CompareTo(local) > 0;
         }
 
         private static bool IsVersionNewer(string candidate, string current)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -116,7 +116,7 @@ namespace ModelLibrary.Editor.Tests
                 float width = testWidths[i];
                 float availableWidth = width - 20f; // Account for scrollbar
                 int calculatedColumns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / (minCardWidth + spacing)));
-                
+
                 Assert.GreaterOrEqual(calculatedColumns, 1, $"Should have at least 1 column for width {width}");
                 // Grid view can have more columns than entries - extra columns will just be empty
                 // For width 600, with minCardWidth ~136 and spacing 8, we get: (600-20)/(136+8) = 580/144 ≈ 4 columns
@@ -154,19 +154,18 @@ namespace ModelLibrary.Editor.Tests
         public void TestGridViewWithEmptyList()
         {
             List<ModelIndex.Entry> emptyEntries = new List<ModelIndex.Entry>();
-            
+
             // Grid view should handle empty lists without errors
             Assert.AreEqual(0, emptyEntries.Count, "Empty list should have zero entries");
-            
+
             // Test column calculation with empty list
             const float thumbnailSize = 128f;
             const float spacing = 8f;
             const float cardPadding = 4f;
             float availableWidth = 800f;
             int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / (thumbnailSize + (cardPadding * 2) + spacing)));
-            
+
             Assert.GreaterOrEqual(columns, 1, "Should calculate at least 1 column even with empty list");
         }
     }
 }
-

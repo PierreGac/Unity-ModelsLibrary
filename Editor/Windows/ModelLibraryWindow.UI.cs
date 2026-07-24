@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -2010,7 +2010,7 @@ namespace ModelLibrary.Editor.Windows
 
             string focusedControl = GUI.GetNameOfFocusedControl();
             return string.Equals(focusedControl, "SearchField", StringComparison.Ordinal) ||
-                   string.Equals(focusedControl, "TagSearchField", StringComparison.Ordinal);
+                string.Equals(focusedControl, "TagSearchField", StringComparison.Ordinal);
         }
 
         private void ToggleSelection(ModelIndex.Entry entry)
@@ -2123,4 +2123,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-

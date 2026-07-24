@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -233,7 +233,7 @@ namespace ModelLibrary.Editor.Windows
             EditorGUILayout.HelpBox(
                 "Install Path: Where the model will be placed in YOUR Unity project.\n" +
                 "This is the full path starting with 'Assets/' that users will see in their Project window.\n" +
-                "Example: Assets/Models/MyModel", 
+                "Example: Assets/Models/MyModel",
                 MessageType.Info);
             string displayInstallPath = string.IsNullOrWhiteSpace(_installPath) ? ResolveDefaultInstallPath() : _installPath;
             InstallPathValidator.ValidationResult installPathValidation = GetInstallPathValidation(displayInstallPath);
@@ -245,12 +245,12 @@ namespace ModelLibrary.Editor.Windows
                 GUI.color = Color.red;
             }
 
-            string newInstallPath = EditorGUILayout.TextField(new GUIContent("Install Path", 
-                "The absolute path where the model will be installed in your Unity project (e.g., Assets/Models/MyModel)"), 
+            string newInstallPath = EditorGUILayout.TextField(new GUIContent("Install Path",
+                "The absolute path where the model will be installed in your Unity project (e.g., Assets/Models/MyModel)"),
                 displayInstallPath);
 
             GUI.color = originalGuiColor;
-            
+
             // Always update the field value to ensure it's captured
             if (newInstallPath != displayInstallPath || string.IsNullOrWhiteSpace(_installPath))
             {
@@ -665,5 +665,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-
-

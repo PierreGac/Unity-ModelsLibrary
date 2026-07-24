@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Repository;
@@ -28,8 +28,8 @@ namespace ModelLibrary.Editor.Tests
 
             // Test that Open method can be called (static method exists)
             // In actual test, this would open a window, but we verify the method signature
-            Assert.IsNotNull(typeof(ModelVersionComparisonWindow).GetMethod("Open", 
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static), 
+            Assert.IsNotNull(typeof(ModelVersionComparisonWindow).GetMethod("Open",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static),
                 "Open method should exist");
         }
 
@@ -216,7 +216,7 @@ namespace ModelLibrary.Editor.Tests
         {
             string[] versions = { "1.0.0", "1.0.1", "1.1.0", "2.0.0" };
             List<string> sortedVersions = new List<string>(versions);
-            
+
             // Simulate SemVer ordering
             sortedVersions.Sort((a, b) =>
             {
@@ -247,4 +247,3 @@ namespace ModelLibrary.Editor.Tests
         }
     }
 }
-

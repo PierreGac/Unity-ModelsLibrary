@@ -24,6 +24,3 @@ namespace ModelLibrary.Editor.Utils
         public static string LibraryPath(string sub) => PathUtils.SanitizePathSeparator(Path.Combine(projectRoot, sub));
     }
 }
-
-
-

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using ModelLibrary.Editor.Utils;
@@ -89,7 +89,7 @@ namespace ModelLibrary.Editor.Windows
                     // Process dragged files
                     int addedCount = 0;
                     int skippedCount = 0;
-                    
+
                     if (DragAndDrop.paths != null && DragAndDrop.paths.Length > 0)
                     {
                         foreach (string path in DragAndDrop.paths)
@@ -113,7 +113,7 @@ namespace ModelLibrary.Editor.Windows
                             }
                         }
                     }
-                    
+
                     // Provide user feedback
                     if (addedCount > 0)
                     {
@@ -130,7 +130,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         int textureAddedCount = 0;
                         int textureSkippedCount = 0;
-                        
+
                         foreach (UnityEngine.Object obj in DragAndDrop.objectReferences)
                         {
                             if (obj is Texture2D texture)
@@ -143,7 +143,7 @@ namespace ModelLibrary.Editor.Windows
                                         // Convert Unity asset path to full file system path
                                         string fullDataPath = Path.GetFullPath(Application.dataPath);
                                         string fullPath;
-                                        
+
                                         if (assetPath.StartsWith("Assets/"))
                                         {
                                             // Remove "Assets/" prefix and combine with project root
@@ -155,7 +155,7 @@ namespace ModelLibrary.Editor.Windows
                                             // Fallback: try direct conversion
                                             fullPath = Path.GetFullPath(assetPath);
                                         }
-                                        
+
                                         int countBefore = _imageAbsPaths.Count;
                                         AddImageFile(fullPath);
                                         if (_imageAbsPaths.Count > countBefore)
@@ -182,7 +182,7 @@ namespace ModelLibrary.Editor.Windows
                                 }
                             }
                         }
-                        
+
                         // Provide user feedback for texture drag-and-drop
                         if (textureAddedCount > 0)
                         {
@@ -247,7 +247,7 @@ namespace ModelLibrary.Editor.Windows
                 ErrorLogger.LogError("Invalid Image File",
                     $"Cannot add image '{fileName}': File does not exist or is not a valid image format.",
                     ErrorHandler.ErrorCategory.Validation, null, $"FilePath: {normalizedPath}");
-                
+
                 // Show user-friendly error message
                 EditorUtility.DisplayDialog("Invalid Image",
                     $"Cannot add '{fileName}':\n\n" +
@@ -285,7 +285,7 @@ namespace ModelLibrary.Editor.Windows
             // Add the normalized path
             _imageAbsPaths.Add(normalizedPath);
             SaveDraft(); // Auto-save draft when images are added
-            
+
             Debug.Log($"[ModelSubmitWindow] Added image: {Path.GetFileName(normalizedPath)}");
             Repaint(); // Refresh UI to show new image
         }
@@ -430,5 +430,3 @@ namespace ModelLibrary.Editor.Windows
         }
     }
 }
-
-

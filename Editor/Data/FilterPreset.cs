@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace ModelLibrary.Editor.Data
@@ -18,4 +18,3 @@ namespace ModelLibrary.Editor.Data
         public List<string> selectedTags;
     }
 }
-

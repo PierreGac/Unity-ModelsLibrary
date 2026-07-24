@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Settings;
 using ModelLibrary.Editor.Windows;
@@ -36,7 +36,7 @@ namespace ModelLibrary.Editor.Tests
         {
             SimpleUserIdentityProvider provider = new SimpleUserIdentityProvider();
             string testName = "TestUser";
-            
+
             provider.SetUserName(testName);
             string savedName = provider.GetUserName();
 
@@ -51,7 +51,7 @@ namespace ModelLibrary.Editor.Tests
         {
             SimpleUserIdentityProvider provider = new SimpleUserIdentityProvider();
             UserRole testRole = UserRole.Artist;
-            
+
             provider.SetUserRole(testRole);
             UserRole savedRole = provider.GetUserRole();
 
@@ -98,11 +98,11 @@ namespace ModelLibrary.Editor.Tests
             // Simulate tab switching
             int currentTab = 0;
             int[] tabs = { 0, 1 }; // User tab, Repository tab
-            
+
             // Switch to Repository tab
             currentTab = tabs[1];
             Assert.AreEqual(1, currentTab, "Should switch to Repository tab");
-            
+
             // Switch back to User tab
             currentTab = tabs[0];
             Assert.AreEqual(0, currentTab, "Should switch back to User tab");
@@ -115,7 +115,7 @@ namespace ModelLibrary.Editor.Tests
         public void TestRepositorySettingsLoad()
         {
             ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
-            
+
             Assert.IsNotNull(settings, "Settings should be loaded");
             Assert.IsNotNull(settings.repositoryKind, "Repository kind should be set");
             Assert.IsNotNull(settings.repositoryRoot, "Repository root should be set");
@@ -149,7 +149,7 @@ namespace ModelLibrary.Editor.Tests
             // Test FileSystem path validation
             string validPath = "C:/Valid/Path";
             string invalidPath = "";
-            
+
             bool isValidFileSystem = !string.IsNullOrWhiteSpace(validPath) && System.IO.Directory.Exists(validPath) == false; // Path may not exist in test
             bool isInvalidFileSystem = string.IsNullOrWhiteSpace(invalidPath);
 
@@ -209,4 +209,3 @@ namespace ModelLibrary.Editor.Tests
         }
     }
 }
-

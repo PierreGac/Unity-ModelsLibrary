@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -102,7 +102,7 @@ namespace ModelLibrary.Editor.Tests
 
                 // Use absolute path to Assets folder in temp directory to avoid searching Unity's actual Assets folder
                 string assetsPath = Path.Combine(tempTestDir, "Assets");
-                
+
                 // Simulate RefreshManifestCacheAsync logic
                 List<string> manifestPaths = new List<string>();
                 foreach (string manifestPath in Directory.EnumerateFiles(assetsPath, ".modelLibrary.meta.json", SearchOption.AllDirectories))
@@ -144,7 +144,7 @@ namespace ModelLibrary.Editor.Tests
 
                 // Use absolute path to Assets folder in temp directory to avoid searching Unity's actual Assets folder
                 string assetsPath = Path.Combine(tempTestDir, "Assets");
-                
+
                 List<string> manifestPaths = new List<string>();
                 foreach (string manifestPath in Directory.EnumerateFiles(assetsPath, ".modelLibrary.meta.json", SearchOption.AllDirectories))
                 {
@@ -209,7 +209,7 @@ namespace ModelLibrary.Editor.Tests
             // Test that RefreshAllUpdatesAsync can be called
             // In actual implementation, this would test the update detector service
             bool canRefresh = true; // Simulated
-            
+
             Assert.IsTrue(canRefresh, "Should be able to refresh all updates");
         }
 
@@ -262,7 +262,7 @@ namespace ModelLibrary.Editor.Tests
             // Test that ReinitializeAfterConfiguration can be called
             // In actual implementation, this would test window reinitialization
             bool canReinitialize = true; // Simulated
-            
+
             Assert.IsTrue(canReinitialize, "Should be able to reinitialize after configuration");
         }
 
@@ -373,4 +373,3 @@ namespace ModelLibrary.Editor.Tests
         }
     }
 }
-
