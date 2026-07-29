@@ -14,7 +14,7 @@ namespace ModelLibrary.Editor.Infrastructure
     /// <para>
     /// SECURITY/STABILITY (audit CRIT-08 + CRIT-09): without a main-thread
     /// <see cref="SynchronizationContext"/>, <c>await</c> continuations in
-    /// async methods run on threadpool threads. Unity Editor APIs
+    /// async methods can run on threadpool threads. Unity Editor APIs
     /// (<see cref="EditorUtility.DisplayProgressBar"/>,
     /// <see cref="EditorUtility.ClearProgressBar"/>,
     /// <see cref="AssetDatabase.Refresh"/>, <c>EditorWindow.Repaint</c>,
@@ -23,20 +23,26 @@ namespace ModelLibrary.Editor.Infrastructure
     /// internal state when invoked from a threadpool thread.
     /// </para>
     /// <para>
-    /// After this class is loaded (via <c>[InitializeOnLoad]</c>), every
-    /// <c>await</c> in the editor will resume on the main thread, which
-    /// also eliminates the race conditions on caches read from <c>OnGUI</c>
-    /// (CRIT-09).
+    /// Unity 6 already installs <c>UnitySynchronizationContext</c> for both
+    /// Edit and Play mode. Replacing it with an unbounded drain loop is
+    /// harmful: <c>await Task.Yield()</c> posts a nested continuation that
+    /// gets executed in the same <see cref="EditorApplication.update"/>
+    /// tick, so loops that yield never return control to the Editor (Unity
+    /// shows "Hold on… Waiting for user code in __ModelLibrary.Editor.dll").
+    /// Opening Project Settings is one common trigger. When Unity's context
+    /// is already present we leave it alone.
     /// </para>
     /// <para>
-    /// This also makes <c>await Task.Yield()</c> a valid "return to main
-    /// thread" pattern (which the codebase already uses extensively but
-    /// was not actually working).
+    /// The fallback pump only processes work that was queued before the
+    /// current tick started (one generation per frame), matching Unity's
+    /// own SyncContext behavior after the <c>Task.Yield</c> hang fix.
     /// </para>
     /// </remarks>
     [InitializeOnLoad]
     internal static class UnityMainThreadSyncContext
     {
+        private const string UnitySynchronizationContextTypeName = "UnitySynchronizationContext";
+
         private sealed class MainThreadContext : SynchronizationContext
         {
             private readonly ConcurrentQueue<Action> _queue = new ConcurrentQueue<Action>();
@@ -45,6 +51,11 @@ namespace ModelLibrary.Editor.Infrastructure
             public MainThreadContext(SynchronizationContext fallback)
             {
                 _fallback = fallback;
+            }
+
+            public override SynchronizationContext CreateCopy()
+            {
+                return this;
             }
 
             public override void Post(SendOrPostCallback callback, object state)
@@ -84,8 +95,18 @@ namespace ModelLibrary.Editor.Infrastructure
 
             public void Pump()
             {
-                while (_queue.TryDequeue(out Action action))
+                // Process only the generation queued before this tick.
+                // Continuations posted by those actions (e.g. await Task.Yield())
+                // run on a later EditorApplication.update — otherwise Yield loops
+                // never return and freeze the Editor.
+                int pending = _queue.Count;
+                for (int i = 0; i < pending; i++)
                 {
+                    if (!_queue.TryDequeue(out Action action))
+                    {
+                        break;
+                    }
+
                     action();
                 }
             }
@@ -99,40 +120,102 @@ namespace ModelLibrary.Editor.Infrastructure
         public static bool IsMainThread => System.Threading.Thread.CurrentThread.ManagedThreadId == _mainThreadId;
 
         private static readonly int _mainThreadId;
+        private static readonly bool _installedFallback;
 
         static UnityMainThreadSyncContext()
         {
             _mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
-            _context = new MainThreadContext(SynchronizationContext.Current);
+
+            SynchronizationContext existing = SynchronizationContext.Current;
+            if (IsUnitySynchronizationContext(existing))
+            {
+                // Unity already marshals await continuations to the main thread
+                // and pumps one generation per player-loop tick. Do not replace.
+                _context = null;
+                _installedFallback = false;
+                UnityEngine.Debug.Log(
+                    "[ModelLibrary] UnityMainThreadSyncContext: using existing UnitySynchronizationContext.");
+                return;
+            }
+
+            _context = new MainThreadContext(existing);
             SynchronizationContext.SetSynchronizationContext(_context);
             EditorApplication.update += Pump;
-            UnityEngine.Debug.Log("[ModelLibrary] UnityMainThreadSyncContext installed.");
+            _installedFallback = true;
+            UnityEngine.Debug.Log("[ModelLibrary] UnityMainThreadSyncContext fallback installed.");
+        }
+
+        private static bool IsUnitySynchronizationContext(SynchronizationContext context)
+        {
+            if (context == null)
+            {
+                return false;
+            }
+
+            string typeName = context.GetType().Name;
+            return string.Equals(typeName, UnitySynchronizationContextTypeName, StringComparison.Ordinal);
         }
 
         private static void Pump()
         {
-            _context.Pump();
+            if (_context != null)
+            {
+                _context.Pump();
+            }
         }
 
         /// <summary>
         /// Enqueues an action to run on the main thread on the next editor update.
-        /// Safe to call from any thread.
+        /// Safe to call from any thread. No-op when the fallback context was not installed
+        /// (Unity's own context is responsible for marshaling).
         /// </summary>
         public static void Post(Action action)
         {
             if (action == null) return;
-            _context.Post(_ => action(), null);
+            if (_context != null)
+            {
+                _context.Post(_ => action(), null);
+                return;
+            }
+
+            if (IsMainThread)
+            {
+                action();
+            }
+            else
+            {
+                EditorApplication.delayCall += () => action();
+            }
         }
 
         /// <summary>
         /// Runs an action on the main thread synchronously. If called from the
-        /// main thread, runs inline. Otherwise throws (Unity's main thread
-        /// cannot block on itself).
+        /// main thread, runs inline. Otherwise throws when no fallback context
+        /// can marshal the call (Unity's main thread cannot block on itself).
         /// </summary>
         public static void Send(Action action)
         {
             if (action == null) return;
-            _context.Send(_ => action(), null);
+            if (_context != null)
+            {
+                _context.Send(_ => action(), null);
+                return;
+            }
+
+            if (IsMainThread)
+            {
+                action();
+                return;
+            }
+
+            throw new InvalidOperationException(
+                "[UnityMainThreadSyncContext] Send() called from a non-main thread while using UnitySynchronizationContext.");
         }
+
+        /// <summary>
+        /// Returns whether this type installed its own fallback context (false when
+        /// Unity's <c>UnitySynchronizationContext</c> was already present).
+        /// </summary>
+        internal static bool InstalledFallback => _installedFallback;
     }
 }
