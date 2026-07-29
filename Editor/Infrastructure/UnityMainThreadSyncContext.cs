@@ -133,8 +133,6 @@ namespace ModelLibrary.Editor.Infrastructure
                 // and pumps one generation per player-loop tick. Do not replace.
                 _context = null;
                 _installedFallback = false;
-                UnityEngine.Debug.Log(
-                    "[ModelLibrary] UnityMainThreadSyncContext: using existing UnitySynchronizationContext.");
                 return;
             }
 
@@ -142,7 +140,6 @@ namespace ModelLibrary.Editor.Infrastructure
             SynchronizationContext.SetSynchronizationContext(_context);
             EditorApplication.update += Pump;
             _installedFallback = true;
-            UnityEngine.Debug.Log("[ModelLibrary] UnityMainThreadSyncContext fallback installed.");
         }
 
         private static bool IsUnitySynchronizationContext(SynchronizationContext context)
