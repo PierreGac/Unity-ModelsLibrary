@@ -276,7 +276,7 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Draws the repository version path and local install path (when installed) under the header.
+        /// Draws the repository version path and preferred install path under the header.
         /// </summary>
         private void DrawModelPathSummary()
         {
@@ -286,11 +286,35 @@ namespace ModelLibrary.Editor.Windows
                 EditorGUILayout.LabelField($"Repository: {repositoryPath}", UIStyles.MutedLabel);
             }
 
-            if (_isInstalled && !string.IsNullOrEmpty(_installPath))
+            string installPath = ResolveDisplayInstallPath();
+            if (!string.IsNullOrEmpty(installPath))
             {
-                string installedPath = _installPath.Replace('\\', '/');
-                EditorGUILayout.LabelField($"Installed: {installedPath}", UIStyles.MutedLabel);
+                EditorGUILayout.LabelField($"Install Path: {installPath}", UIStyles.MutedLabel);
             }
+        }
+
+        /// <summary>
+        /// Resolves the install path shown in the header: metadata preferred path, then the local install folder.
+        /// </summary>
+        /// <returns>A display install path, or empty when none is available.</returns>
+        private string ResolveDisplayInstallPath()
+        {
+            if (!string.IsNullOrWhiteSpace(_meta?.installPath))
+            {
+                return PathUtils.SanitizePathSeparator(_meta.installPath.Trim());
+            }
+
+            if (!_isInstalled || string.IsNullOrEmpty(_installPath))
+            {
+                return string.Empty;
+            }
+
+            if (InstallPathUtils.TryConvertAbsoluteToProjectRelative(_installPath, out string relativePath))
+            {
+                return relativePath;
+            }
+
+            return PathUtils.SanitizePathSeparator(_installPath);
         }
 
         /// <summary>
