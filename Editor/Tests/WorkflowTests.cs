@@ -8,6 +8,7 @@ using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Repository;
 using ModelLibrary.Editor.Services;
 using ModelLibrary.Editor.Settings;
+using ModelLibrary.Editor.Utils;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -103,11 +104,11 @@ namespace ModelLibrary.Editor.Tests
                 }
             };
 
-            // Test grid view calculations
+            // Test grid view calculations against the production layout helper
             const float thumbnailSize = 128f;
-            const float spacing = 8f;
-            const float cardPadding = 4f;
-            const float minCardWidth = thumbnailSize + (cardPadding * 2);
+            const float spacing = UIConstants.SPACING_STANDARD;
+            const float cardPadding = UIConstants.PADDING_SMALL;
+            float cardLayoutWidth = GridLayoutUtils.GetGridCardLayoutWidth(thumbnailSize, cardPadding);
 
             // Test column calculation for various window widths
             float[] testWidths = { 400f, 600f, 800f, 1200f, 1600f };
@@ -115,12 +116,12 @@ namespace ModelLibrary.Editor.Tests
             {
                 float width = testWidths[i];
                 float availableWidth = width - 20f; // Account for scrollbar
-                int calculatedColumns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / (minCardWidth + spacing)));
+                int calculatedColumns = GridLayoutUtils.CalculateColumnCount(availableWidth, cardLayoutWidth, spacing);
+                float usedWidth = GridLayoutUtils.GetRowWidth(calculatedColumns, cardLayoutWidth, spacing);
 
                 Assert.GreaterOrEqual(calculatedColumns, 1, $"Should have at least 1 column for width {width}");
-                // Grid view can have more columns than entries - extra columns will just be empty
-                // For width 600, with minCardWidth ~136 and spacing 8, we get: (600-20)/(136+8) = 580/144 ≈ 4 columns
-                // This is correct behavior - the grid layout allows empty columns
+                Assert.LessOrEqual(usedWidth, availableWidth,
+                    $"Grid columns must fit in the viewport for width {width}");
             }
 
             // Test that entries can be processed in grid format
@@ -160,10 +161,11 @@ namespace ModelLibrary.Editor.Tests
 
             // Test column calculation with empty list
             const float thumbnailSize = 128f;
-            const float spacing = 8f;
-            const float cardPadding = 4f;
+            const float spacing = UIConstants.SPACING_STANDARD;
+            const float cardPadding = UIConstants.PADDING_SMALL;
             float availableWidth = 800f;
-            int columns = Mathf.Max(1, Mathf.FloorToInt(availableWidth / (thumbnailSize + (cardPadding * 2) + spacing)));
+            float cardLayoutWidth = GridLayoutUtils.GetGridCardLayoutWidth(thumbnailSize, cardPadding);
+            int columns = GridLayoutUtils.CalculateColumnCount(availableWidth, cardLayoutWidth, spacing);
 
             Assert.GreaterOrEqual(columns, 1, "Should calculate at least 1 column even with empty list");
         }

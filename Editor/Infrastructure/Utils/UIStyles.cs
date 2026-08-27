@@ -203,6 +203,7 @@ namespace ModelLibrary.Editor.Utils
                     UIConstants.PADDING_SMALL,
                     UIConstants.PADDING_SMALL)
             };
+            // Horizontal padding/margin must stay in sync with GridLayoutUtils.CardBox*Horizontal.
 
             _tagPill = new GUIStyle(EditorStyles.miniLabel)
             {

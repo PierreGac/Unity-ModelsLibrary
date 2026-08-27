@@ -46,10 +46,9 @@ namespace ModelLibrary.Editor.Windows
         private const float __GRID_CARD_PADDING = UIConstants.PADDING_SMALL;
         private const float __GRID_CARD_EXTRA_HEIGHT = 80f;
         private const float __GRID_CARD_NEW_VERSION_BUTTON_HEIGHT = 28f;
-        private const float __GRID_CARD_BOX_HORIZONTAL_MARGIN = UIConstants.PADDING_SMALL * 2f;
         private const float __BROWSER_CONTENT_HORIZONTAL_INSET = 20f;
         private const float __BROWSER_VERTICAL_SCROLLBAR_WIDTH = 18f;
-        private const float __GRID_LAYOUT_SAFETY_BUFFER = 4f;
+        private const float __GRID_LAYOUT_SAFETY_BUFFER = 8f;
         private const float __IMAGE_CARD_SPACING = UIConstants.SPACING_DEFAULT;
 
         private const float __LOADING_OVERLAY_ALPHA = 0.5f;
@@ -321,7 +320,24 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            _scroll = EditorGUILayout.BeginScrollView(_scroll);
+            bool suppressHorizontalScroll = _viewMode == ViewMode.Grid || _viewMode == ViewMode.ImageOnly;
+            if (suppressHorizontalScroll)
+            {
+                // Horizontal overflow is a layout bug, not a feature: hide the bar so IMGUI
+                // cannot steal vertical space and shrink the viewport in a feedback loop.
+                _scroll = EditorGUILayout.BeginScrollView(
+                    _scroll,
+                    false,
+                    false,
+                    GUIStyle.none,
+                    GUI.skin.verticalScrollbar,
+                    GUI.skin.scrollView);
+            }
+            else
+            {
+                _scroll = EditorGUILayout.BeginScrollView(_scroll);
+            }
+
             if (_viewMode == ViewMode.Grid)
             {
                 DrawGridView(filteredEntries);
@@ -335,6 +351,11 @@ namespace ModelLibrary.Editor.Windows
                 DrawListView(filteredEntries);
             }
             EditorGUILayout.EndScrollView();
+
+            if (suppressHorizontalScroll)
+            {
+                _scroll.x = 0f;
+            }
 
             // Draw thumbnail size slider in lower right corner (only for grid/image views)
             if (_viewMode == ViewMode.Grid || _viewMode == ViewMode.ImageOnly)
@@ -1013,26 +1034,15 @@ namespace ModelLibrary.Editor.Windows
         private float GetBrowserContentWidth()
         {
             float availableWidth = position.width;
-            if (availableWidth <= 1f)
+            if (EditorGUIUtility.currentViewWidth > 1f)
             {
-                availableWidth = EditorGUIUtility.currentViewWidth;
+                availableWidth = Mathf.Min(availableWidth, EditorGUIUtility.currentViewWidth);
             }
 
             availableWidth -= __BROWSER_CONTENT_HORIZONTAL_INSET
                 + __BROWSER_VERTICAL_SCROLLBAR_WIDTH
                 + __GRID_LAYOUT_SAFETY_BUFFER;
             return Mathf.Max(1f, availableWidth);
-        }
-
-        /// <summary>
-        /// Calculates how many fixed-width cards fit on one row, accounting for inter-card spacing.
-        /// </summary>
-        /// <param name="availableWidth">Usable viewport width for the row.</param>
-        /// <param name="cardLayoutWidth">Outer horizontal footprint of one card (content + margins).</param>
-        /// <param name="interCardSpacing">Space inserted between adjacent cards.</param>
-        private static int CalculateGridColumnCount(float availableWidth, float cardLayoutWidth, float interCardSpacing)
-        {
-            return Mathf.Max(1, Mathf.FloorToInt((availableWidth + interCardSpacing) / (cardLayoutWidth + interCardSpacing)));
         }
 
         private void DrawGridView(List<ModelIndex.Entry> entries)
@@ -1047,12 +1057,12 @@ namespace ModelLibrary.Editor.Windows
                 extraHeight += __GRID_CARD_NEW_VERSION_BUTTON_HEIGHT;
             }
 
-            float minCardWidth = thumbnailSize + (cardPadding * 2f);
             float minCardHeight = thumbnailSize + extraHeight;
-            float cardLayoutWidth = minCardWidth + __GRID_CARD_BOX_HORIZONTAL_MARGIN;
+            float cardOuterWidth = GridLayoutUtils.GetGridCardOuterWidth(thumbnailSize, cardPadding);
+            float cardLayoutWidth = GridLayoutUtils.GetGridCardLayoutWidth(thumbnailSize, cardPadding);
 
             float availableWidth = GetBrowserContentWidth();
-            int columns = CalculateGridColumnCount(availableWidth, cardLayoutWidth, spacing);
+            int columns = GridLayoutUtils.CalculateColumnCount(availableWidth, cardLayoutWidth, spacing);
             _lastGridColumns = columns;
 
             int totalRows = Mathf.CeilToInt((float)entries.Count / columns);
@@ -1071,31 +1081,34 @@ namespace ModelLibrary.Editor.Windows
                 GUILayout.Space(firstVisibleRow * rowHeight);
             }
 
-            for (int row = firstVisibleRow; row <= lastVisibleRow; row++)
+            using (new EditorGUILayout.VerticalScope(GUILayout.Width(availableWidth), GUILayout.MaxWidth(availableWidth), GUILayout.ExpandWidth(false)))
             {
-                using (new EditorGUILayout.HorizontalScope())
+                for (int row = firstVisibleRow; row <= lastVisibleRow; row++)
                 {
-                    for (int col = 0; col < columns; col++)
+                    using (new EditorGUILayout.HorizontalScope(GUILayout.MaxWidth(availableWidth), GUILayout.ExpandWidth(false)))
                     {
-                        int index = (row * columns) + col;
-                        if (index >= entries.Count)
+                        for (int col = 0; col < columns; col++)
                         {
-                            break;
+                            int index = (row * columns) + col;
+                            if (index >= entries.Count)
+                            {
+                                break;
+                            }
+
+                            ModelIndex.Entry entry = entries[index];
+                            bool isHighlighted = index == _keyboardSelectionIndex;
+                            DrawGridCard(entry, thumbnailSize, cardPadding, cardOuterWidth, minCardHeight, isHighlighted, canSubmitNewVersion);
+
+                            // Add spacing between cards (except for the last card in row)
+                            if (col < columns - 1)
+                            {
+                                GUILayout.Space(spacing);
+                            }
                         }
 
-                        ModelIndex.Entry entry = entries[index];
-                        bool isHighlighted = index == _keyboardSelectionIndex;
-                        DrawGridCard(entry, thumbnailSize, cardPadding, minCardHeight, isHighlighted, canSubmitNewVersion);
-
-                        // Add spacing between cards (except for the last card in row)
-                        if (col < columns - 1)
-                        {
-                            GUILayout.Space(spacing);
-                        }
+                        // Fill leftover row space without expanding the scroll-view content width
+                        GUILayout.FlexibleSpace();
                     }
-
-                    // Add flexible space at the end to prevent the last card from stretching
-                    GUILayout.FlexibleSpace();
                 }
             }
 
@@ -1113,7 +1126,7 @@ namespace ModelLibrary.Editor.Windows
             float cardLayoutWidth = thumbnailSize;
 
             float availableWidth = GetBrowserContentWidth();
-            int columns = CalculateGridColumnCount(availableWidth, cardLayoutWidth, spacing);
+            int columns = GridLayoutUtils.CalculateColumnCount(availableWidth, cardLayoutWidth, spacing);
             _lastImageColumns = columns;
             int totalRows = Mathf.CeilToInt((float)entries.Count / columns);
             float rowHeight = __IMAGE_ESTIMATED_ROW_HEIGHT;
@@ -1127,31 +1140,33 @@ namespace ModelLibrary.Editor.Windows
                 GUILayout.Space(firstVisibleRow * rowHeight);
             }
 
-            for (int row = firstVisibleRow; row <= lastVisibleRow; row++)
+            using (new EditorGUILayout.VerticalScope(GUILayout.Width(availableWidth), GUILayout.MaxWidth(availableWidth), GUILayout.ExpandWidth(false)))
             {
-                using (new EditorGUILayout.HorizontalScope())
+                for (int row = firstVisibleRow; row <= lastVisibleRow; row++)
                 {
-                    for (int col = 0; col < columns; col++)
+                    using (new EditorGUILayout.HorizontalScope(GUILayout.MaxWidth(availableWidth), GUILayout.ExpandWidth(false)))
                     {
-                        int index = (row * columns) + col;
-                        if (index >= entries.Count)
+                        for (int col = 0; col < columns; col++)
                         {
-                            break;
+                            int index = (row * columns) + col;
+                            if (index >= entries.Count)
+                            {
+                                break;
+                            }
+
+                            ModelIndex.Entry entry = entries[index];
+                            bool isHighlighted = index == _keyboardSelectionIndex;
+                            DrawImageOnlyCard(entry, thumbnailSize, isHighlighted);
+
+                            // Add spacing between cards (except for the last card in row)
+                            if (col < columns - 1)
+                            {
+                                GUILayout.Space(spacing);
+                            }
                         }
 
-                        ModelIndex.Entry entry = entries[index];
-                        bool isHighlighted = index == _keyboardSelectionIndex;
-                        DrawImageOnlyCard(entry, thumbnailSize, isHighlighted);
-
-                        // Add spacing between cards (except for the last card in row)
-                        if (col < columns - 1)
-                        {
-                            GUILayout.Space(spacing);
-                        }
+                        GUILayout.FlexibleSpace();
                     }
-
-                    // Add flexible space at the end to prevent the last card from stretching
-                    GUILayout.FlexibleSpace();
                 }
             }
 
@@ -1314,7 +1329,7 @@ namespace ModelLibrary.Editor.Windows
             GUI.backgroundColor = originalBackground;
         }
 
-        private void DrawGridCard(ModelIndex.Entry entry, float thumbnailSize, float padding, float minHeight, bool highlight, bool canSubmitNewVersion)
+        private void DrawGridCard(ModelIndex.Entry entry, float thumbnailSize, float padding, float cardOuterWidth, float minHeight, bool highlight, bool canSubmitNewVersion)
         {
             Color originalBackground = GUI.backgroundColor;
             if (highlight)
@@ -1322,11 +1337,12 @@ namespace ModelLibrary.Editor.Windows
                 GUI.backgroundColor = UIConstants.COLOR_SELECTION_BACKGROUND;
             }
 
-            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox, GUILayout.Width(thumbnailSize + (padding * 2f)), GUILayout.MinHeight(minHeight), GUILayout.ExpandWidth(false)))
+            using (new EditorGUILayout.VerticalScope(UIStyles.CardBox, GUILayout.Width(cardOuterWidth), GUILayout.MaxWidth(cardOuterWidth), GUILayout.MinHeight(minHeight), GUILayout.ExpandWidth(false)))
             {
+                float contentWidth = thumbnailSize + (padding * 2f);
                 if (_bulkSelectionMode)
                 {
-                    using (new EditorGUILayout.HorizontalScope())
+                    using (new EditorGUILayout.HorizontalScope(GUILayout.Width(contentWidth), GUILayout.MaxWidth(contentWidth)))
                     {
                         bool isSelected = _selectedModels.Contains(entry.id);
                         bool newSelected = EditorGUILayout.Toggle(isSelected, GUILayout.Width(20f));
@@ -1357,7 +1373,7 @@ namespace ModelLibrary.Editor.Windows
                 bool isLoadingMeta = _loadingMeta.Contains(key);
 
                 // Use horizontal scope to center the thumbnail and ensure it fills available width
-                using (new EditorGUILayout.HorizontalScope())
+                using (new EditorGUILayout.HorizontalScope(GUILayout.Width(contentWidth), GUILayout.MaxWidth(contentWidth)))
                 {
                     GUILayout.FlexibleSpace();
                     Rect thumbRect = GUILayoutUtility.GetRect(thumbnailSize, thumbnailSize, GUILayout.Width(thumbnailSize), GUILayout.Height(thumbnailSize), GUILayout.ExpandWidth(false));
@@ -1413,7 +1429,7 @@ namespace ModelLibrary.Editor.Windows
 
                 GUILayout.Space(UIConstants.SPACING_EXTRA_SMALL);
 
-                using (new EditorGUILayout.HorizontalScope())
+                using (new EditorGUILayout.HorizontalScope(GUILayout.Width(contentWidth), GUILayout.MaxWidth(contentWidth)))
                 {
                     bool isFavorite = _favoritesManager.IsFavorite(entry.id);
                     string starText = isFavorite ? "★" : "☆";
@@ -1449,7 +1465,7 @@ namespace ModelLibrary.Editor.Windows
                     }
 
                     // Calculate available width for the label (accounting for star button and update badge)
-                    float labelWidth = thumbnailSize + (padding * 2f) - 16f - (hasUpdateBadge ? 16f : 0f) - 8f; // Subtract space for buttons and margin
+                    float labelWidth = contentWidth - 16f - (hasUpdateBadge ? 16f : 0f) - 8f; // Subtract space for buttons and margin
 
                     // Get truncated text with ellipsis if needed
                     string displayName = TruncateTextWithEllipsis(entry.name, EditorStyles.miniLabel, labelWidth);
@@ -1458,7 +1474,7 @@ namespace ModelLibrary.Editor.Windows
                     GUILayout.Label(displayName, EditorStyles.miniLabel, GUILayout.Width(labelWidth), GUILayout.ExpandWidth(false));
                 }
 
-                GUILayout.Label($"v{entry.latestVersion}", EditorStyles.centeredGreyMiniLabel);
+                GUILayout.Label($"v{entry.latestVersion}", EditorStyles.centeredGreyMiniLabel, GUILayout.MaxWidth(contentWidth));
 
                 bool installed = TryGetLocalInstall(entry, out ModelMeta localMeta);
                 string localVersion = installed ? localMeta.version : null;
@@ -1470,16 +1486,26 @@ namespace ModelLibrary.Editor.Windows
                     string statusText = hasUpdate ? "Update Available" : "Installed";
                     Color textColor = hasUpdate ? UIConstants.COLOR_STATUS_UPDATE : UIConstants.COLOR_STATUS_INSTALLED;
                     Color bgColor = hasUpdate ? UIConstants.COLOR_STATUS_UPDATE_BG : UIConstants.COLOR_STATUS_INSTALLED_BG;
-                    UIStyles.DrawStatusBadge(statusText, textColor, bgColor);
+                    using (new EditorGUILayout.HorizontalScope(GUILayout.Width(contentWidth), GUILayout.MaxWidth(contentWidth)))
+                    {
+                        UIStyles.DrawStatusBadge(statusText, textColor, bgColor);
+                    }
                 }
                 else if (installed && (string.IsNullOrEmpty(localVersion) || localVersion == "(unknown)"))
                 {
-                    UIStyles.DrawStatusBadge("Installed", UIConstants.COLOR_STATUS_UNKNOWN, UIConstants.COLOR_STATUS_UNKNOWN_BG);
+                    using (new EditorGUILayout.HorizontalScope(GUILayout.Width(contentWidth), GUILayout.MaxWidth(contentWidth)))
+                    {
+                        UIStyles.DrawStatusBadge("Installed", UIConstants.COLOR_STATUS_UNKNOWN, UIConstants.COLOR_STATUS_UNKNOWN_BG);
+                    }
                 }
 
                 if (canSubmitNewVersion)
                 {
-                    DrawNewVersionSubmitButton(entry.id, EditorStyles.miniButton);
+                    DrawNewVersionSubmitButton(
+                        entry.id,
+                        EditorStyles.miniButton,
+                        GUILayout.Width(contentWidth),
+                        GUILayout.MaxWidth(contentWidth));
                 }
 
                 GUI.backgroundColor = originalBackground;
