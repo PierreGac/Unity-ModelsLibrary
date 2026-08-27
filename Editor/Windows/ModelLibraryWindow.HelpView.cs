@@ -166,11 +166,12 @@ namespace ModelLibrary.Editor.Windows
         private void DrawHelpSubmissionSection()
         {
             DrawHelpSectionHeader("Submitting Models");
-            DrawHelpParagraph("Artists can open the submission form from Actions ▾ → Submit Model or via Project view context menus. The form auto-saves drafts and provides validation hints inline.");
+            DrawHelpParagraph("Artists and Admins can open the submission form from Actions ▾ → Submit Model, Project view context menus, or New Version on model details and browser cards. The form auto-saves drafts and provides validation hints inline.");
             DrawHelpBulletedList(new string[]
             {
                 "Tabs organize the workflow: Basic Info, Assets, Images, and Advanced (changelog).",
                 "Switch between New Model and Update Existing using the toggle at the top of the form.",
+                "New Version on details or browser cards opens Update Existing already selected for that model. Submit Model starts a new entry; if you switch to Update Existing, use Select Model to search the catalog (nothing is pre-selected).",
                 "Drag and drop preview images directly into the Images tab, where size and format checks run automatically.",
                 "Use Save Draft to pause your work; you can clear the draft when finished or if requirements change."
             });

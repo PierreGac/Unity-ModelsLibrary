@@ -504,7 +504,7 @@ namespace ModelLibrary.Editor.Windows
                     hasError = true;
                     versionError = "Version must be in SemVer format (e.g., 1.0.0)";
                 }
-                else if (_mode == SubmitMode.Update && _existingModels.Count > 0)
+                else if (_mode == SubmitMode.Update && _hasValidUpdateSelection && _existingModels.Count > 0)
                 {
                     ModelIndex.Entry selectedModel = _existingModels[Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1)];
                     if (string.Equals(selectedModel.latestVersion, _version, StringComparison.OrdinalIgnoreCase))

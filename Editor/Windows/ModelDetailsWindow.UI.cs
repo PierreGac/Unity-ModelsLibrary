@@ -226,6 +226,22 @@ namespace ModelLibrary.Editor.Windows
                 GUILayout.FlexibleSpace();
                 using (new EditorGUILayout.HorizontalScope())
                 {
+                    SimpleUserIdentityProvider identityProviderForSubmit = new SimpleUserIdentityProvider();
+                    if (identityProviderForSubmit.CanSubmitModels())
+                    {
+                        GUIContent newVersionContent = new GUIContent(
+                            StringConstants.NEW_VERSION_BUTTON_LABEL,
+                            StringConstants.NEW_VERSION_BUTTON_TOOLTIP);
+                        if (UIStyles.DrawSecondaryButton(newVersionContent, GUILayout.Width(__NEW_VERSION_BUTTON_WIDTH)))
+                        {
+                            ModelLibraryWindow libraryWindow = GetWindow<ModelLibraryWindow>("Model Library");
+                            if (libraryWindow != null)
+                            {
+                                libraryWindow.NavigateToSubmitViewForUpdate(_modelId);
+                            }
+                        }
+                    }
+
                     if (UIStyles.DrawSecondaryButton("Compare Versions", GUILayout.Width(150)))
                     {
                         // Navigate to VersionComparison view in ModelLibraryWindow

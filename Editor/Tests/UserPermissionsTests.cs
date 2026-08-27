@@ -88,9 +88,9 @@ namespace ModelLibrary.Editor.Tests
             UserRole artistRole = UserRole.Artist;
             UserRole adminRole = UserRole.Admin;
 
-            bool developerCanSubmit = developerRole == UserRole.Artist || developerRole == UserRole.Admin;
-            bool artistCanSubmit = artistRole == UserRole.Artist || artistRole == UserRole.Admin;
-            bool adminCanSubmit = adminRole == UserRole.Artist || adminRole == UserRole.Admin;
+            bool developerCanSubmit = SimpleUserIdentityProvider.CanSubmitModels(developerRole);
+            bool artistCanSubmit = SimpleUserIdentityProvider.CanSubmitModels(artistRole);
+            bool adminCanSubmit = SimpleUserIdentityProvider.CanSubmitModels(adminRole);
 
             Assert.IsFalse(developerCanSubmit, "Developer should NOT be able to submit");
             Assert.IsTrue(artistCanSubmit, "Artist should be able to submit");
@@ -183,9 +183,9 @@ namespace ModelLibrary.Editor.Tests
             UserRole artistRole = UserRole.Artist;
             UserRole adminRole = UserRole.Admin;
 
-            bool developerCanSubmit = developerRole == UserRole.Artist || developerRole == UserRole.Admin;
-            bool artistCanSubmit = artistRole == UserRole.Artist || artistRole == UserRole.Admin;
-            bool adminCanSubmit = adminRole == UserRole.Artist || adminRole == UserRole.Admin;
+            bool developerCanSubmit = SimpleUserIdentityProvider.CanSubmitModels(developerRole);
+            bool artistCanSubmit = SimpleUserIdentityProvider.CanSubmitModels(artistRole);
+            bool adminCanSubmit = SimpleUserIdentityProvider.CanSubmitModels(adminRole);
 
             Assert.IsFalse(developerCanSubmit, "Developer should NOT be able to submit via context menu");
             Assert.IsTrue(artistCanSubmit, "Artist should be able to submit via context menu");

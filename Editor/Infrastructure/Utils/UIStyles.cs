@@ -311,11 +311,22 @@ namespace ModelLibrary.Editor.Utils
         /// </summary>
         public static bool DrawSecondaryButton(string text, params GUILayoutOption[] options)
         {
+            return DrawSecondaryButton(new GUIContent(text), options);
+        }
+
+        /// <summary>
+        /// Draws a button with secondary styling (gray background, white text).
+        /// </summary>
+        /// <param name="content">Button label and optional tooltip.</param>
+        /// <param name="options">Layout options.</param>
+        /// <returns>True when the button is clicked.</returns>
+        public static bool DrawSecondaryButton(GUIContent content, params GUILayoutOption[] options)
+        {
             Color originalBg = GUI.backgroundColor;
             Color originalColor = GUI.color;
             GUI.backgroundColor = UIConstants.COLOR_BUTTON_SECONDARY_BG;
             GUI.color = UIConstants.COLOR_BUTTON_SECONDARY_TEXT;
-            bool result = GUILayout.Button(text, ButtonSecondary, options);
+            bool result = GUILayout.Button(content, ButtonSecondary, options);
             GUI.backgroundColor = originalBg;
             GUI.color = originalColor;
             return result;

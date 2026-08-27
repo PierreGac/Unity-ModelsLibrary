@@ -159,6 +159,10 @@ namespace ModelLibrary.Editor.Windows
         private const string __RESOLVE_MESH_DEPENDENCIES_PARAM = "resolveMeshDependencies";
         /// <summary>View parameter key for asset GUIDs captured at submit entry (e.g. context menu).</summary>
         private const string __SUBMIT_SELECTION_GUIDS_PARAM = "submitSelectionGuids";
+        /// <summary>View parameter key for the submit form mode (New or Update).</summary>
+        private const string __SUBMIT_MODE_PARAM = "submitMode";
+        /// <summary>View parameter key for the model id to pre-select in Update Existing mode.</summary>
+        private const string __SUBMIT_UPDATE_MODEL_ID_PARAM = "submitUpdateModelId";
         /// <summary>Hidden ModelSubmitWindow instance for reuse.</summary>
         private ModelSubmitWindow _submitWindowInstance;
         /// <summary>When true, the submit form is reset on the next Submit view draw.</summary>
@@ -167,6 +171,10 @@ namespace ModelLibrary.Editor.Windows
         private bool _resolveMeshDependenciesOnNextDraw;
         /// <summary>Asset GUIDs captured at entry, used on the next submit form reset.</summary>
         private string[] _submitSelectionGuidsOnNextDraw;
+        /// <summary>Submit mode applied on the next submit form reset.</summary>
+        private ModelSubmitWindow.SubmitMode _submitModeOnNextDraw = ModelSubmitWindow.SubmitMode.New;
+        /// <summary>Model id to pre-select when resetting the submit form in Update mode.</summary>
+        private string _submitUpdateModelIdOnNextDraw;
 
         // BatchUploadWindow state (for view mode)
         /// <summary>Selected source directory for batch upload.</summary>

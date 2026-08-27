@@ -6,7 +6,7 @@ namespace ModelLibrary.Editor.Windows
     /// Wizard window for submitting new models or updating existing models to the repository.
     /// Provides a comprehensive form for entering model metadata, selecting assets, and managing versions.
     /// Includes validation for changelogs, paths, and version numbers.
-    /// Only accessible to users with the Artist role.
+    /// Only accessible to users with the Artist or Admin role.
     ///
     /// This class is split into partial classes for better maintainability:
     /// - ModelSubmitWindow.State.cs: Field declarations, enums, and constants

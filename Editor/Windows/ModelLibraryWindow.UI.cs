@@ -40,10 +40,12 @@ namespace ModelLibrary.Editor.Windows
         private const float __LIST_BUTTON_DETAILS_WIDTH = 70f;
         private const float __LIST_BUTTON_DOWNLOAD_WIDTH = 90f;
         private const float __LIST_BUTTON_IMPORT_WIDTH = 80f;
+        private const float __LIST_BUTTON_NEW_VERSION_WIDTH = 100f;
 
         private const float __GRID_CARD_SPACING = UIConstants.SPACING_STANDARD;
         private const float __GRID_CARD_PADDING = UIConstants.PADDING_SMALL;
         private const float __GRID_CARD_EXTRA_HEIGHT = 80f;
+        private const float __GRID_CARD_NEW_VERSION_BUTTON_HEIGHT = 28f;
         private const float __GRID_CARD_BOX_HORIZONTAL_MARGIN = UIConstants.PADDING_SMALL * 2f;
         private const float __BROWSER_CONTENT_HORIZONTAL_INSET = 20f;
         private const float __BROWSER_VERTICAL_SCROLLBAR_WIDTH = 18f;
@@ -1038,8 +1040,15 @@ namespace ModelLibrary.Editor.Windows
             float thumbnailSize = _thumbnailSize;
             float spacing = __GRID_CARD_SPACING;
             float cardPadding = __GRID_CARD_PADDING;
+            bool canSubmitNewVersion = CurrentUserCanSubmitModels();
+            float extraHeight = __GRID_CARD_EXTRA_HEIGHT;
+            if (canSubmitNewVersion)
+            {
+                extraHeight += __GRID_CARD_NEW_VERSION_BUTTON_HEIGHT;
+            }
+
             float minCardWidth = thumbnailSize + (cardPadding * 2f);
-            float minCardHeight = thumbnailSize + __GRID_CARD_EXTRA_HEIGHT;
+            float minCardHeight = thumbnailSize + extraHeight;
             float cardLayoutWidth = minCardWidth + __GRID_CARD_BOX_HORIZONTAL_MARGIN;
 
             float availableWidth = GetBrowserContentWidth();
@@ -1048,6 +1057,10 @@ namespace ModelLibrary.Editor.Windows
 
             int totalRows = Mathf.CeilToInt((float)entries.Count / columns);
             float rowHeight = __GRID_ESTIMATED_ROW_HEIGHT;
+            if (canSubmitNewVersion)
+            {
+                rowHeight += __GRID_CARD_NEW_VERSION_BUTTON_HEIGHT;
+            }
             int firstVisibleRow = Mathf.Max(0, Mathf.FloorToInt(_scroll.y / rowHeight));
             float viewHeight = GetVisibleViewHeight();
             int visibleRowCount = Mathf.CeilToInt(viewHeight / rowHeight) + __VIRTUALIZATION_BUFFER;
@@ -1072,7 +1085,7 @@ namespace ModelLibrary.Editor.Windows
 
                         ModelIndex.Entry entry = entries[index];
                         bool isHighlighted = index == _keyboardSelectionIndex;
-                        DrawGridCard(entry, thumbnailSize, cardPadding, minCardHeight, isHighlighted);
+                        DrawGridCard(entry, thumbnailSize, cardPadding, minCardHeight, isHighlighted, canSubmitNewVersion);
 
                         // Add spacing between cards (except for the last card in row)
                         if (col < columns - 1)
@@ -1217,6 +1230,11 @@ namespace ModelLibrary.Editor.Windows
                         NavigateToView(ViewType.ModelDetails, parameters);
                     }
 
+                    if (CurrentUserCanSubmitModels())
+                    {
+                        DrawNewVersionSubmitButton(entry.id, GUILayout.Width(__LIST_BUTTON_NEW_VERSION_WIDTH));
+                    }
+
                     bool downloaded = IsDownloaded(entry.id, entry.latestVersion);
                     using (new EditorGUI.DisabledScope(downloaded || isBusy))
                     {
@@ -1296,7 +1314,7 @@ namespace ModelLibrary.Editor.Windows
             GUI.backgroundColor = originalBackground;
         }
 
-        private void DrawGridCard(ModelIndex.Entry entry, float thumbnailSize, float padding, float minHeight, bool highlight = false)
+        private void DrawGridCard(ModelIndex.Entry entry, float thumbnailSize, float padding, float minHeight, bool highlight, bool canSubmitNewVersion)
         {
             Color originalBackground = GUI.backgroundColor;
             if (highlight)
@@ -1459,7 +1477,73 @@ namespace ModelLibrary.Editor.Windows
                     UIStyles.DrawStatusBadge("Installed", UIConstants.COLOR_STATUS_UNKNOWN, UIConstants.COLOR_STATUS_UNKNOWN_BG);
                 }
 
+                if (canSubmitNewVersion)
+                {
+                    DrawNewVersionSubmitButton(entry.id, EditorStyles.miniButton);
+                }
+
                 GUI.backgroundColor = originalBackground;
+            }
+        }
+
+        /// <summary>
+        /// Returns true when the current EditorPrefs role may submit models or new versions.
+        /// </summary>
+        private static bool CurrentUserCanSubmitModels()
+        {
+            SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
+            return identityProvider.CanSubmitModels();
+        }
+
+        /// <summary>
+        /// Draws the New Version action that opens Update Existing for <paramref name="modelId"/>.
+        /// </summary>
+        /// <param name="modelId">Catalog model id to pre-select.</param>
+        /// <param name="options">Layout options for the button.</param>
+        private void DrawNewVersionSubmitButton(string modelId, params GUILayoutOption[] options)
+        {
+            DrawNewVersionSubmitButtonCore(modelId, null, options);
+        }
+
+        /// <summary>
+        /// Draws the New Version action that opens Update Existing for <paramref name="modelId"/>.
+        /// </summary>
+        /// <param name="modelId">Catalog model id to pre-select.</param>
+        /// <param name="style">Button style.</param>
+        /// <param name="options">Layout options for the button.</param>
+        private void DrawNewVersionSubmitButton(string modelId, GUIStyle style, params GUILayoutOption[] options)
+        {
+            DrawNewVersionSubmitButtonCore(modelId, style, options);
+        }
+
+        /// <summary>
+        /// Draws the New Version action that opens Update Existing for <paramref name="modelId"/>.
+        /// </summary>
+        private void DrawNewVersionSubmitButtonCore(string modelId, GUIStyle style, GUILayoutOption[] options)
+        {
+            GUIContent content = new GUIContent(
+                StringConstants.NEW_VERSION_BUTTON_LABEL,
+                StringConstants.NEW_VERSION_BUTTON_TOOLTIP);
+
+            // Card highlight tints GUI.backgroundColor; buttons must draw with a neutral
+            // tint or the first (keyboard-selected) card looks like a different style.
+            Color originalBackground = GUI.backgroundColor;
+            GUI.backgroundColor = Color.white;
+            bool clicked;
+            if (style != null)
+            {
+                clicked = GUILayout.Button(content, style, options);
+            }
+            else
+            {
+                clicked = GUILayout.Button(content, options);
+            }
+
+            GUI.backgroundColor = originalBackground;
+
+            if (clicked)
+            {
+                NavigateToSubmitViewForUpdate(modelId);
             }
         }
 

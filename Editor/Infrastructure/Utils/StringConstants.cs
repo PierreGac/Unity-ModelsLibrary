@@ -23,5 +23,17 @@
 
         /// <summary>Default install path.</summary>
         public const string DEFAULT_INSTALL_PATH = "Assets/Models/NewModel";
+
+        /// <summary>Label for submitting a new repository version of an existing model.</summary>
+        public const string NEW_VERSION_BUTTON_LABEL = "New Version";
+
+        /// <summary>Tooltip for the New Version action (publish to repository, not local import).</summary>
+        public const string NEW_VERSION_BUTTON_TOOLTIP = "Submit a new version of this model to the repository";
+
+        /// <summary>Label for changing the model selected in Update Existing mode.</summary>
+        public const string CHANGE_MODEL_BUTTON_LABEL = "Change";
+
+        /// <summary>Label for choosing a model when Update Existing has no valid selection.</summary>
+        public const string SELECT_MODEL_BUTTON_LABEL = "Select Model";
     }
 }

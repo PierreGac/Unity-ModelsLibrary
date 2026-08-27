@@ -12,6 +12,9 @@ namespace ModelLibrary.Editor.Windows
     /// </summary>
     public partial class ModelDetailsWindow
     {
+        /// <summary>Width of the New Version action in the details footer.</summary>
+        private const float __NEW_VERSION_BUTTON_WIDTH = 120f;
+
         // Model Identification
         /// <summary>The unique identifier of the model being displayed.</summary>
         private string _modelId;

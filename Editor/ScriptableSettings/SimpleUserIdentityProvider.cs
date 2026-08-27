@@ -105,5 +105,26 @@ namespace ModelLibrary.Editor.Identity
             _cachedRole = null;
             _cachedRoleRaw = null;
         }
+
+        /// <summary>
+        /// Returns true when <paramref name="role"/> may submit models or new versions.
+        /// Advisory UI gating only; not a security boundary.
+        /// </summary>
+        /// <param name="role">The role to evaluate.</param>
+        /// <returns>True for Artist and Admin; false otherwise.</returns>
+        public static bool CanSubmitModels(UserRole role)
+        {
+            return role == UserRole.Artist || role == UserRole.Admin;
+        }
+
+        /// <summary>
+        /// Returns true when the current EditorPrefs role may submit models or new versions.
+        /// Advisory UI gating only; not a security boundary.
+        /// </summary>
+        /// <returns>True for Artist and Admin; false otherwise.</returns>
+        public bool CanSubmitModels()
+        {
+            return CanSubmitModels(GetUserRole());
+        }
     }
 }

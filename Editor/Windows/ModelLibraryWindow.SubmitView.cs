@@ -36,6 +36,25 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
+        /// Navigates to the Submit view already in Update Existing mode for a catalog model.
+        /// Does not pre-populate assets from the Project selection.
+        /// </summary>
+        /// <param name="modelId">Catalog model id to pre-select. When empty, Update Existing opens with the searchable picker.</param>
+        public void NavigateToSubmitViewForUpdate(string modelId)
+        {
+            Dictionary<string, object> parameters = new Dictionary<string, object>
+            {
+                { __SUBMIT_MODE_PARAM, ModelSubmitWindow.SubmitMode.Update }
+            };
+            if (!string.IsNullOrEmpty(modelId))
+            {
+                parameters[__SUBMIT_UPDATE_MODEL_ID_PARAM] = modelId;
+            }
+
+            NavigateToView(ViewType.Submit, parameters);
+        }
+
+        /// <summary>
         /// Initializes submit state when navigating to the Submit view.
         /// Always schedules a full form reset before the next draw.
         /// </summary>
@@ -44,6 +63,10 @@ namespace ModelLibrary.Editor.Windows
             _resetSubmitFormOnNextDraw = true;
             _resolveMeshDependenciesOnNextDraw = GetViewParameter<bool>(__RESOLVE_MESH_DEPENDENCIES_PARAM, false);
             _submitSelectionGuidsOnNextDraw = GetViewParameter<string[]>(__SUBMIT_SELECTION_GUIDS_PARAM, null);
+            _submitModeOnNextDraw = GetViewParameter<ModelSubmitWindow.SubmitMode>(
+                __SUBMIT_MODE_PARAM,
+                ModelSubmitWindow.SubmitMode.New);
+            _submitUpdateModelIdOnNextDraw = GetViewParameter<string>(__SUBMIT_UPDATE_MODEL_ID_PARAM, null);
         }
 
         /// <summary>
@@ -72,10 +95,20 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void ApplySubmitFormReset()
         {
-            _submitWindowInstance.PrepareForNewSubmission(_resolveMeshDependenciesOnNextDraw, _submitSelectionGuidsOnNextDraw);
+            if (_submitModeOnNextDraw == ModelSubmitWindow.SubmitMode.Update)
+            {
+                _submitWindowInstance.PrepareForUpdateSubmission(_submitUpdateModelIdOnNextDraw);
+            }
+            else
+            {
+                _submitWindowInstance.PrepareForNewSubmission(_resolveMeshDependenciesOnNextDraw, _submitSelectionGuidsOnNextDraw);
+            }
+
             _resetSubmitFormOnNextDraw = false;
             _resolveMeshDependenciesOnNextDraw = false;
             _submitSelectionGuidsOnNextDraw = null;
+            _submitModeOnNextDraw = ModelSubmitWindow.SubmitMode.New;
+            _submitUpdateModelIdOnNextDraw = null;
             Repaint();
         }
     }

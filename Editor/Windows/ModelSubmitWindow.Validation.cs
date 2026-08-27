@@ -110,6 +110,7 @@ namespace ModelLibrary.Editor.Windows
                 _installPath ?? string.Empty, "|",
                 _changeSummary ?? string.Empty, "|",
                 _selectedModelIndex.ToString(), "|",
+                _hasValidUpdateSelection.ToString(), "|",
                 _existingModels.Count.ToString(), "|",
                 selectedModelVersion, "|",
                 _isLoadingIndex.ToString(), "|",
@@ -216,6 +217,10 @@ namespace ModelLibrary.Editor.Windows
                 else if (_existingModels.Count == 0)
                 {
                     errors.Add("No existing models available to update");
+                }
+                else if (!_hasValidUpdateSelection)
+                {
+                    errors.Add(__SELECT_MODEL_REQUIRED_MESSAGE);
                 }
                 else
                 {

@@ -7,6 +7,7 @@ using ModelLibrary.Data;
 using ModelLibrary.Editor.Services;
 using ModelLibrary.Editor.Utils;
 using UnityEditor;
+using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
@@ -43,14 +44,119 @@ namespace ModelLibrary.Editor.Windows
         /// </param>
         public void PrepareForNewSubmission(bool resolveMeshDependencies = false, string[] selectionGuids = null)
         {
+            ResetSubmissionFormFields();
             _mode = SubmitMode.New;
+            _targetUpdateModelId = null;
+            _changeSummary = __DEFAULT_CHANGE_SUMMARY;
+
+            InitializeSelectedAssetsFromProjectSelection(selectionGuids);
+            if (resolveMeshDependencies)
+            {
+                AddDependenciesForAllMeshAssets();
+            }
+
+            PrePopulateFromSelection();
+            _installPath = ResolveDefaultInstallPath();
+        }
+
+        /// <summary>
+        /// Resets the form and switches to Update Existing for a catalog model.
+        /// Does not attach Project-view assets.
+        /// </summary>
+        /// <param name="modelId">Catalog model id to pre-select. When empty, the searchable picker is used.</param>
+        public void PrepareForUpdateSubmission(string modelId)
+        {
+            ResetSubmissionFormFields();
+            _mode = SubmitMode.Update;
+            _targetUpdateModelId = string.IsNullOrWhiteSpace(modelId) ? null : modelId.Trim();
+            _changeSummary = string.Empty;
+            ApplyTargetUpdateModelSelection();
+        }
+
+        /// <summary>
+        /// Finds the catalog index of a model by id.
+        /// </summary>
+        /// <param name="models">Catalog entries to search.</param>
+        /// <param name="modelId">Model id to match.</param>
+        /// <returns>The matching index, or -1 when not found.</returns>
+        public static int FindExistingModelIndex(IReadOnlyList<ModelIndex.Entry> models, string modelId)
+        {
+            if (models == null || string.IsNullOrEmpty(modelId))
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < models.Count; i++)
+            {
+                ModelIndex.Entry entry = models[i];
+                if (entry != null && string.Equals(entry.id, modelId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Resolves which catalog entry should be selected in Update Existing mode.
+        /// </summary>
+        /// <param name="models">Loaded catalog entries.</param>
+        /// <param name="targetModelId">Optional model id requested by navigation.</param>
+        /// <param name="currentSelectedIndex">Unused when resolving by id; kept for call-site compatibility.</param>
+        /// <param name="selectedIndex">Resolved index, or -1 when unresolved.</param>
+        /// <param name="modelIdMissing">True when <paramref name="targetModelId"/> is not in the catalog.</param>
+        /// <returns>True when a valid catalog selection is available.</returns>
+        public static bool TryResolveUpdateSelection(
+            IReadOnlyList<ModelIndex.Entry> models,
+            string targetModelId,
+            int currentSelectedIndex,
+            out int selectedIndex,
+            out bool modelIdMissing)
+        {
+            selectedIndex = currentSelectedIndex;
+            modelIdMissing = false;
+
+            if (models == null || models.Count == 0)
+            {
+                selectedIndex = -1;
+                modelIdMissing = !string.IsNullOrEmpty(targetModelId);
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(targetModelId))
+            {
+                int foundIndex = FindExistingModelIndex(models, targetModelId);
+                if (foundIndex >= 0)
+                {
+                    selectedIndex = foundIndex;
+                    return true;
+                }
+
+                modelIdMissing = true;
+                selectedIndex = -1;
+                return false;
+            }
+
+            // No deep-linked model: do not silently select the first catalog entry.
+            // The user must pick via the searchable picker (Submit Model → Update Existing).
+            selectedIndex = -1;
+            return false;
+        }
+
+        /// <summary>
+        /// Clears shared form fields used by both new and update submission entry points.
+        /// </summary>
+        private void ResetSubmissionFormFields()
+        {
             _selectedTab = FormTab.BasicInfo;
             _selectedModelIndex = 0;
             _loadingBaseMeta = false;
             _isSubmitting = false;
             _cancelSubmission = false;
-            _changeSummary = __DEFAULT_CHANGE_SUMMARY;
             _latestSelectedMeta = null;
+            _updateModelIdMissing = false;
+            _hasValidUpdateSelection = false;
 
             _name = __DEFAULT_MODEL_NAME;
             _version = __DEFAULT_VERSION;
@@ -81,15 +187,6 @@ namespace ModelLibrary.Editor.Windows
             _notificationTime = DateTime.MinValue;
 
             ClearPreviewTextureCache();
-
-            InitializeSelectedAssetsFromProjectSelection(selectionGuids);
-            if (resolveMeshDependencies)
-            {
-                AddDependenciesForAllMeshAssets();
-            }
-
-            PrePopulateFromSelection();
-            _installPath = ResolveDefaultInstallPath();
         }
 
         /// <summary>
@@ -178,11 +275,7 @@ namespace ModelLibrary.Editor.Windows
             else
             {
                 _changeSummary = string.Empty;
-                if (!_isLoadingIndex && _existingModels.Count > 0)
-                {
-                    _selectedModelIndex = Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1);
-                    _ = LoadBaseMetaForSelection();
-                }
+                ApplyTargetUpdateModelSelection();
             }
         }
 
@@ -200,14 +293,14 @@ namespace ModelLibrary.Editor.Windows
                     _existingModels.AddRange(index.entries.OrderBy(e => e.name));
                 }
 
-                if (_mode == SubmitMode.Update && _existingModels.Count > 0)
+                if (_mode == SubmitMode.Update)
                 {
-                    _selectedModelIndex = Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1);
-                    await LoadBaseMetaForSelection();
+                    ApplyResolvedUpdateSelection();
                 }
                 else
                 {
                     _latestSelectedMeta = null;
+                    _hasValidUpdateSelection = false;
                 }
             }
             catch
@@ -220,6 +313,43 @@ namespace ModelLibrary.Editor.Windows
             {
                 _isLoadingIndex = false;
                 Repaint();
+            }
+        }
+
+        /// <summary>
+        /// Applies <see cref="_targetUpdateModelId"/> (or the current index) once the catalog is available.
+        /// </summary>
+        private void ApplyTargetUpdateModelSelection()
+        {
+            if (_isLoadingIndex)
+            {
+                return;
+            }
+
+            ApplyResolvedUpdateSelection();
+        }
+
+        /// <summary>
+        /// Resolves the Update Existing catalog selection from the current in-memory index.
+        /// </summary>
+        private void ApplyResolvedUpdateSelection()
+        {
+            bool resolved = TryResolveUpdateSelection(
+                _existingModels,
+                _targetUpdateModelId,
+                _selectedModelIndex,
+                out int selectedIndex,
+                out bool modelIdMissing);
+            _updateModelIdMissing = modelIdMissing;
+            _hasValidUpdateSelection = resolved;
+            if (resolved)
+            {
+                _selectedModelIndex = selectedIndex;
+                _ = LoadBaseMetaForSelection();
+            }
+            else
+            {
+                _latestSelectedMeta = null;
             }
         }
 
@@ -237,24 +367,76 @@ namespace ModelLibrary.Editor.Windows
                 return false;
             }
 
-            string[] options = _existingModels.Select(e => $"{e.name} (latest v{e.latestVersion})").ToArray();
-            int newIndex = EditorGUILayout.Popup("Model", _selectedModelIndex, options);
-            if (newIndex != _selectedModelIndex)
+            if (_updateModelIdMissing)
             {
-                _selectedModelIndex = newIndex;
-                _ = LoadBaseMetaForSelection();
+                EditorGUILayout.HelpBox(__MODEL_NOT_FOUND_MESSAGE, MessageType.Warning);
             }
 
-            ModelIndex.Entry entry = _existingModels[Mathf.Clamp(_selectedModelIndex, 0, _existingModels.Count - 1)];
-            EditorGUILayout.LabelField("Current Latest", entry.latestVersion);
+            ModelIndex.Entry selectedEntry = null;
+            if (_hasValidUpdateSelection && _selectedModelIndex >= 0 && _selectedModelIndex < _existingModels.Count)
+            {
+                selectedEntry = _existingModels[_selectedModelIndex];
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                string modelLabel = selectedEntry != null
+                    ? ModelUpdatePickerDropdown.FormatModelOption(selectedEntry)
+                    : __NO_MODEL_SELECTED_LABEL;
+                EditorGUILayout.LabelField("Model", modelLabel);
+
+                string pickerLabel = selectedEntry != null
+                    ? StringConstants.CHANGE_MODEL_BUTTON_LABEL
+                    : StringConstants.SELECT_MODEL_BUTTON_LABEL;
+                GUIContent pickerContent = new GUIContent(pickerLabel, __UPDATE_PICKER_TOOLTIP);
+                Rect pickerRect = GUILayoutUtility.GetRect(
+                    pickerContent,
+                    GUI.skin.button,
+                    GUILayout.Width(__CHANGE_MODEL_BUTTON_WIDTH));
+                if (GUI.Button(pickerRect, pickerContent))
+                {
+                    ModelUpdatePickerDropdown dropdown = new ModelUpdatePickerDropdown(
+                        new AdvancedDropdownState(),
+                        _existingModels,
+                        OnUpdateModelPicked);
+                    dropdown.Show(pickerRect);
+                }
+            }
+
+            if (selectedEntry != null)
+            {
+                EditorGUILayout.LabelField("Current Latest", selectedEntry.latestVersion);
+            }
+
             if (_loadingBaseMeta)
             {
                 EditorGUILayout.LabelField("Loading metadata...", EditorStyles.miniLabel);
                 return false;
             }
 
-            _name = entry.name;
+            if (!_hasValidUpdateSelection || selectedEntry == null)
+            {
+                return false;
+            }
+
+            _name = selectedEntry.name;
             return true;
+        }
+
+        private void OnUpdateModelPicked(int index)
+        {
+            if (index < 0 || index >= _existingModels.Count)
+            {
+                return;
+            }
+
+            ModelIndex.Entry entry = _existingModels[index];
+            _selectedModelIndex = index;
+            _targetUpdateModelId = entry.id;
+            _updateModelIdMissing = false;
+            _hasValidUpdateSelection = true;
+            _ = LoadBaseMetaForSelection();
+            Repaint();
         }
 
         private async Task LoadBaseMetaForSelection()
@@ -349,6 +531,15 @@ namespace ModelLibrary.Editor.Windows
                 {
                     ErrorHandler.ShowErrorDialog("Validation Error",
                         "No existing models available for update. Please switch to 'New Model' mode.",
+                        ErrorHandler.ErrorCategory.Validation);
+                    _isSubmitting = false;
+                    return;
+                }
+
+                if (!_hasValidUpdateSelection)
+                {
+                    ErrorHandler.ShowErrorDialog("Validation Error",
+                        __SELECT_MODEL_REQUIRED_MESSAGE + ".",
                         ErrorHandler.ErrorCategory.Validation);
                     _isSubmitting = false;
                     return;

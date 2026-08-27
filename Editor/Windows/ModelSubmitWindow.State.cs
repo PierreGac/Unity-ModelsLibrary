@@ -44,6 +44,17 @@ namespace ModelLibrary.Editor.Windows
         private const int __BUTTON_WIDTH_SMALL = 24;
         /// <summary>Width for medium-sized buttons.</summary>
         private const int __BUTTON_WIDTH_MEDIUM = 50;
+        /// <summary>Width of the Change/Select Model button in Update Existing mode.</summary>
+        private const int __CHANGE_MODEL_BUTTON_WIDTH = 100;
+        /// <summary>Label shown when Update Existing has no resolved catalog selection.</summary>
+        private const string __NO_MODEL_SELECTED_LABEL = "None selected";
+        /// <summary>Tooltip for the searchable catalog picker.</summary>
+        private const string __UPDATE_PICKER_TOOLTIP = "Search and select a catalog model to update";
+        /// <summary>Warning when a deep-linked model id is not in the catalog.</summary>
+        private const string __MODEL_NOT_FOUND_MESSAGE =
+            "The selected model was not found in the catalog. Choose another model to update.";
+        /// <summary>Validation message when Update Existing has no catalog selection.</summary>
+        private const string __SELECT_MODEL_REQUIRED_MESSAGE = "Please select a model to update";
         /// <summary>Minimum height for the description text area.</summary>
         private const int __TEXT_AREA_HEIGHT_DESCRIPTION = 60;
         /// <summary>Minimum height for the changelog text area.</summary>
@@ -74,6 +85,12 @@ namespace ModelLibrary.Editor.Windows
         private readonly List<ModelIndex.Entry> _existingModels = new();
         /// <summary>Index of the selected model in update mode.</summary>
         private int _selectedModelIndex;
+        /// <summary>Model id to select after the catalog loads (Update Existing deep-link).</summary>
+        private string _targetUpdateModelId;
+        /// <summary>True when <see cref="_targetUpdateModelId"/> was not found in the catalog.</summary>
+        private bool _updateModelIdMissing;
+        /// <summary>True when Update Existing has a resolved catalog selection.</summary>
+        private bool _hasValidUpdateSelection;
         /// <summary>Flag indicating if the index is currently being loaded.</summary>
         private bool _isLoadingIndex;
         /// <summary>Flag indicating if base metadata is being loaded for the selected model.</summary>

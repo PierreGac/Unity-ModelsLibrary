@@ -17,7 +17,7 @@ namespace ModelLibrary.Editor.Windows
     {
         /// <summary>
         /// Opens the model submission window.
-        /// Checks user role and only allows Artists to access the submission interface.
+        /// Checks user role and only allows Artists or Admins to access the submission interface.
         /// Prevents opening during play mode.
         /// Now navigates to the Submit view in ModelLibraryWindow instead of opening a separate window.
         /// </summary>
@@ -29,32 +29,56 @@ namespace ModelLibrary.Editor.Windows
         /// </param>
         public static void Open(bool resolveMeshDependencies = false, string[] selectedAssetGuids = null)
         {
-            // Don't open during play mode
+            if (!TryGetSubmitHostWindow(out ModelLibraryWindow window))
+            {
+                return;
+            }
+
+            window.NavigateToSubmitView(resolveMeshDependencies, selectedAssetGuids);
+        }
+
+        /// <summary>
+        /// Opens the submission form in Update Existing mode for a catalog model.
+        /// </summary>
+        /// <param name="modelId">Catalog model id to pre-select.</param>
+        public static void OpenForUpdate(string modelId)
+        {
+            if (!TryGetSubmitHostWindow(out ModelLibraryWindow window))
+            {
+                return;
+            }
+
+            window.NavigateToSubmitViewForUpdate(modelId);
+        }
+
+        /// <summary>
+        /// Validates play mode and role, then returns the Model Library host window.
+        /// </summary>
+        /// <param name="window">The host window when the checks succeed.</param>
+        /// <returns>True when submission UI may be opened.</returns>
+        private static bool TryGetSubmitHostWindow(out ModelLibraryWindow window)
+        {
+            window = null;
             if (EditorApplication.isPlaying)
             {
                 EditorUtility.DisplayDialog("Cannot Open During Play Mode",
                     "The Model Submission window cannot be opened while the application is playing.\n\n" +
                     "Please stop play mode first.",
                     "OK");
-                return;
+                return false;
             }
 
-            // Only allow Artists to submit models
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
-            if (identityProvider.GetUserRole() != UserRole.Artist && identityProvider.GetUserRole() != UserRole.Admin)
+            if (!identityProvider.CanSubmitModels())
             {
                 EditorUtility.DisplayDialog("Access Denied",
                     "Model submission is only available for Artists or Admins. Please switch to Artist role in User Settings.",
                     "OK");
-                return;
+                return false;
             }
 
-            // Navigate to Submit view in ModelLibraryWindow
-            ModelLibraryWindow window = GetWindow<ModelLibraryWindow>("Model Library");
-            if (window != null)
-            {
-                window.NavigateToSubmitView(resolveMeshDependencies, selectedAssetGuids);
-            }
+            window = GetWindow<ModelLibraryWindow>("Model Library");
+            return window != null;
         }
 
         private void OnEnable()
