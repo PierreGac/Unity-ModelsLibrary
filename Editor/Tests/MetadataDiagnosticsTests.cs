@@ -16,20 +16,46 @@ namespace ModelLibrary.Editor.Tests
         [Test]
         public void TestManifestFileDetection()
         {
-            // Test that we can find manifest files in the project
-            // Use file system enumeration because AssetDatabase.FindAssets() cannot find files starting with dot
-            // Unity doesn't import files starting with dot, so they're not in the AssetDatabase
-            System.Collections.Generic.List<string> manifestPaths = new System.Collections.Generic.List<string>();
-
-            // Search for new naming convention (.modelLibrary.meta.json) first, then old naming for backward compatibility
-            foreach (string manifestPath in System.IO.Directory.EnumerateFiles("Assets", ".modelLibrary.meta.json", System.IO.SearchOption.AllDirectories))
+            // Diagnostic scan of the host Unity project. Ignore unexpected
+            // LogError from real manifests so this is not environment-dependent.
+            bool previousIgnoreFailingMessages = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = true;
+            try
             {
-                manifestPaths.Add(manifestPath);
+                ScanProjectManifestFiles();
             }
-            // Fallback for old files created before the naming change
-            foreach (string manifestPath in System.IO.Directory.EnumerateFiles("Assets", "modelLibrary.meta.json", System.IO.SearchOption.AllDirectories))
+            finally
             {
-                manifestPaths.Add(manifestPath);
+                LogAssert.ignoreFailingMessages = previousIgnoreFailingMessages;
+            }
+        }
+
+        private void ScanProjectManifestFiles()
+        {
+            System.Collections.Generic.List<string> manifestPaths = new System.Collections.Generic.List<string>();
+            string assetsRoot = Application.dataPath;
+            if (string.IsNullOrEmpty(assetsRoot) || !Directory.Exists(assetsRoot))
+            {
+                Debug.Log("[MetadataDiagnostics] Assets folder is not available — skipping project scan");
+                return;
+            }
+
+            try
+            {
+                foreach (string manifestPath in Directory.EnumerateFiles(assetsRoot, ".modelLibrary.meta.json", SearchOption.AllDirectories))
+                {
+                    manifestPaths.Add(manifestPath);
+                }
+
+                foreach (string manifestPath in Directory.EnumerateFiles(assetsRoot, "modelLibrary.meta.json", SearchOption.AllDirectories))
+                {
+                    manifestPaths.Add(manifestPath);
+                }
+            }
+            catch (DirectoryNotFoundException)
+            {
+                Debug.Log("[MetadataDiagnostics] Assets folder was not found — skipping project scan");
+                return;
             }
 
             string[] manifestFiles = manifestPaths.ToArray();
@@ -265,17 +291,23 @@ namespace ModelLibrary.Editor.Tests
                 Debug.Log("[MetadataDiagnostics] Null JSON correctly throws ArgumentException (expected behavior)");
             }
 
-            // Test handling of invalid JSON
+            // Invalid ModelMeta JSON is recovered via fallback deserialization
+            // (empty instance) rather than throwing or returning null.
+            // JsonUtility may also emit an error log while rejecting the payload.
             string invalidJson = "{ invalid json }";
+            bool previousIgnoreFailingMessages = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = true;
             try
             {
                 ModelMeta invalidResult = JsonUtil.FromJson<ModelMeta>(invalidJson);
-                Assert.IsNull(invalidResult, "Invalid JSON should return null or throw exception");
+                Assert.IsNotNull(invalidResult, "Invalid ModelMeta JSON should fall back to an empty instance");
+                Assert.IsTrue(
+                    invalidResult.identity == null || string.IsNullOrEmpty(invalidResult.identity.id),
+                    "Fallback ModelMeta should not invent an identity id");
             }
-            catch (System.ArgumentException)
+            finally
             {
-                // Unity's JsonUtility throws ArgumentException for invalid JSON - this is expected
-                Debug.Log("[MetadataDiagnostics] Invalid JSON correctly throws ArgumentException (expected behavior)");
+                LogAssert.ignoreFailingMessages = previousIgnoreFailingMessages;
             }
         }
 

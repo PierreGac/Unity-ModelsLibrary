@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Services;
 using ModelLibrary.Editor.Utils;
@@ -68,20 +69,27 @@ namespace ModelLibrary.Editor.Tests
             Assert.IsNotNull(method, "ImportFromCacheAsync method should exist");
 
             ParameterInfo[] parameters = method.GetParameters();
-            Assert.AreEqual(5, parameters.Length, "ImportFromCacheAsync should have 5 parameters");
+            Assert.AreEqual(6, parameters.Length, "ImportFromCacheAsync should have 6 parameters");
 
-            // Check that isUpdate parameter exists
+            // Check that isUpdate and cancellationToken parameters exist
             bool hasIsUpdateParam = false;
-            foreach (ParameterInfo param in parameters)
+            bool hasCancellationTokenParam = false;
+            for (int i = 0; i < parameters.Length; i++)
             {
+                ParameterInfo param = parameters[i];
                 if (param.Name == "isUpdate" && param.ParameterType == typeof(bool))
                 {
                     hasIsUpdateParam = true;
-                    break;
+                }
+
+                if (param.Name == "cancellationToken" && param.ParameterType == typeof(CancellationToken))
+                {
+                    hasCancellationTokenParam = true;
                 }
             }
 
             Assert.IsTrue(hasIsUpdateParam, "ImportFromCacheAsync should have isUpdate parameter");
+            Assert.IsTrue(hasCancellationTokenParam, "ImportFromCacheAsync should have cancellationToken parameter");
         }
 
         [Test]

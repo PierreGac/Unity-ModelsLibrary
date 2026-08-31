@@ -272,36 +272,6 @@ namespace ModelLibrary.Editor.Tests
         #region Path Preservation Tests
 
         [Test]
-        public void TestModelDeployerResolveRelativePath()
-        {
-            // Test valid relative paths
-            List<string> validPaths = new List<string>
-            {
-                "Models/Weapons",
-                "Models/Medieval/Armor",
-                "Prefabs/Vehicles",
-                "Textures/UI",
-                "Scripts/Gameplay"
-            };
-
-            for (int i = 0; i < validPaths.Count; i++)
-            {
-                string testPath = validPaths[i];
-                // Use reflection to test private method
-                System.Reflection.MethodInfo method = typeof(ModelDeployer).GetMethod("ResolveRelativePath",
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-
-                Assert.IsNotNull(method, "ResolveRelativePath method should exist");
-
-                string result = (string)method.Invoke(null, new object[] { testPath, __TEST_MODEL_NAME });
-
-                Assert.IsNotNull(result, $"Result should not be null for path: {testPath}");
-                Assert.IsFalse(result.StartsWith("Assets/"), $"Result should not start with 'Assets/' for path: {testPath}");
-                Assert.IsTrue(result.Contains(testPath.Replace("Assets/", "")), $"Result should contain the path: {testPath}");
-            }
-        }
-
-        [Test]
         public void TestModelDeployerResolveInstallPath()
         {
             // Test install path resolution

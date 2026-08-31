@@ -110,6 +110,8 @@ namespace ModelLibrary.Editor.Utils
                             {
                                 result.Errors.Add(
                                     $"Install path '{normalizedPath}' already contains model files. Use a dedicated subfolder per model.");
+                                result.SuggestedInstallPath = PathUtils.SanitizePathSeparator(
+                                    $"{normalizedPath}/{sanitizedModelName}");
                             }
 
                             List<string> nestedModelFolders = GetNestedModelFolderNames(absolutePath);
@@ -227,15 +229,14 @@ namespace ModelLibrary.Editor.Utils
             string parentPath = normalizedPath;
             if (FolderLooksLikeModelLeaf(normalizedPath))
             {
-                parentPath = Path.GetDirectoryName(normalizedPath.Replace('/', Path.DirectorySeparatorChar));
+                parentPath = GetParentPath(normalizedPath);
                 if (string.IsNullOrEmpty(parentPath))
                 {
                     parentPath = "Assets/Models";
                 }
-                parentPath = PathUtils.SanitizePathSeparator(parentPath);
             }
 
-            if (!parentPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+            if (!IsProjectRelativeAssetsPath(parentPath))
             {
                 parentPath = $"Assets/{parentPath.TrimStart('/')}";
             }
@@ -257,6 +258,23 @@ namespace ModelLibrary.Editor.Utils
             }
 
             return string.Equals(GetLastPathSegment(installPath), folderName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Returns true when <paramref name="path"/> is already project-relative under Assets
+        /// (either the Assets root itself or a path starting with Assets/).
+        /// </summary>
+        /// <param name="path">Normalized install path using forward slashes.</param>
+        /// <returns>True when the path should not get an extra Assets/ prefix.</returns>
+        private static bool IsProjectRelativeAssetsPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            return string.Equals(path, "Assets", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string GetLastPathSegment(string installPath)

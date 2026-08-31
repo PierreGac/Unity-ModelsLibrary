@@ -46,6 +46,7 @@ namespace ModelLibrary.Editor.Tests
             Directory.CreateDirectory(modelPath);
             File.WriteAllText(Path.Combine(modelPath, "Existing.fbx"), "dummy");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -61,6 +62,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -76,6 +78,7 @@ namespace ModelLibrary.Editor.Tests
             Directory.CreateDirectory(modelPath);
             File.WriteAllText(Path.Combine(modelPath, ".modelLibrary.meta.json"), "{}");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -84,6 +87,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -98,6 +102,7 @@ namespace ModelLibrary.Editor.Tests
             string modelPath = Path.Combine(tempRoot, "Assets", "Models", "My_Model");
             Directory.CreateDirectory(modelPath);
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -106,6 +111,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -122,6 +128,7 @@ namespace ModelLibrary.Editor.Tests
             File.WriteAllText(Path.Combine(modelPath, "CleaningProducts.fbx"), "dummy");
             File.WriteAllText(Path.Combine(modelPath, ".modelLibrary.meta.json"), "{}");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -138,6 +145,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -153,6 +161,7 @@ namespace ModelLibrary.Editor.Tests
             Directory.CreateDirectory(modelPath);
             File.WriteAllText(Path.Combine(modelPath, "CleaningProducts.fbx"), "dummy");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -169,6 +178,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -187,6 +197,7 @@ namespace ModelLibrary.Editor.Tests
             File.WriteAllText(Path.Combine(modelPath, ".modelLibrary.meta.json"), "{}");
             File.WriteAllText(Path.Combine(partsPath, "Part.fbx"), "dummy");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -202,6 +213,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -219,6 +231,7 @@ namespace ModelLibrary.Editor.Tests
             File.WriteAllText(Path.Combine(modelPath, "My_Model.fbx"), "dummy");
             File.WriteAllText(Path.Combine(modelPath, ".modelLibrary.meta.json"), "{}");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -235,6 +248,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -251,6 +265,7 @@ namespace ModelLibrary.Editor.Tests
             Directory.CreateDirectory(nestedModelPath);
             File.WriteAllText(Path.Combine(nestedModelPath, "ExistingModel.fbx"), "dummy");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -268,6 +283,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -282,9 +298,9 @@ namespace ModelLibrary.Editor.Tests
             string modelPath = Path.Combine(tempRoot, "Assets", "Models", "My_Model");
             string partsPath = Path.Combine(modelPath, "Parts");
             Directory.CreateDirectory(partsPath);
-            File.WriteAllText(Path.Combine(modelPath, "My_Model.fbx"), "dummy");
             File.WriteAllText(Path.Combine(partsPath, "Part.fbx"), "dummy");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -301,6 +317,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -316,6 +333,7 @@ namespace ModelLibrary.Editor.Tests
             Directory.CreateDirectory(modelPath);
             File.WriteAllText(Path.Combine(modelPath, "Existing.fbx"), "dummy");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -333,6 +351,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -348,6 +367,7 @@ namespace ModelLibrary.Editor.Tests
             Directory.CreateDirectory(modelPath);
             File.WriteAllText(Path.Combine(modelPath, "My_Model.fbx"), "dummy");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -363,6 +383,35 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, true);
+                }
+            }
+        }
+
+        [Test]
+        public void BuildSuggestedInstallPath_DoesNotDoubleAssetsPrefixWhenParentIsAssetsRoot()
+        {
+            string tempRoot = Path.Combine(Path.GetTempPath(), "InstallPathValidator_" + System.Guid.NewGuid().ToString("N"));
+            string occupiedPath = Path.Combine(tempRoot, "Assets", "My Path");
+            Directory.CreateDirectory(occupiedPath);
+            File.WriteAllText(Path.Combine(occupiedPath, "Existing.fbx"), "dummy");
+
+            string previousCwd = Directory.GetCurrentDirectory();
+            try
+            {
+                Directory.SetCurrentDirectory(tempRoot);
+
+                string suggested = InstallPathValidator.BuildSuggestedInstallPath("Assets/My Path", MODEL_NAME);
+
+                Assert.AreEqual("Assets/My_Model", suggested);
+                Assert.IsFalse(suggested.StartsWith("Assets/Assets/", System.StringComparison.OrdinalIgnoreCase));
+            }
+            finally
+            {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -438,6 +487,7 @@ namespace ModelLibrary.Editor.Tests
             Directory.CreateDirectory(weaponsPath);
             File.WriteAllText(Path.Combine(weaponsPath, "Sword.fbx"), "dummy");
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -454,6 +504,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);
@@ -468,6 +519,7 @@ namespace ModelLibrary.Editor.Tests
             string emptyPath = Path.Combine(tempRoot, "Assets", "Art", "EmptyFolder");
             Directory.CreateDirectory(emptyPath);
 
+            string previousCwd = Directory.GetCurrentDirectory();
             try
             {
                 Directory.SetCurrentDirectory(tempRoot);
@@ -484,6 +536,7 @@ namespace ModelLibrary.Editor.Tests
             }
             finally
             {
+                Directory.SetCurrentDirectory(previousCwd);
                 if (Directory.Exists(tempRoot))
                 {
                     Directory.Delete(tempRoot, true);

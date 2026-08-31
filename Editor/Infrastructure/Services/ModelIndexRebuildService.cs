@@ -92,21 +92,13 @@ namespace ModelLibrary.Editor.Services
                     report.backupPath = backupPath;
                 }
 
-                // STABILITY (MED-08): Write the new index to a temp file
-                // first, then atomically move it into place. This prevents
-                // leaving the index in a corrupt state if the write is
-                // interrupted (power loss, process kill).
+                // STABILITY (MED-08): Persist through SaveIndexAsync so the
+                // write is atomic (SafeFileWriter temp + move) and the
+                // repository file-existence cache is invalidated. Writing
+                // models_index.json directly left LoadIndexAsync returning
+                // an empty index when the file did not exist before rebuild.
                 ModelIndex newIndex = new ModelIndex { entries = entries };
-                string tempIndexPath = Path.Combine(root, MODELS_INDEX_FILE_NAME + ".tmp");
-                string json = JsonUtil.ToJson(newIndex);
-                await File.WriteAllTextAsync(tempIndexPath, json);
-                // File.Move with overwrite:true is atomic on the same volume
-                // (on Windows since .NET Core 3.0 / .NET 5; on Linux always).
-                if (File.Exists(indexPath))
-                {
-                    File.Delete(indexPath);
-                }
-                File.Move(tempIndexPath, indexPath);
+                await repo.SaveIndexAsync(newIndex);
                 report.success = report.errors.Count == 0;
             }
             catch (Exception ex)
