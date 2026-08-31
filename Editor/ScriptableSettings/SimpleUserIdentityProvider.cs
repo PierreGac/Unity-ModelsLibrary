@@ -51,7 +51,7 @@ namespace ModelLibrary.Editor.Identity
     /// Until a server-side enforcement layer exists, treat all role checks in
     /// the editor as advisory: a determined user can bypass any of them.
     /// </remarks>
-    public class SimpleUserIdentityProvider : IUserIdentityProvider
+    internal class SimpleUserIdentityProvider : IUserIdentityProvider
     {
         private const string Key = "ModelLibrary.UserName";
         private const string RoleKey = "ModelLibrary.UserRole";

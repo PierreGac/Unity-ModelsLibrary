@@ -7,7 +7,7 @@ namespace ModelLibrary.Editor.Windows
     /// Provides access to settings tab enumeration and navigation to the settings view.
     /// The actual settings UI is implemented in ModelLibraryWindow.SettingsView.
     /// </summary>
-    public static class UnifiedSettingsWindow
+    internal static class UnifiedSettingsWindow
     {
         /// <summary>
         /// Tab selection for the settings view.

@@ -8,7 +8,7 @@ namespace ModelLibrary.Editor.Utils
     /// <summary>
     /// Utility class for install path operations and path normalization.
     /// </summary>
-    public static class InstallPathUtils
+    internal static class InstallPathUtils
     {
         /// <summary>
         /// Sanitizes a folder name by replacing invalid characters with underscores.

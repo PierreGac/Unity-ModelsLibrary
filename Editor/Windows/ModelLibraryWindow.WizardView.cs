@@ -29,7 +29,7 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Initializes wizard state when navigating to the wizard view.
         /// </summary>
-        public void InitializeWizardState()
+        internal void InitializeWizardState()
         {
             ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
             SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();

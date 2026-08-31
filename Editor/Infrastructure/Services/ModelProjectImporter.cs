@@ -16,7 +16,7 @@ namespace ModelLibrary.Editor.Services
     /// Copies a cached model version into the project under Assets/Models/<ModelName>/
     /// Flattens payload and dependencies into the named folder, places images under an images/ subfolder.
     /// </summary>
-    public static class ModelProjectImporter
+    internal static class ModelProjectImporter
     {
         public static async Task<string> ImportFromCacheAsync(string cacheVersionRoot, ModelMeta meta, bool cleanDestination = true, string overrideInstallPath = null, bool isUpdate = false, CancellationToken cancellationToken = default)
         {

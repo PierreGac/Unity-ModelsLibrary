@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor.Utils
     /// Manages recently used models persistence for the Model Library browser.
     /// Tracks the most recently imported models and maintains a limited history.
     /// </summary>
-    public class RecentlyUsedManager
+    internal class RecentlyUsedManager
     {
         private readonly List<string> _recentlyUsed = new List<string>();
         private readonly string _prefsKey;

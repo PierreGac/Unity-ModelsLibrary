@@ -10,7 +10,7 @@ namespace ModelLibrary.Editor.Utils
     /// Manages favorites persistence for the Model Library browser.
     /// Handles loading, saving, and toggling favorite status of models.
     /// </summary>
-    public class FavoritesManager
+    internal class FavoritesManager
     {
         private readonly HashSet<string> _favorites = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly string _prefsKey;

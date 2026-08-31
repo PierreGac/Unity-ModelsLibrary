@@ -12,7 +12,7 @@ namespace ModelLibrary.Editor.Windows
     /// First-run configuration wizard for the Model Library system.
     /// Provides a guided, multi-step setup experience covering user identity and repository configuration.
     /// </summary>
-    public class FirstRunWizard : EditorWindow
+    internal class FirstRunWizard : EditorWindow
     {
         /// <summary>
         /// Wizard step enumeration for navigation.

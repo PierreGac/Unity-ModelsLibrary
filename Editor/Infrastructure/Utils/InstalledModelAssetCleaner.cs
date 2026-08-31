@@ -13,7 +13,7 @@ namespace ModelLibrary.Editor.Utils
     /// using only paths and GUIDs listed in that version's local manifest.
     /// Does not recursively wipe the install folder.
     /// </summary>
-    public static class InstalledModelAssetCleaner
+    internal static class InstalledModelAssetCleaner
     {
         private const string NEW_MANIFEST_NAME = ".modelLibrary.meta.json";
         private const string OLD_MANIFEST_NAME = "modelLibrary.meta.json";

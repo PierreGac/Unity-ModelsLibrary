@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor.Utils
     /// Centralized logging utility for path preservation debugging.
     /// Provides structured logging for path-related operations across the ModelLibrary system.
     /// </summary>
-    public static class PathPreservationLogger
+    internal static class PathPreservationLogger
     {
         private const string __LOG_PREFIX = "[PathPreservation]";
         private const bool __ENABLE_DEBUG_LOGGING = true;

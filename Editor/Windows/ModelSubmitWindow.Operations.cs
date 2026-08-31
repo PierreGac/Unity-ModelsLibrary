@@ -42,7 +42,7 @@ namespace ModelLibrary.Editor.Windows
         /// <param name="selectionGuids">
         /// Optional asset GUIDs captured at entry time. Falls back to the current Project selection.
         /// </param>
-        public void PrepareForNewSubmission(bool resolveMeshDependencies = false, string[] selectionGuids = null)
+        internal void PrepareForNewSubmission(bool resolveMeshDependencies = false, string[] selectionGuids = null)
         {
             ResetSubmissionFormFields();
             _mode = SubmitMode.New;
@@ -64,7 +64,7 @@ namespace ModelLibrary.Editor.Windows
         /// Does not attach Project-view assets.
         /// </summary>
         /// <param name="modelId">Catalog model id to pre-select. When empty, the searchable picker is used.</param>
-        public void PrepareForUpdateSubmission(string modelId)
+        internal void PrepareForUpdateSubmission(string modelId)
         {
             ResetSubmissionFormFields();
             _mode = SubmitMode.Update;
@@ -79,7 +79,7 @@ namespace ModelLibrary.Editor.Windows
         /// <param name="models">Catalog entries to search.</param>
         /// <param name="modelId">Model id to match.</param>
         /// <returns>The matching index, or -1 when not found.</returns>
-        public static int FindExistingModelIndex(IReadOnlyList<ModelIndex.Entry> models, string modelId)
+        internal static int FindExistingModelIndex(IReadOnlyList<ModelIndex.Entry> models, string modelId)
         {
             if (models == null || string.IsNullOrEmpty(modelId))
             {
@@ -107,7 +107,7 @@ namespace ModelLibrary.Editor.Windows
         /// <param name="selectedIndex">Resolved index, or -1 when unresolved.</param>
         /// <param name="modelIdMissing">True when <paramref name="targetModelId"/> is not in the catalog.</param>
         /// <returns>True when a valid catalog selection is available.</returns>
-        public static bool TryResolveUpdateSelection(
+        internal static bool TryResolveUpdateSelection(
             IReadOnlyList<ModelIndex.Entry> models,
             string targetModelId,
             int currentSelectedIndex,

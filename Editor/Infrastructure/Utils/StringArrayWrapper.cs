@@ -26,7 +26,7 @@ namespace ModelLibrary.Editor.Utils
     /// </para>
     /// </remarks>
     [Serializable]
-    public class StringArrayWrapper
+    internal class StringArrayWrapper
     {
         /// <summary>The string array to serialize.</summary>
         public string[] values;

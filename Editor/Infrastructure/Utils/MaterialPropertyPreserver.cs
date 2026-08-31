@@ -6,7 +6,7 @@ namespace ModelLibrary.Editor.Utils
     /// Utility class for preserving material properties when copying or instantiating materials.
     /// Ensures consistent material rendering properties across different contexts.
     /// </summary>
-    public static class MaterialPropertyPreserver
+    internal static class MaterialPropertyPreserver
     {
         // Material property names
         private const string PROPERTY_ALPHA_CLIP = "_AlphaClip";

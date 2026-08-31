@@ -6,7 +6,7 @@ namespace ModelLibrary.Editor.Utils
     /// Viewport-aware layout math for the model browser grid and image-only views.
     /// Card footprint values must stay in sync with <see cref="UIStyles.CardBox"/> padding and margin.
     /// </summary>
-    public static class GridLayoutUtils
+    internal static class GridLayoutUtils
     {
         /// <summary>
         /// Left + right padding of <see cref="UIStyles.CardBox"/> (<see cref="UIConstants.PADDING_LARGE"/> on each side).

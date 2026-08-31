@@ -4,7 +4,7 @@
     /// Constants for string length limits and common string values.
     /// Centralizes string-related constants to eliminate magic numbers.
     /// </summary>
-    public static class StringConstants
+    internal static class StringConstants
     {
         /// <summary>Maximum length for string truncation in tooltips (50 characters).</summary>
         public const int MAX_TOOLTIP_PREVIEW_LENGTH = 50;

@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace ModelLibrary.Editor.Windows
 {
-    public class PerformanceProfilerWindow : EditorWindow
+    internal class PerformanceProfilerWindow : EditorWindow
     {
         private const float __COLUMN_OPERATION_WIDTH = 220f;
         private const float __COLUMN_COUNT_WIDTH = 50f;

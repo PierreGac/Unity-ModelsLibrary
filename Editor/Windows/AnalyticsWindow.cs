@@ -13,7 +13,7 @@ namespace ModelLibrary.Editor.Windows
     /// Analytics dashboard window for viewing model usage statistics and reports.
     /// Displays import counts, view counts, most popular models, and usage trends.
     /// </summary>
-    public class AnalyticsWindow : EditorWindow
+    internal class AnalyticsWindow : EditorWindow
     {
         private const float __TOOLBAR_BUTTON_WIDTH_SMALL = 80f;
         private const float __TOOLBAR_BUTTON_WIDTH_MEDIUM = 100f;

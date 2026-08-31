@@ -8,7 +8,7 @@ namespace ModelLibrary.Editor.Utils
     /// Utility class for showing input dialogs in the Unity Editor.
     /// Provides simple text input functionality for user prompts.
     /// </summary>
-    public static class EditorInputDialog
+    internal static class EditorInputDialog
     {
         /// <summary>
         /// Shows a simple input dialog and returns the user's input.

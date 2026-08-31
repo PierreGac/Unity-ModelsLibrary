@@ -113,7 +113,7 @@ namespace ModelLibrary.Editor.Windows
         /// This ensures that changes to repository location or settings are properly reflected.
         /// Use this method for a complete refresh that matches the initialization process.
         /// </summary>
-        public void FullRefresh()
+        internal void FullRefresh()
         {
             // Don't refresh during play mode
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -133,7 +133,7 @@ namespace ModelLibrary.Editor.Windows
         /// Reinitializes services after configuration changes.
         /// This is an alias for FullRefresh() to maintain backward compatibility.
         /// </summary>
-        public void ReinitializeAfterConfiguration()
+        internal void ReinitializeAfterConfiguration()
         {
             FullRefresh();
         }
@@ -144,7 +144,7 @@ namespace ModelLibrary.Editor.Windows
         /// For a full refresh that includes service recreation, use FullRefresh() instead.
         /// Can be called from other windows (e.g., ModelSubmitWindow) after submission.
         /// </summary>
-        public void RefreshIndex()
+        internal void RefreshIndex()
         {
             // Don't refresh during play mode
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -166,7 +166,7 @@ namespace ModelLibrary.Editor.Windows
         /// Refreshes the manifest cache to update installation status.
         /// This should be called after removing a model from the project.
         /// </summary>
-        public void RefreshManifestCache()
+        internal void RefreshManifestCache()
         {
             // Clear caches to force re-scan
             _localInstallCache.Clear();
@@ -407,7 +407,7 @@ namespace ModelLibrary.Editor.Windows
         /// Updates the window title to reflect pending updates and notes.
         /// Can be called externally to refresh the title after notification state changes.
         /// </summary>
-        public void UpdateWindowTitle()
+        internal void UpdateWindowTitle()
         {
             List<string> indicators = new List<string>();
             if (_updateCount > 0)
@@ -462,7 +462,7 @@ namespace ModelLibrary.Editor.Windows
         /// Recomputes the number of models that contain unread notes.
         /// Can be called externally to refresh the count after notification state changes.
         /// </summary>
-        public void UpdateNotesCount()
+        internal void UpdateNotesCount()
         {
             _notesCount = 0;
             if (_indexCache?.entries == null)
@@ -484,7 +484,7 @@ namespace ModelLibrary.Editor.Windows
         /// Recomputes the number of models that have unread updates.
         /// Can be called externally to refresh the count after notification state changes.
         /// </summary>
-        public void UpdateUpdateCount()
+        internal void UpdateUpdateCount()
         {
             _updateCount = 0;
             if (_indexCache?.entries == null)

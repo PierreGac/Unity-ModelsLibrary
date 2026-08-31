@@ -7,7 +7,7 @@ namespace ModelLibrary.Editor.Utils
     /// Utility class for resolving Unity Editor-specific paths.
     /// Provides convenient access to project root and library paths.
     /// </summary>
-    public static class EditorPaths
+    internal static class EditorPaths
     {
         /// <summary>
         /// Gets the Unity project root directory (the folder containing Assets, Library, etc.).

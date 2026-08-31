@@ -13,7 +13,7 @@ namespace ModelLibrary.Editor.Services
     /// Service for managing model index operations.
     /// Handles loading, caching, and refreshing the global model index.
     /// </summary>
-    public class ModelIndexService
+    internal class ModelIndexService
     {
         private readonly IModelRepository _repo;
         private ModelIndex _indexCache;

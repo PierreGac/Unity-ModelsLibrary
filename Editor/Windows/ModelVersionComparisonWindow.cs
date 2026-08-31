@@ -15,7 +15,7 @@ namespace ModelLibrary.Editor.Windows
     /// <summary>
     /// Displays a side-by-side comparison of two model versions highlighting metadata differences.
     /// </summary>
-    public class ModelVersionComparisonWindow : EditorWindow
+    internal class ModelVersionComparisonWindow : EditorWindow
     {
         private const float __ColumnWidth = 0.5f;
         private const float __LABEL_BASE_WIDTH = 90f;

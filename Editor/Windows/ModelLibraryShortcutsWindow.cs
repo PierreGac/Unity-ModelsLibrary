@@ -7,7 +7,7 @@ namespace ModelLibrary.Editor.Windows
     /// <summary>
     /// Dedicated reference window listing keyboard shortcuts and productivity tips for the Model Library.
     /// </summary>
-    public class ModelLibraryShortcutsWindow : EditorWindow
+    internal class ModelLibraryShortcutsWindow : EditorWindow
     {
         private const float __SHORTCUT_LABEL_WIDTH = 180f;
         private struct ShortcutEntry

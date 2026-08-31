@@ -8,7 +8,7 @@ namespace ModelLibrary.Editor.Data
     /// Contains a search query and selected tags that can be quickly applied to the model browser.
     /// </summary>
     [Serializable]
-    public class FilterPreset
+    internal class FilterPreset
     {
         /// <summary>The name of the preset for display in the UI.</summary>
         public string name;

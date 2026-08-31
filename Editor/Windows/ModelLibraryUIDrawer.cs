@@ -14,7 +14,7 @@ namespace ModelLibrary.Editor.Windows
     /// Static helper class for drawing UI components in the Model Library browser window.
     /// Provides reusable UI drawing methods that take parameters instead of accessing instance fields.
     /// </summary>
-    public static class ModelLibraryUIDrawer
+    internal static class ModelLibraryUIDrawer
     {
         /// <summary>
         /// Filter mode for displaying models.

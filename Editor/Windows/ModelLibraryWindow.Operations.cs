@@ -320,7 +320,7 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        public void CancelImport(string modelId)
+        private void CancelImport(string modelId)
         {
             if (_importsInProgress.Contains(modelId))
             {
@@ -332,7 +332,7 @@ namespace ModelLibrary.Editor.Windows
             }
         }
 
-        public void UndoLastImport()
+        private void UndoLastImport()
         {
             if (_importHistory.Count == 0)
             {

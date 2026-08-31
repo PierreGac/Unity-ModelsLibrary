@@ -7,7 +7,7 @@ namespace ModelLibrary.Editor.Utils
     /// <summary>
     /// Creates <see cref="ModelIndex.Entry"/> instances from <see cref="ModelMeta"/> for index updates and rebuilds.
     /// </summary>
-    public static class ModelIndexEntryFactory
+    internal static class ModelIndexEntryFactory
     {
         /// <summary>
         /// Builds an index entry from the latest-version metadata for a model family.

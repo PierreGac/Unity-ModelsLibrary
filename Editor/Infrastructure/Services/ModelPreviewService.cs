@@ -12,7 +12,7 @@ namespace ModelLibrary.Editor.Services
     /// Service for managing preview texture operations.
     /// Handles loading and caching preview textures from the repository.
     /// </summary>
-    public class ModelPreviewService
+    internal class ModelPreviewService
     {
         private readonly IModelRepository _repo;
         private readonly Dictionary<string, Texture2D> _previewCache = new Dictionary<string, Texture2D>();

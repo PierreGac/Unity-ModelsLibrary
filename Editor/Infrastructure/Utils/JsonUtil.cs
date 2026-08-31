@@ -12,7 +12,7 @@ namespace ModelLibrary.Editor.Utils
     ///
     /// For robust deserialization that handles schema changes, use the versioned methods.
     /// </summary>
-    public static class JsonUtil
+    internal static class JsonUtil
     {
         /// <summary>
         /// Convert an object to JSON string format.

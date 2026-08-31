@@ -10,7 +10,7 @@ namespace ModelLibrary.Editor.Utils
     /// Helper class for install path operations that require Unity Editor dialogs.
     /// Handles determining default install paths and prompting users for custom paths.
     /// </summary>
-    public class InstallPathHelper
+    internal class InstallPathHelper
     {
         /// <summary>
         /// Determines the install path for a model based on its metadata.

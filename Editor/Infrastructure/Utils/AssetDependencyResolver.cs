@@ -13,7 +13,7 @@ namespace ModelLibrary.Editor.Utils
     /// Single source of truth for <see cref="AssetDatabase.GetDependencies"/> usage
     /// when collecting materials, textures, and related assets for model submission.
     /// </summary>
-    public static class AssetDependencyResolver
+    internal static class AssetDependencyResolver
     {
         /// <summary>
         /// Callback invoked when a dependency mesh path is encountered during meta enrichment.

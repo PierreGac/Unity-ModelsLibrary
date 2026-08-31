@@ -15,7 +15,7 @@ namespace ModelLibrary.Editor.Services
     /// Manifest files are scanned once per refresh. GUID-based detection is retained as a
     /// bounded-concurrency fallback for projects created before manifests were introduced.
     /// </summary>
-    public class ModelScanService
+    internal class ModelScanService
     {
         private const int MAX_CONCURRENT_LEGACY_LOOKUPS = 4;
 

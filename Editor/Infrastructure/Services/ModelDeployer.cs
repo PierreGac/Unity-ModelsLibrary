@@ -16,7 +16,7 @@ namespace ModelLibrary.Editor.Services
     /// Helps modelers assemble a version folder from selected project assets and create meta.
     /// Responsible for collecting selected assets, resolving dependencies, and materializing a local version folder for submission.
     /// </summary>
-    public static class ModelDeployer
+    internal static class ModelDeployer
     {
         /// <summary>
         /// Builds ModelMeta from the currently selected assets in the Unity Project window.

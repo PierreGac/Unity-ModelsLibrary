@@ -6,7 +6,7 @@ namespace ModelLibrary.Editor.Utils
     /// Constants for UI layout values used throughout the editor windows.
     /// Centralizes UI spacing, sizing, and color definitions to eliminate magic numbers.
     /// </summary>
-    public static class UIConstants
+    internal static class UIConstants
     {
         /// <summary>Small spacing (5 pixels).</summary>
         public const float SPACING_SMALL = 5f;

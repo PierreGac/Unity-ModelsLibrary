@@ -8,7 +8,7 @@ namespace ModelLibrary.Editor.Utils
     /// Utility class for validating changelog entries.
     /// Provides comprehensive validation rules for changelog content.
     /// </summary>
-    public static class ChangelogValidator
+    internal static class ChangelogValidator
     {
         // Validation Constants
         private const int __MIN_CHANGELOG_LENGTH = 10;

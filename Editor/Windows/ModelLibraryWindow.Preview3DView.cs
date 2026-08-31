@@ -20,7 +20,7 @@ namespace ModelLibrary.Editor.Windows
         /// Initializes preview 3D state when navigating to the Preview3D view.
         /// Sets up the preview window with model ID, version, and loading state.
         /// </summary>
-        public void InitializePreview3DState()
+        internal void InitializePreview3DState()
         {
             string modelId = GetViewParameter<string>("modelId", string.Empty);
             string version = GetViewParameter<string>("version", string.Empty);

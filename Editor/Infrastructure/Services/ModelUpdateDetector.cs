@@ -11,7 +11,7 @@ namespace ModelLibrary.Editor.Services
     /// Detects model updates by comparing locally installed versions with the repository index.
     /// Refreshes are cached and concurrent callers share the same in-flight task.
     /// </summary>
-    public class ModelUpdateDetector
+    internal class ModelUpdateDetector
     {
         private readonly ModelLibraryService _service;
         private readonly Dictionary<string, ModelUpdateInfo> _updateCache =
@@ -26,20 +26,6 @@ namespace ModelLibrary.Editor.Services
         public ModelUpdateDetector(ModelLibraryService service)
         {
             _service = service ?? throw new ArgumentNullException(nameof(service));
-        }
-
-        /// <summary>
-        /// Information about a model update status.
-        /// </summary>
-        public class ModelUpdateInfo
-        {
-            public string modelId { get; set; }
-            public string modelName { get; set; }
-            public string localVersion { get; set; }
-            public string remoteVersion { get; set; }
-            public bool hasUpdate { get; set; }
-            public DateTime lastChecked { get; set; }
-            public string updateDescription { get; set; }
         }
 
         /// <summary>

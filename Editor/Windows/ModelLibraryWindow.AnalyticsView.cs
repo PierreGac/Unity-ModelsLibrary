@@ -19,7 +19,7 @@ namespace ModelLibrary.Editor.Windows
         /// Initializes analytics state when navigating to the Analytics view.
         /// Creates the hidden AnalyticsWindow instance if needed.
         /// </summary>
-        public void InitializeAnalyticsState()
+        internal void InitializeAnalyticsState()
         {
             // Create instance if needed - will be initialized by DrawEditorWindowView
             if (_analyticsInstance == null)

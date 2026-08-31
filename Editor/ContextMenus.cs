@@ -17,7 +17,7 @@ namespace ModelLibrary.Editor
     /// Provides right-click functionality to submit models, open models in the library,
     /// check for updates, and view model details directly from selected assets.
     /// </summary>
-    public static class ContextMenus
+    internal static class ContextMenus
     {
         private static List<string> _manifestPaths = null;
         /// <summary>

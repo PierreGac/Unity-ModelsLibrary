@@ -18,7 +18,7 @@ namespace ModelLibrary.Editor.Windows
     /// allows artists to review and edit metadata for each model, then uploads them sequentially.
     /// Only accessible to users with the Artist role.
     /// </summary>
-    public class BatchUploadWindow : EditorWindow
+    internal class BatchUploadWindow : EditorWindow
     {
         private const float __SOURCE_LABEL_WIDTH = 120f;
         private const float __BUTTON_BROWSE_WIDTH = 80f;

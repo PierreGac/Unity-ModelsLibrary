@@ -14,7 +14,7 @@ namespace ModelLibrary.Editor.Windows
     /// <summary>
     /// Window for applying bulk tag operations (add/remove) across multiple models.
     /// </summary>
-    public class ModelBulkTagWindow : EditorWindow
+    internal class ModelBulkTagWindow : EditorWindow
     {
         private const float __LIST_SCROLL_HEIGHT = 100f;
         private const float __BUTTON_APPLY_WIDTH = 120f;

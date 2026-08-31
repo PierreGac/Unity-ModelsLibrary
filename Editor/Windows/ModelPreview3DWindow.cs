@@ -16,7 +16,7 @@ namespace ModelLibrary.Editor.Windows
     /// Interactive 3D preview window for viewing model meshes.
     /// Allows users to rotate, zoom, and inspect models in real-time.
     /// </summary>
-    public class ModelPreview3DWindow : EditorWindow
+    internal class ModelPreview3DWindow : EditorWindow
     {
         // Constants for magic numbers
         private const float __DEFAULT_CAMERA_ROTATION_X = 30f;

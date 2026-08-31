@@ -18,7 +18,7 @@ namespace ModelLibrary.Editor.Windows
         /// Initializes error log state when navigating to the ErrorLog view.
         /// Creates the hidden ErrorLogViewerWindow instance if needed.
         /// </summary>
-        public void InitializeErrorLogState()
+        internal void InitializeErrorLogState()
         {
             // Create instance if needed - will be initialized by DrawEditorWindowView
             if (_errorLogInstance == null)

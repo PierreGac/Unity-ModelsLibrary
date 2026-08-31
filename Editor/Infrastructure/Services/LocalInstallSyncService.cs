@@ -12,7 +12,7 @@ namespace ModelLibrary.Editor.Services
     /// <summary>
     /// Result of a post-submit local install sync attempt.
     /// </summary>
-    public sealed class LocalInstallSyncResult
+    internal sealed class LocalInstallSyncResult
     {
         /// <summary>
         /// True when the local install was updated (manifest sync or path migration).
@@ -49,7 +49,7 @@ namespace ModelLibrary.Editor.Services
     /// Syncs the local install after an update submit in the authoring project.
     /// Manifest-only when installPath is unchanged; path migration when it changed.
     /// </summary>
-    public static class LocalInstallSyncService
+    internal static class LocalInstallSyncService
     {
         private const string NEW_MANIFEST_NAME = ".modelLibrary.meta.json";
 

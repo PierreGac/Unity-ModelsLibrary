@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor.Utils
     /// Manages search history persistence and UI for the Model Library browser.
     /// Handles loading, saving, and displaying search history in a context menu.
     /// </summary>
-    public class SearchHistoryManager
+    internal class SearchHistoryManager
     {
         private readonly List<string> _searchHistory = new List<string>();
         private readonly string _prefsKey;

@@ -13,7 +13,7 @@ namespace ModelLibrary.Editor.Services
     /// Service for managing model metadata operations.
     /// Handles loading, saving, and updating model metadata.
     /// </summary>
-    public class ModelMetadataService
+    internal class ModelMetadataService
     {
         private readonly IModelRepository _repo;
         private readonly object _inFlightLock = new object();

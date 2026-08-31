@@ -19,7 +19,7 @@ namespace ModelLibrary.Editor.Windows
         /// <param name="selectedAssetGuids">
         /// Optional asset GUIDs captured at entry time (e.g. from a context menu click before focus changes).
         /// </param>
-        public void NavigateToSubmitView(bool resolveMeshDependencies = false, string[] selectedAssetGuids = null)
+        internal void NavigateToSubmitView(bool resolveMeshDependencies = false, string[] selectedAssetGuids = null)
         {
             Dictionary<string, object> parameters = new Dictionary<string, object>();
             if (resolveMeshDependencies)
@@ -40,7 +40,7 @@ namespace ModelLibrary.Editor.Windows
         /// Does not pre-populate assets from the Project selection.
         /// </summary>
         /// <param name="modelId">Catalog model id to pre-select. When empty, Update Existing opens with the searchable picker.</param>
-        public void NavigateToSubmitViewForUpdate(string modelId)
+        internal void NavigateToSubmitViewForUpdate(string modelId)
         {
             Dictionary<string, object> parameters = new Dictionary<string, object>
             {
@@ -58,7 +58,7 @@ namespace ModelLibrary.Editor.Windows
         /// Initializes submit state when navigating to the Submit view.
         /// Always schedules a full form reset before the next draw.
         /// </summary>
-        public void InitializeSubmitState()
+        internal void InitializeSubmitState()
         {
             _resetSubmitFormOnNextDraw = true;
             _resolveMeshDependenciesOnNextDraw = GetViewParameter<bool>(__RESOLVE_MESH_DEPENDENCIES_PARAM, false);

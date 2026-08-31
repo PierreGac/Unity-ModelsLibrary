@@ -8,7 +8,7 @@ namespace ModelLibrary.Editor.Utils
     /// <summary>
     /// Utility class for path-related operations and validation.
     /// </summary>
-    public static class PathUtils
+    internal static class PathUtils
     {
         /// <summary>
         /// Sanitizes path separators by converting backslashes to forward slashes and removing double slashes.

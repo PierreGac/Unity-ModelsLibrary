@@ -25,7 +25,7 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Available view types for navigation within the Model Library window.
         /// </summary>
-        public enum ViewType
+        internal enum ViewType
         {
             /// <summary>Main browser view - the default landing page.</summary>
             Browser,

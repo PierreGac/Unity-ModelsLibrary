@@ -14,7 +14,7 @@ namespace ModelLibrary.Editor.Windows
         /// Initializes version comparison state when navigating to the VersionComparison view.
         /// Sets up the comparison window with the model ID and preferred version for comparison.
         /// </summary>
-        public void InitializeVersionComparisonState()
+        internal void InitializeVersionComparisonState()
         {
             string modelId = GetViewParameter<string>("modelId", string.Empty);
             string preferredRightVersion = GetViewParameter<string>("preferredRightVersion", null);

@@ -7,7 +7,7 @@ namespace ModelLibrary.Editor.Utils
     /// Utility class for discovering model library manifest files in the project.
     /// Handles both new naming convention (.modelLibrary.meta.json) and old naming (modelLibrary.meta.json).
     /// </summary>
-    public static class ManifestDiscoveryUtility
+    internal static class ManifestDiscoveryUtility
     {
         /// <summary>
         /// Manifest file names (new and old naming conventions).

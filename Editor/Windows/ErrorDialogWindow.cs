@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor.Windows
     /// <summary>
     /// Custom error dialog window with prominent retry button and "don't show again" option.
     /// </summary>
-    public class ErrorDialogWindow : EditorWindow
+    internal class ErrorDialogWindow : EditorWindow
     {
         private const string __SuppressionKeysPrefKey = "ModelLibrary.ErrorSuppressed.Keys";
         private const float __WINDOW_MIN_WIDTH = 500f;

@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor
     /// determine whether a given file extension should be considered not allowed
     /// (e.g., script/shader source files that are not importable assets).
     /// </summary>
-    public static class FileExtensions
+    internal static class FileExtensions
     {
         // --- 3D model formats ---
         /// <summary>File extension for Autodesk Filmbox 3D models (.fbx).</summary>

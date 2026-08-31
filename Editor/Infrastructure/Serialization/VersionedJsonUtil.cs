@@ -10,7 +10,7 @@ namespace ModelLibrary.Editor.Serialization
     /// Enhanced JSON utility that supports versioned deserialization with migration and fallback handling.
     /// This provides robust deserialization that can handle schema changes gracefully.
     /// </summary>
-    public static class VersionedJsonUtil
+    internal static class VersionedJsonUtil
     {
         /// <summary>
         /// Deserialize JSON with version handling and migration support.

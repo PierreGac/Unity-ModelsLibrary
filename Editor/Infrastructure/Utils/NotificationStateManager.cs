@@ -10,7 +10,7 @@ namespace ModelLibrary.Editor.Utils
     /// Manages notification read/unread state for models.
     /// Tracks which models have been viewed to hide notification badges after viewing.
     /// </summary>
-    public static class NotificationStateManager
+    internal static class NotificationStateManager
     {
         private const string __NOTES_READ_PREF_KEY_PREFIX = "ModelLibrary.NotesRead.";
         private const string __UPDATES_READ_PREF_KEY_PREFIX = "ModelLibrary.UpdatesRead.";

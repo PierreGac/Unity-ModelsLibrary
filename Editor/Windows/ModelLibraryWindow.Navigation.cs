@@ -17,7 +17,7 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         /// <param name="viewType">The view type to navigate to.</param>
         /// <param name="parameters">Optional parameters for the view (e.g., modelId, version).</param>
-        public void NavigateToView(ViewType viewType, Dictionary<string, object> parameters = null)
+        internal void NavigateToView(ViewType viewType, Dictionary<string, object> parameters = null)
         {
             // Store current view as previous if not already navigating
             if (_currentView != viewType)
@@ -92,7 +92,7 @@ namespace ModelLibrary.Editor.Windows
         /// - From VersionComparison: Go to ModelDetails (if modelId cached), otherwise Browser
         /// - From Preview3D: Go to ModelDetails (if modelId cached), otherwise Browser
         /// </summary>
-        public void NavigateBack()
+        internal void NavigateBack()
         {
             // Special navigation rules based on current view
             if (_currentView == ViewType.ModelDetails)
@@ -149,7 +149,7 @@ namespace ModelLibrary.Editor.Windows
         /// <param name="key">The parameter key.</param>
         /// <param name="defaultValue">Default value if parameter is not found.</param>
         /// <returns>The parameter value or default if not found.</returns>
-        public T GetViewParameter<T>(string key, T defaultValue = default(T))
+        internal T GetViewParameter<T>(string key, T defaultValue = default(T))
         {
             if (_viewParameters.TryGetValue(key, out object value) && value is T)
             {
@@ -163,7 +163,7 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         /// <param name="key">The parameter key.</param>
         /// <returns>True if the parameter exists, false otherwise.</returns>
-        public bool HasViewParameter(string key)
+        internal bool HasViewParameter(string key)
         {
             return _viewParameters.ContainsKey(key);
         }
@@ -172,7 +172,7 @@ namespace ModelLibrary.Editor.Windows
         /// Gets the current view type.
         /// </summary>
         /// <returns>The current view type.</returns>
-        public ViewType GetCurrentView()
+        internal ViewType GetCurrentView()
         {
             return _currentView;
         }

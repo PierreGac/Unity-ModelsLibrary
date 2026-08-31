@@ -13,7 +13,7 @@ namespace ModelLibrary.Editor.Services
     /// Service for tracking model usage analytics and generating reports.
     /// Tracks model imports, updates, views, and other user interactions.
     /// </summary>
-    public class AnalyticsService
+    internal class AnalyticsService
     {
         /// <summary>EditorPrefs key for storing analytics data.</summary>
         private const string __AnalyticsPrefKey = "ModelLibrary.Analytics";
@@ -244,7 +244,7 @@ namespace ModelLibrary.Editor.Services
     /// Usage statistics for a model.
     /// </summary>
     [Serializable]
-    public class ModelUsageStats
+    internal class ModelUsageStats
     {
         public string modelId;
         public int importCount;

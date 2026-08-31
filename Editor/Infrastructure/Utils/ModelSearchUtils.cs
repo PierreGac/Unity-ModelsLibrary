@@ -7,7 +7,7 @@ namespace ModelLibrary.Editor.Utils
     /// Utility class for searching and matching model index entries.
     /// Provides support for advanced search queries with AND/OR operators.
     /// </summary>
-    public static class ModelSearchUtils
+    internal static class ModelSearchUtils
     {
         /// <summary>
         /// Checks if an entry matches the advanced search query.

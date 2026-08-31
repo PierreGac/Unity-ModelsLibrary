@@ -8,7 +8,7 @@ namespace ModelLibrary.Editor.Utils
     /// Mutable IMGUI cache for tag picker layout and selection lookups.
     /// Encapsulates revision tracking to avoid rebuilding badge layout every repaint.
     /// </summary>
-    public class TagPickerState
+    internal class TagPickerState
     {
         /// <summary>
         /// Precomputed label and width for one catalog tag badge button.

@@ -7,7 +7,7 @@ namespace ModelLibrary.Editor.Utils
     /// <summary>
     /// Centralized GUIStyles for a consistent, polished UI across editor windows.
     /// </summary>
-    public static class UIStyles
+    internal static class UIStyles
     {
         private static bool _initialized;
         private static GUIStyle _titleLabel;

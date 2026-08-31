@@ -25,7 +25,7 @@ namespace ModelLibrary.Editor.Repository
     /// the index to be updated as if a submission had succeeded, while the
     /// payload was never actually transferred.
     /// </remarks>
-    public class HttpRepository : IModelRepository
+    internal class HttpRepository : IModelRepository
     {
         public string Root { get; }
 

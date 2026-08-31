@@ -12,7 +12,7 @@ namespace ModelLibrary.Editor.Services
     /// <summary>
     /// Rebuilds models_index.json by scanning modelId/version folders and loading model.json metadata.
     /// </summary>
-    public class ModelIndexRebuildService
+    internal class ModelIndexRebuildService
     {
         private const string MODELS_INDEX_FILE_NAME = "models_index.json";
         private const string BACKUP_FILE_PREFIX = "models_index.json.bak-";

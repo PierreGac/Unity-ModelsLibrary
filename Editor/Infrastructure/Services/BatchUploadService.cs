@@ -16,7 +16,7 @@ namespace ModelLibrary.Editor.Services
     /// Scans directories for model folders, allows metadata editing, and uploads models sequentially.
     /// Provides progress tracking and error reporting for batch operations.
     /// </summary>
-    public class BatchUploadService
+    internal class BatchUploadService
     {
         /// <summary>The model library service for repository operations.</summary>
         private readonly ModelLibraryService _service;

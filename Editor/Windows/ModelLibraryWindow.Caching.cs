@@ -48,7 +48,7 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         /// <param name="modelId">The model ID.</param>
         /// <param name="version">The version string.</param>
-        public void InvalidateMetaCache(string modelId, string version)
+        internal void InvalidateMetaCache(string modelId, string version)
         {
             string key = modelId + "@" + version;
             if (_metaCache.ContainsKey(key))
@@ -442,7 +442,7 @@ namespace ModelLibrary.Editor.Windows
         /// This should be called when a model is removed from the project.
         /// </summary>
         /// <param name="modelId">The model ID to invalidate.</param>
-        public void InvalidateLocalInstallCache(string modelId)
+        internal void InvalidateLocalInstallCache(string modelId)
         {
             _localInstallCache.Remove(modelId);
             _negativeCache.Remove(modelId);
@@ -456,7 +456,7 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         /// <param name="modelId">The model ID to update.</param>
         /// <param name="meta">The model metadata to cache.</param>
-        public void UpdateLocalInstallCache(string modelId, ModelMeta meta)
+        internal void UpdateLocalInstallCache(string modelId, ModelMeta meta)
         {
             if (string.IsNullOrEmpty(modelId) || meta == null)
             {

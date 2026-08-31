@@ -12,7 +12,7 @@ namespace ModelLibrary.Editor.Utils
     /// Centralized error logging system for the Model Library.
     /// Logs errors to both Unity console and a persistent log file.
     /// </summary>
-    public static class ErrorLogger
+    internal static class ErrorLogger
     {
         private const string LOG_FILE_NAME = "ModelLibrary_ErrorLog.txt";
         private const int MAX_LOG_ENTRIES = 1000; // Keep last 1000 entries
@@ -289,7 +289,7 @@ namespace ModelLibrary.Editor.Utils
     /// Represents a single error log entry.
     /// </summary>
     [Serializable]
-    public class ErrorLogEntry
+    internal class ErrorLogEntry
     {
         public DateTime Timestamp;
         public string Title;

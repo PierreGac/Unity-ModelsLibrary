@@ -100,20 +100,20 @@ namespace ModelLibrary.Editor.Services
         /// <summary>
         /// Get all models with available updates.
         /// </summary>
-        public Task<List<ModelUpdateDetector.ModelUpdateInfo>> GetAvailableUpdatesAsync()
+        public Task<List<ModelUpdateInfo>> GetAvailableUpdatesAsync()
             => _updateDetector.GetAvailableUpdatesAsync();
 
         /// <summary>
         /// Get update information for a specific model.
         /// </summary>
-        public Task<ModelUpdateDetector.ModelUpdateInfo> GetUpdateInfoAsync(string modelId)
+        public Task<ModelUpdateInfo> GetUpdateInfoAsync(string modelId)
             => _updateDetector.GetUpdateInfoAsync(modelId);
 
 
         /// <summary>
         /// Gets a stable snapshot of update information after a single refresh.
         /// </summary>
-        public Task<Dictionary<string, ModelUpdateDetector.ModelUpdateInfo>> GetUpdateSnapshotAsync()
+        public Task<Dictionary<string, ModelUpdateInfo>> GetUpdateSnapshotAsync()
             => _updateDetector.GetUpdateSnapshotAsync();
 
         /// <summary>

@@ -8,7 +8,7 @@ namespace ModelLibrary.Editor.Utils
     /// Manages tag counting and caching for the Model Library browser.
     /// Tracks how many models use each tag and maintains a sorted list of tags.
     /// </summary>
-    public class TagCacheManager
+    internal class TagCacheManager
     {
         private readonly Dictionary<string, int> _tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> _sortedTags = new List<string>();

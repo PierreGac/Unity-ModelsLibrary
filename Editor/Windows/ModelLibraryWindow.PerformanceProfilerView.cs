@@ -18,7 +18,7 @@ namespace ModelLibrary.Editor.Windows
         /// Initializes profiler state when navigating to the PerformanceProfiler view.
         /// Creates the hidden PerformanceProfilerWindow instance if needed.
         /// </summary>
-        public void InitializePerformanceProfilerState()
+        internal void InitializePerformanceProfilerState()
         {
             // Create instance if needed - will be initialized by DrawEditorWindowView
             if (_profilerInstance == null)

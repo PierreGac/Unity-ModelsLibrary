@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor.Utils
     /// <summary>
     /// Utility class for controlling asset visibility in the Unity Project window.
     /// </summary>
-    public static class AssetVisibilityUtility
+    internal static class AssetVisibilityUtility
     {
         /// <summary>
         /// Hides an asset from the Unity Project window by renaming it to start with a dot.

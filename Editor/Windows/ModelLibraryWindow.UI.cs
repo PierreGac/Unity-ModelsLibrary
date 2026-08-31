@@ -428,7 +428,7 @@ namespace ModelLibrary.Editor.Windows
 
 
 
-        public void CloseWindow()
+        internal void CloseWindow()
         {
             _isExiting = true;
             Close();

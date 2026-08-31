@@ -15,7 +15,7 @@ namespace ModelLibrary.Editor.Repository
     /// This is the simplest repository implementation - just files and folders on disk.
     /// Can work with local drives, network shares (UNC paths), or any accessible file system.
     /// </summary>
-    public class FileSystemRepository : IModelRepository
+    internal class FileSystemRepository : IModelRepository
     {
         /// <summary>
         /// The root directory path where all model data is stored.

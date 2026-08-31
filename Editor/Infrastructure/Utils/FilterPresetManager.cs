@@ -11,7 +11,7 @@ namespace ModelLibrary.Editor.Utils
     /// Manages filter preset persistence and UI for the Model Library browser.
     /// Handles loading, saving, and applying filter presets.
     /// </summary>
-    public class FilterPresetManager
+    internal class FilterPresetManager
     {
         private readonly List<FilterPreset> _filterPresets = new List<FilterPreset>();
         private readonly string _prefsKey;

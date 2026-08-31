@@ -10,7 +10,7 @@ namespace ModelLibrary.Editor.Utils
     /// Shared IMGUI drawing for emoji tag badge display and tag picker editing.
     /// Used by ModelSubmitWindow and ModelDetailsWindow.
     /// </summary>
-    public static class TagBadgeDrawer
+    internal static class TagBadgeDrawer
     {
         private const float VERTICAL_SCROLLBAR_WIDTH = 18f;
         private const float LAYOUT_EDGE_PADDING = UIConstants.PADDING_LARGE * 2f;

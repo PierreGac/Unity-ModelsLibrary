@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor.Windows
     /// <summary>
     /// Searchable dropdown for selecting an existing catalog model to update.
     /// </summary>
-    public sealed class ModelUpdatePickerDropdown : AdvancedDropdown
+    internal sealed class ModelUpdatePickerDropdown : AdvancedDropdown
     {
         /// <summary>Minimum dropdown width so names and versions remain readable.</summary>
         private const float __MIN_WIDTH = 280f;

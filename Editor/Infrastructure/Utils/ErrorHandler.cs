@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor.Utils
     /// Centralized error handling utility for the Model Library.
     /// Provides consistent error reporting with actionable guidance and retry options.
     /// </summary>
-    public static class ErrorHandler
+    internal static class ErrorHandler
     {
         /// <summary>
         /// Error categories for better error classification and user guidance.

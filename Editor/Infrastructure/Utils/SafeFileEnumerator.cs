@@ -17,7 +17,7 @@ namespace ModelLibrary.Editor.Utils
     ///
     /// This helper provides safe enumeration that skips reparse points.
     /// </remarks>
-    public static class SafeFileEnumerator
+    internal static class SafeFileEnumerator
     {
         /// <summary>
         /// Enumerates files under <paramref name="root"/> recursively,

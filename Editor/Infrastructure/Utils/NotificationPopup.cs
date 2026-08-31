@@ -10,7 +10,7 @@ namespace ModelLibrary.Editor.Utils
     /// Meta Quest-style notification popup system for displaying notifications in the Unity Editor.
     /// Provides a modern, animated notification system that appears at the top of the screen.
     /// </summary>
-    public class NotificationPopup : EditorWindow
+    internal class NotificationPopup : EditorWindow
     {
         /// <summary>Queue of pending notifications to display.</summary>
         private static readonly Queue<NotificationData> _notificationQueue = new Queue<NotificationData>();

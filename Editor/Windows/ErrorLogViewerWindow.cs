@@ -11,7 +11,7 @@ namespace ModelLibrary.Editor.Windows
     /// <summary>
     /// Window for viewing and managing error logs from the Model Library.
     /// </summary>
-    public class ErrorLogViewerWindow : EditorWindow
+    internal class ErrorLogViewerWindow : EditorWindow
     {
         private const float __TOOLBAR_BUTTON_WIDTH_SMALL = 80f;
         private const float __TOOLBAR_BUTTON_WIDTH_MEDIUM = 100f;

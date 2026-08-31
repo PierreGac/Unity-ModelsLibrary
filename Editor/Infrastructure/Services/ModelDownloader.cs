@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor.Services
     /// Provides a clean interface for downloading models to the local cache.
     /// This is a lightweight facade that delegates to ModelLibraryService.
     /// </summary>
-    public class ModelDownloader
+    internal class ModelDownloader
     {
         /// <summary>The underlying model library service that handles repository operations.</summary>
         private readonly ModelLibraryService _service;

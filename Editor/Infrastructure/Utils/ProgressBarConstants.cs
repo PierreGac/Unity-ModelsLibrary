@@ -4,7 +4,7 @@
     /// Constants for progress bar values used throughout the editor.
     /// Centralizes progress value definitions to eliminate magic numbers.
     /// </summary>
-    public static class ProgressBarConstants
+    internal static class ProgressBarConstants
     {
         /// <summary>Initial/connecting progress (10%).</summary>
         public const float INITIAL = 0.1f;

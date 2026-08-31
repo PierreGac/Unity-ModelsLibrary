@@ -6,7 +6,7 @@ namespace ModelLibrary.Editor.Utils
     /// <summary>
     /// Utility class for version comparison and upgrade detection.
     /// </summary>
-    public static class ModelVersionUtils
+    internal static class ModelVersionUtils
     {
         /// <summary>
         /// Determines if a local model version needs to be upgraded to the remote version.

@@ -7,7 +7,7 @@ namespace ModelLibrary.Editor.Utils
     /// Shared tag list operations used across editor windows.
     /// Provides case-insensitive duplicate detection and badge label formatting.
     /// </summary>
-    public static class TagUtils
+    internal static class TagUtils
     {
         private static readonly StringComparer TagComparer = StringComparer.OrdinalIgnoreCase;
 

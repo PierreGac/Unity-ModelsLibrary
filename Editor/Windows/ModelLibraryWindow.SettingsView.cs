@@ -19,7 +19,7 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Initializes settings state when navigating to the Settings view.
         /// </summary>
-        public void InitializeSettingsState()
+        internal void InitializeSettingsState()
         {
             if (_settingsIdentityProvider == null)
             {

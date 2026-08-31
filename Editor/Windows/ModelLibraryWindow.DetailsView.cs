@@ -23,7 +23,7 @@ namespace ModelLibrary.Editor.Windows
         /// Initializes details state when navigating to the ModelDetails view.
         /// Marks notifications as read and initializes the details window instance.
         /// </summary>
-        public void InitializeDetailsState()
+        internal void InitializeDetailsState()
         {
             string modelId = GetViewParameter<string>("modelId", string.Empty);
             string version = GetViewParameter<string>("version", string.Empty);

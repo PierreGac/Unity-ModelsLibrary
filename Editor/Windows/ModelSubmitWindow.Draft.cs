@@ -83,7 +83,7 @@ namespace ModelLibrary.Editor.Windows
         /// Restores the saved draft into the form. This is an explicit user action;
         /// drafts are not auto-loaded when opening the submit view.
         /// </summary>
-        public void RestoreSavedDraft()
+        internal void RestoreSavedDraft()
         {
             LoadDraft();
             Repaint();

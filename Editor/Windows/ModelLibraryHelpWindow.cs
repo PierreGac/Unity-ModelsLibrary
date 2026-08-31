@@ -10,7 +10,7 @@ namespace ModelLibrary.Editor.Windows
     /// Centralized in-app help window for the Model Library ecosystem.
     /// Provides contextual guidance for browsing, searching, importing, and submitting models.
     /// </summary>
-    public class ModelLibraryHelpWindow : EditorWindow
+    internal class ModelLibraryHelpWindow : EditorWindow
     {
         /// <summary>
         /// Top-level help sections available in the window.

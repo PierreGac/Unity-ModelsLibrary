@@ -16,7 +16,7 @@ namespace ModelLibrary.Editor.Utils
     /// These helpers wrap fire-and-forget calls so exceptions are at least
     /// logged to the Unity console (and <see cref="ErrorLogger"/> if available).
     /// </remarks>
-    public static class FireAndForgetExtensions
+    internal static class FireAndForgetExtensions
     {
         /// <summary>
         /// Awaits the given task and logs any exception to the Unity console

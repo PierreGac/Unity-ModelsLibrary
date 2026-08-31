@@ -9,7 +9,7 @@ namespace ModelLibrary.Editor.Serialization
     /// Handles migration of ModelMeta data between different schema versions.
     /// This ensures backward compatibility when the data structure changes.
     /// </summary>
-    public static class ModelMetaMigration
+    internal static class ModelMetaMigration
     {
         /// <summary>
         /// Current schema version - increment this when making breaking changes.

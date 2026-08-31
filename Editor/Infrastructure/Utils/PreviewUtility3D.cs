@@ -22,7 +22,7 @@ namespace ModelLibrary.Editor.Utils
     ///    scene's lighting. We now save the originals in the constructor
     ///    and restore them in <see cref="Dispose"/>.
     /// </remarks>
-    public sealed class PreviewUtility3D : IDisposable
+    internal sealed class PreviewUtility3D : IDisposable
     {
         /// <summary>Unity's preview render utility for generating preview textures.</summary>
         private readonly PreviewRenderUtility _preview;

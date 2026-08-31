@@ -12,7 +12,7 @@ namespace ModelLibrary.Editor.Services
     /// against the GUIDs of assets currently in the project.
     /// This is a fallback detection method when manifest files are not available.
     /// </summary>
-    public static class GuidScanner
+    internal static class GuidScanner
     {
         /// <summary>
         /// Scans the Unity project to find which models from the index are installed locally.

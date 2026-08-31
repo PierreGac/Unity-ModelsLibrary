@@ -10,7 +10,7 @@ namespace ModelLibrary.Editor.Utils
     /// Validates install paths for model submission and import.
     /// Ensures install paths point to dedicated model folders, not shared containers.
     /// </summary>
-    public static class InstallPathValidator
+    internal static class InstallPathValidator
     {
         private const string NEW_MANIFEST_NAME = ".modelLibrary.meta.json";
         private const string OLD_MANIFEST_NAME = "modelLibrary.meta.json";

@@ -23,7 +23,7 @@ namespace ModelLibrary.Editor.Windows
         /// <summary>
         /// Initializes help state when navigating to the Help view.
         /// </summary>
-        public void InitializeHelpState()
+        internal void InitializeHelpState()
         {
             // Check if a specific section was requested via parameters
             if (HasViewParameter("helpSection"))

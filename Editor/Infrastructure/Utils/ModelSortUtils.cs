@@ -7,7 +7,7 @@ namespace ModelLibrary.Editor.Utils
     /// <summary>
     /// Sort mode for model entries.
     /// </summary>
-    public enum ModelSortMode
+    internal enum ModelSortMode
     {
         Name,
         Date,
@@ -17,7 +17,7 @@ namespace ModelLibrary.Editor.Utils
     /// <summary>
     /// Utility class for sorting model index entries.
     /// </summary>
-    public static class ModelSortUtils
+    internal static class ModelSortUtils
     {
         /// <summary>
         /// Returns a sorted copy of the supplied list.

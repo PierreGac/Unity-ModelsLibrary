@@ -46,7 +46,7 @@ namespace ModelLibrary.Editor.Windows
         /// Initializes batch upload state when navigating to the BatchUpload view.
         /// Sets up the service instances needed for batch upload operations.
         /// </summary>
-        public void InitializeBatchUploadState()
+        internal void InitializeBatchUploadState()
         {
             // Initialize main service if needed
             if (_service == null)

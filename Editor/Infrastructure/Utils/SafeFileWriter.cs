@@ -7,7 +7,7 @@ namespace ModelLibrary.Editor.Utils
     /// Safe local file writes for editor cache and repository download paths.
     /// Clears read-only attributes and replaces files atomically when possible.
     /// </summary>
-    public static class SafeFileWriter
+    internal static class SafeFileWriter
     {
         private const string TEMP_FILE_SUFFIX = ".tmp";
 
