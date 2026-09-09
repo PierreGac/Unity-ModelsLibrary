@@ -8,6 +8,8 @@ Editor tools for browsing, versioning, submitting, and importing 3D models from 
 
 Package: `com.models-library` · Display name: **Models Library** · Version: **1.0.1**
 
+![Model Library catalog](images/models_details.png)
+
 ## Features
 
 - Browse models with search, tags, grid/list views, favorites, and recent
@@ -17,6 +19,24 @@ Package: `com.models-library` · Display name: **Models Library** · Version: **
 - Notes, bulk operations, batch upload, analytics, and 3D preview
 - File-system repository (supported) and HTTP repository (experimental)
 - Hidden install manifests (`.modelLibrary.meta.json`)
+
+## Screenshots
+
+**Model details** — metadata, tags, changelog, notes, Import to Project, 3D Preview, Compare Versions.
+
+![Model details](images/import_window.png)
+
+**Submit** — New Model or Update Existing; SemVer, description, tags, drafts.
+
+![Submit Basic Info](images/submit_window.png)
+
+**Submit assets** — drag-and-drop or Project selection, optional dependencies, install path.
+
+![Submit Assets tab](images/submit_window_assets_tab.png)
+
+**Project window** — `Assets > Model Library` context menu on selected assets.
+
+![Project context menu](images/contextual_menu.png)
 
 ## Requirements
 
