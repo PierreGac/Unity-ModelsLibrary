@@ -14,6 +14,53 @@ namespace ModelLibrary.Editor.Tests
     /// </summary>
     public class SettingsTests
     {
+        private const string USER_NAME_KEY = "ModelLibrary.UserName";
+        private const string USER_ROLE_KEY = "ModelLibrary.UserRole";
+
+        private bool _hadUserName;
+        private string _userName;
+        private bool _hadUserRole;
+        private string _userRole;
+        private bool _settingsCaptured;
+        private ModelLibrarySettings.RepositoryKind _repositoryKind;
+        private string _repositoryRoot;
+
+        /// <summary>
+        /// Saves EditorPrefs and repository settings before each test.
+        /// </summary>
+        [SetUp]
+        public void SetUp()
+        {
+            _hadUserName = EditorPrefs.HasKey(USER_NAME_KEY);
+            _userName = EditorPrefs.GetString(USER_NAME_KEY, string.Empty);
+            _hadUserRole = EditorPrefs.HasKey(USER_ROLE_KEY);
+            _userRole = EditorPrefs.GetString(USER_ROLE_KEY, string.Empty);
+            SimpleUserIdentityProvider.InvalidateCache();
+
+            ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
+            _repositoryKind = settings.repositoryKind;
+            _repositoryRoot = settings.repositoryRoot;
+            _settingsCaptured = true;
+        }
+
+        /// <summary>
+        /// Restores EditorPrefs and repository settings after each test.
+        /// </summary>
+        [TearDown]
+        public void TearDown()
+        {
+            RestoreEditorPref(USER_NAME_KEY, _hadUserName, _userName);
+            RestoreEditorPref(USER_ROLE_KEY, _hadUserRole, _userRole);
+            SimpleUserIdentityProvider.InvalidateCache();
+
+            if (_settingsCaptured)
+            {
+                ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
+                settings.repositoryKind = _repositoryKind;
+                settings.repositoryRoot = _repositoryRoot;
+            }
+        }
+
         /// <summary>
         /// Tests that current user name and role are loaded.
         /// </summary>
@@ -64,11 +111,9 @@ namespace ModelLibrary.Editor.Tests
         [Test]
         public void TestUserSettingsDefaultValues()
         {
-            // Clear EditorPrefs to test defaults
-            string key = "ModelLibrary.UserName";
-            string roleKey = "ModelLibrary.UserRole";
-            EditorPrefs.DeleteKey(key);
-            EditorPrefs.DeleteKey(roleKey);
+            EditorPrefs.DeleteKey(USER_NAME_KEY);
+            EditorPrefs.DeleteKey(USER_ROLE_KEY);
+            SimpleUserIdentityProvider.InvalidateCache();
 
             SimpleUserIdentityProvider provider = new SimpleUserIdentityProvider();
             string userName = provider.GetUserName();
@@ -206,6 +251,18 @@ namespace ModelLibrary.Editor.Tests
             bool windowsRefreshed = settingsChanged; // Simulated
 
             Assert.IsTrue(windowsRefreshed, "Windows should refresh when settings change");
+        }
+
+        private static void RestoreEditorPref(string key, bool hadKey, string value)
+        {
+            if (hadKey)
+            {
+                EditorPrefs.SetString(key, value);
+            }
+            else
+            {
+                EditorPrefs.DeleteKey(key);
+            }
         }
     }
 }

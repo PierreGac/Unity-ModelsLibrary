@@ -11,6 +11,54 @@ namespace ModelLibrary.Editor.Tests
     /// </summary>
     public class UserPermissionsTests
     {
+        private const string USER_NAME_KEY = "ModelLibrary.UserName";
+        private const string USER_ROLE_KEY = "ModelLibrary.UserRole";
+
+        private bool _hadUserName;
+        private string _userName;
+        private bool _hadUserRole;
+        private string _userRole;
+
+        /// <summary>
+        /// Saves identity EditorPrefs before each test.
+        /// </summary>
+        [SetUp]
+        public void SetUp()
+        {
+            _hadUserName = EditorPrefs.HasKey(USER_NAME_KEY);
+            _userName = EditorPrefs.GetString(USER_NAME_KEY, string.Empty);
+            _hadUserRole = EditorPrefs.HasKey(USER_ROLE_KEY);
+            _userRole = EditorPrefs.GetString(USER_ROLE_KEY, string.Empty);
+            SimpleUserIdentityProvider.InvalidateCache();
+        }
+
+        /// <summary>
+        /// Restores identity EditorPrefs after each test.
+        /// </summary>
+        [TearDown]
+        public void TearDown()
+        {
+            if (_hadUserName)
+            {
+                EditorPrefs.SetString(USER_NAME_KEY, _userName);
+            }
+            else
+            {
+                EditorPrefs.DeleteKey(USER_NAME_KEY);
+            }
+
+            if (_hadUserRole)
+            {
+                EditorPrefs.SetString(USER_ROLE_KEY, _userRole);
+            }
+            else
+            {
+                EditorPrefs.DeleteKey(USER_ROLE_KEY);
+            }
+
+            SimpleUserIdentityProvider.InvalidateCache();
+        }
+
         /// <summary>
         /// Tests that Developer role has correct permissions.
         /// </summary>

@@ -1,12 +1,6 @@
 ﻿using System;
-using System.Threading.Tasks;
-using ModelLibrary.Data;
-using ModelLibrary.Editor.Repository;
-using ModelLibrary.Editor.Services;
-using ModelLibrary.Editor.Settings;
 using ModelLibrary.Editor.Windows;
 using NUnit.Framework;
-using UnityEditor;
 using UnityEngine;
 
 namespace ModelLibrary.Editor.Tests
@@ -18,29 +12,30 @@ namespace ModelLibrary.Editor.Tests
     public class ModelDetailsWindowImportTests
     {
         /// <summary>
+        /// Closes details windows created during a fixture.
+        /// Structure checks must not subscribe to <see cref="UnityEditor.EditorApplication.delayCall"/>,
+        /// because that callback runs after the test and can open a window in a later fixture.
+        /// </summary>
+        [TearDown]
+        public void TearDown()
+        {
+            ModelDetailsWindow[] windows = Resources.FindObjectsOfTypeAll<ModelDetailsWindow>();
+            for (int i = 0; i < windows.Length; i++)
+            {
+                ModelDetailsWindow window = windows[i];
+                if (window != null)
+                {
+                    window.Close();
+                }
+            }
+        }
+
+        /// <summary>
         /// Tests that ModelDetailsWindow closes after import completes.
         /// </summary>
         [Test]
         public void TestWindowClosesAfterSuccessfulImport()
         {
-            // Test that the ImportToProject method schedules window closing via EditorApplication.delayCall
-            bool delayCallScheduled = false;
-            Action originalDelayCall = null;
-
-            // Simulate the delayCall scheduling
-            EditorApplication.delayCall += () =>
-            {
-                delayCallScheduled = true;
-                // Simulate window closing
-                ModelDetailsWindow currentWindow = EditorWindow.GetWindow<ModelDetailsWindow>();
-                if (currentWindow != null)
-                {
-                    // In test, we just verify the logic exists
-                    Assert.IsTrue(true, "Window closing logic should be scheduled");
-                }
-            };
-
-            // Verify that delayCall scheduling logic exists
             Assert.IsTrue(true, "Import completion should schedule window closing via delayCall");
         }
 
@@ -90,24 +85,6 @@ namespace ModelLibrary.Editor.Tests
         [Test]
         public void TestImportCompletionDialogShown()
         {
-            // Test that the completion dialog is shown before window closing
-            bool dialogShown = false;
-            bool windowClosed = false;
-
-            // Simulate the delayCall sequence
-            EditorApplication.delayCall += () =>
-            {
-                // First: Show completion dialog
-                dialogShown = true;
-                // EditorUtility.DisplayDialog("Import Complete", ...);
-
-                // Then: Close window
-                windowClosed = true;
-                // currentWindow.Close();
-            };
-
-            // Verify the order: dialog should be shown before closing
-            // In actual execution, both happen in the same delayCall, but dialog blocks
             Assert.IsTrue(true, "Completion dialog should be shown before window closing");
         }
     }
