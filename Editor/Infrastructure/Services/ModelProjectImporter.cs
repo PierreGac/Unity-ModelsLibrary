@@ -18,6 +18,10 @@ namespace ModelLibrary.Editor.Services
     /// </summary>
     internal static class ModelProjectImporter
     {
+        private const string PAYLOAD_DIRECTORY_NAME = "payload";
+        private const string DEPENDENCY_DIRECTORY_NAME = "deps";
+        private const string AUTO_PREVIEW_FILE_NAME = "auto_preview.png";
+
         public static async Task<string> ImportFromCacheAsync(string cacheVersionRoot, ModelMeta meta, bool cleanDestination = true, string overrideInstallPath = null, bool isUpdate = false, CancellationToken cancellationToken = default)
         {
             // Track imported files for rollback on cancellation
@@ -67,19 +71,19 @@ namespace ModelLibrary.Editor.Services
             }
 
             // Copy payload files into root of model folder (flatten), and images under images/
-            string payloadRoot = Path.Combine(cacheVersionRoot, "payload");
-            string depsRoot = Path.Combine(payloadRoot, "deps");
+            string payloadRoot = Path.Combine(cacheVersionRoot, PAYLOAD_DIRECTORY_NAME);
+            string depsRoot = Path.Combine(payloadRoot, DEPENDENCY_DIRECTORY_NAME);
+            HashSet<string> disallowedMetadataPaths = CollectDisallowedMetadataPaths(meta);
 
-            // Copy top-level payload files directly into destAbs (skip shaders). Copy .meta alongside when present
+            // Copy top-level payload files directly into destAbs. Copy .meta alongside when present.
             if (Directory.Exists(payloadRoot))
             {
-                foreach (string file in Directory.GetFiles(payloadRoot, "*", SearchOption.TopDirectoryOnly))
+                string[] payloadFiles = Directory.GetFiles(payloadRoot, "*", SearchOption.TopDirectoryOnly);
+                for (int payloadIndex = 0; payloadIndex < payloadFiles.Length; payloadIndex++)
                 {
-                    string fileName = Path.GetFileName(file);
-                    string target = Path.Combine(destAbs, fileName);
-                    string ext = Path.GetExtension(file).ToLowerInvariant();
-                    if (ext == FileExtensions.META) { continue; }
-                    if (FileExtensions.IsNotAllowedFileExtension(ext))
+                    string file = payloadFiles[payloadIndex];
+                    string target = Path.Combine(destAbs, Path.GetFileName(file));
+                    if (!CanImportPayloadFile(cacheVersionRoot, file, disallowedMetadataPaths, false))
                     {
                         continue;
                     }
@@ -120,20 +124,15 @@ namespace ModelLibrary.Editor.Services
                 importedDirectories.Add(destAbs);
             }
 
-            // Copy dependency files (any depth) directly into destAbs (flatten) and skip shaders. Copy .meta alongside when present
+            // Copy dependency files (any depth) directly into destAbs (flatten). Copy .meta alongside when present.
             if (Directory.Exists(depsRoot))
             {
-                foreach (string file in Directory.GetFiles(depsRoot, "*", SearchOption.AllDirectories))
+                string[] dependencyFiles = Directory.GetFiles(depsRoot, "*", SearchOption.AllDirectories);
+                for (int dependencyIndex = 0; dependencyIndex < dependencyFiles.Length; dependencyIndex++)
                 {
-                    string fileName = Path.GetFileName(file);
-                    string target = Path.Combine(destAbs, fileName);
-                    string ext = Path.GetExtension(file).ToLowerInvariant();
-                    if (ext == FileExtensions.META) { continue; }
-                    if (FileExtensions.IsNotAllowedFileExtension(ext))
-                    {
-                        continue;
-                    }
-                    if (string.Equals(fileName, "auto_preview.png"))
+                    string file = dependencyFiles[dependencyIndex];
+                    string target = Path.Combine(destAbs, Path.GetFileName(file));
+                    if (!CanImportPayloadFile(cacheVersionRoot, file, disallowedMetadataPaths, true))
                     {
                         continue;
                     }
@@ -261,6 +260,115 @@ namespace ModelLibrary.Editor.Services
                 RollbackImport(importedFiles, importedDirectories);
                 throw new OperationCanceledException("Import cancelled.", ex);
             }
+        }
+
+        /// <summary>
+        /// Returns whether a cached payload or dependency file may be copied into Assets.
+        /// Meta files are copied only as siblings of an accepted file. Disallowed metadata
+        /// paths and extensions outside the payload allowlist are rejected.
+        /// </summary>
+        /// <param name="cacheVersionRoot">Absolute cache folder for this model version.</param>
+        /// <param name="filePath">Absolute path of the candidate file.</param>
+        /// <param name="disallowedMetadataPaths">Version-relative paths named by metadata that must not be imported.</param>
+        /// <param name="skipAutoPreview">True for dependency copies, which omit the generated preview image.</param>
+        /// <returns>True when the file may be copied into the project.</returns>
+        private static bool CanImportPayloadFile(string cacheVersionRoot, string filePath, HashSet<string> disallowedMetadataPaths, bool skipAutoPreview)
+        {
+            string extension = Path.GetExtension(filePath);
+            if (string.Equals(extension, FileExtensions.META, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (skipAutoPreview && string.Equals(Path.GetFileName(filePath), AUTO_PREVIEW_FILE_NAME, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string relativePath = ToVersionRelativePath(cacheVersionRoot, filePath);
+            if (disallowedMetadataPaths.Contains(relativePath) || !FileExtensions.IsAcceptablePayloadExtension(extension))
+            {
+                Debug.LogWarning($"[ModelProjectImporter] Rejected disallowed payload file: {relativePath}");
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Collects version-relative metadata paths whose extensions are not acceptable payload files.
+        /// </summary>
+        /// <param name="meta">Model metadata that may name payload, material, and texture paths.</param>
+        /// <returns>Normalized relative paths that import must not copy.</returns>
+        private static HashSet<string> CollectDisallowedMetadataPaths(ModelMeta meta)
+        {
+            HashSet<string> disallowedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (meta == null)
+            {
+                return disallowedPaths;
+            }
+
+            AddDisallowedPaths(disallowedPaths, meta.payloadRelativePaths);
+            AddDisallowedAssetRefs(disallowedPaths, meta.materials);
+            AddDisallowedAssetRefs(disallowedPaths, meta.textures);
+            return disallowedPaths;
+        }
+
+        private static void AddDisallowedPaths(HashSet<string> disallowedPaths, List<string> relativePaths)
+        {
+            if (relativePaths == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < relativePaths.Count; i++)
+            {
+                AddDisallowedPath(disallowedPaths, relativePaths[i]);
+            }
+        }
+
+        private static void AddDisallowedAssetRefs(HashSet<string> disallowedPaths, List<AssetRef> assetRefs)
+        {
+            if (assetRefs == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < assetRefs.Count; i++)
+            {
+                AssetRef assetRef = assetRefs[i];
+                if (assetRef != null)
+                {
+                    AddDisallowedPath(disallowedPaths, assetRef.relativePath);
+                }
+            }
+        }
+
+        private static void AddDisallowedPath(HashSet<string> disallowedPaths, string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                return;
+            }
+
+            string normalized = relativePath.Replace('\\', '/').TrimStart('/');
+            string extension = Path.GetExtension(normalized);
+            if (string.Equals(extension, FileExtensions.META, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (!FileExtensions.IsAcceptablePayloadExtension(extension))
+            {
+                disallowedPaths.Add(normalized);
+            }
+        }
+
+        private static string ToVersionRelativePath(string cacheVersionRoot, string filePath)
+        {
+            string root = cacheVersionRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string relative = filePath.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return relative.Replace('\\', '/');
         }
 
         /// <summary>
