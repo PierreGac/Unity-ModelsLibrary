@@ -291,19 +291,14 @@ namespace ModelLibrary.Editor.Tests
                 Debug.Log("[MetadataDiagnostics] Null JSON correctly throws ArgumentException (expected behavior)");
             }
 
-            // Invalid ModelMeta JSON is recovered via fallback deserialization
-            // (empty instance) rather than throwing or returning null.
-            // JsonUtility may also emit an error log while rejecting the payload.
+            // Invalid JSON must not become a savable empty ModelMeta.
             string invalidJson = "{ invalid json }";
             bool previousIgnoreFailingMessages = LogAssert.ignoreFailingMessages;
             LogAssert.ignoreFailingMessages = true;
             try
             {
                 ModelMeta invalidResult = JsonUtil.FromJson<ModelMeta>(invalidJson);
-                Assert.IsNotNull(invalidResult, "Invalid ModelMeta JSON should fall back to an empty instance");
-                Assert.IsTrue(
-                    invalidResult.identity == null || string.IsNullOrEmpty(invalidResult.identity.id),
-                    "Fallback ModelMeta should not invent an identity id");
+                Assert.IsNull(invalidResult, "Invalid ModelMeta JSON should be refused");
             }
             finally
             {

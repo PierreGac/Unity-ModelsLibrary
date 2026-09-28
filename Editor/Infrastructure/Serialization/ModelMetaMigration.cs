@@ -30,9 +30,12 @@ namespace ModelLibrary.Editor.Serialization
             }
 
             int currentVersion = modelMeta.schemaVersion;
+            if (currentVersion > CURRENT_SCHEMA_VERSION)
+            {
+                return false;
+            }
 
-            // If already at current version, no migration needed
-            if (currentVersion >= CURRENT_SCHEMA_VERSION)
+            if (currentVersion == CURRENT_SCHEMA_VERSION)
             {
                 return true;
             }

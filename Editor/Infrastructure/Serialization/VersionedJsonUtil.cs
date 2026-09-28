@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Utils;
 using UnityEngine;
@@ -30,6 +29,12 @@ namespace ModelLibrary.Editor.Serialization
 
             if (typeof(T) == typeof(ModelMeta))
             {
+                if (!IsCompleteJsonObject(json))
+                {
+                    Debug.LogWarning("VersionedJsonUtil: Refusing incomplete model metadata JSON.");
+                    return default;
+                }
+
                 json = DictionaryJsonMigration.PrepareModelMeta(json);
             }
             else if (typeof(T) == typeof(ModelIndex))
@@ -39,7 +44,6 @@ namespace ModelLibrary.Editor.Serialization
 
             try
             {
-                // First attempt: Direct deserialization
                 T result = JsonUtility.FromJson<T>(json);
                 if (result is ModelMeta modelMeta)
                 {
@@ -56,6 +60,10 @@ namespace ModelLibrary.Editor.Serialization
                 {
                     return result;
                 }
+            }
+            catch (InvalidOperationException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -91,107 +99,16 @@ namespace ModelLibrary.Editor.Serialization
                     return FinishModelMeta(modelMeta, json);
                 }
             }
+            catch (InvalidOperationException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 Debug.LogWarning($"VersionedJsonUtil: ModelMeta deserialization failed: {ex.Message}");
             }
 
-            // Fallback: Try to extract basic information even if full deserialization fails
-            return TryDeserializeModelMetaFallback(json);
-        }
-
-        /// <summary>
-        /// Fallback deserialization for ModelMeta that extracts available fields even if some are missing.
-        /// </summary>
-        private static ModelMeta TryDeserializeModelMetaFallback(string json)
-        {
-            try
-            {
-                ModelMeta modelMeta = new ModelMeta();
-
-                // Try to extract basic fields using simple JSON parsing
-                string jsonLower = json.ToLower();
-
-                // Extract version if present
-                if (TryExtractStringValue(json, "version", out string version))
-                {
-                    modelMeta.version = version;
-                }
-
-                if (TryExtractStringValue(json, "description", out string description))
-                {
-                    modelMeta.description = description;
-                }
-
-                if (TryExtractStringValue(json, "author", out string author))
-                {
-                    modelMeta.author = author;
-                }
-
-                if (TryExtractStringValue(json, "installPath", out string installPath))
-                {
-                    modelMeta.installPath = installPath;
-                }
-
-                ApplyLegacyInstallPathMigration(modelMeta, json);
-
-                if (TryExtractStringValue(json, "previewImagePath", out string previewImagePath))
-                {
-                    modelMeta.previewImagePath = previewImagePath;
-                }
-
-                // Extract numeric values
-                if (TryExtractLongValue(json, "createdTimeTicks", out long createdTimeTicks))
-                {
-                    modelMeta.createdTimeTicks = createdTimeTicks;
-                }
-
-                if (TryExtractLongValue(json, "updatedTimeTicks", out long updatedTimeTicks))
-                {
-                    modelMeta.updatedTimeTicks = updatedTimeTicks;
-                }
-
-                if (TryExtractLongValue(json, "uploadTimeTicks", out long uploadTimeTicks))
-                {
-                    modelMeta.uploadTimeTicks = uploadTimeTicks;
-                }
-
-                if (TryExtractIntValue(json, "vertexCount", out int vertexCount))
-                {
-                    modelMeta.vertexCount = vertexCount;
-                }
-
-                if (TryExtractIntValue(json, "triangleCount", out int triangleCount))
-                {
-                    modelMeta.triangleCount = triangleCount;
-                }
-
-                // Initialize collections
-                modelMeta.payloadRelativePaths = new List<string>();
-                modelMeta.materials = new List<AssetRef>();
-                modelMeta.textures = new List<AssetRef>();
-                modelMeta.assetGuids = new List<string>();
-                modelMeta.imageRelativePaths = new List<string>();
-                modelMeta.notes = new List<ModelNote>();
-                modelMeta.dependencies = new List<string>();
-                modelMeta.dependenciesDetailed = new List<DependencyRef>();
-                modelMeta.extra = new Dictionary<string, string>();
-                modelMeta.modelImporters = new Dictionary<string, ModelImporterSettings>();
-                modelMeta.changelog = new List<ModelChangelogEntry>();
-                modelMeta.identity = new ModelIdentity();
-                modelMeta.tags = new Tags();
-
-                // Set schema version to current
-                modelMeta.schemaVersion = ModelMetaMigration.CURRENT_SCHEMA_VERSION;
-
-                Debug.LogWarning("VersionedJsonUtil: Used fallback deserialization for ModelMeta - some fields may be missing");
-                return modelMeta;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"VersionedJsonUtil: Fallback deserialization failed: {ex.Message}");
-                return new ModelMeta(); // Return empty instance as last resort
-            }
+            return null;
         }
 
         /// <summary>
@@ -237,58 +154,108 @@ namespace ModelLibrary.Editor.Serialization
         }
 
         /// <summary>
-        /// Try to extract a long value from JSON using simple parsing.
-        /// </summary>
-        private static bool TryExtractLongValue(string json, string fieldName, out long value)
-        {
-            value = 0;
-            try
-            {
-                string pattern = $"\"{fieldName}\"\\s*:\\s*(\\d+)";
-                System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(json, pattern);
-                if (match.Success && long.TryParse(match.Groups[1].Value, out value))
-                {
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"VersionedJsonUtil: Failed to extract long value for {fieldName}: {ex.Message}");
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// Try to extract an int value from JSON using simple parsing.
-        /// </summary>
-        private static bool TryExtractIntValue(string json, string fieldName, out int value)
-        {
-            value = 0;
-            try
-            {
-                string pattern = $"\"{fieldName}\"\\s*:\\s*(\\d+)";
-                System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(json, pattern);
-                if (match.Success && int.TryParse(match.Groups[1].Value, out value))
-                {
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"VersionedJsonUtil: Failed to extract int value for {fieldName}: {ex.Message}");
-            }
-            return false;
-        }
-
-        /// <summary>
         /// Applies install-path migration, schema migration, and dictionary entry loading.
         /// </summary>
         private static ModelMeta FinishModelMeta(ModelMeta modelMeta, string json)
         {
+            if (modelMeta.schemaVersion > ModelMetaMigration.CURRENT_SCHEMA_VERSION)
+            {
+                throw new InvalidOperationException(
+                    $"Refusing model metadata schema {modelMeta.schemaVersion}. Current schema is {ModelMetaMigration.CURRENT_SCHEMA_VERSION}.");
+            }
+
             ApplyLegacyInstallPathMigration(modelMeta, json);
-            ModelMetaMigration.MigrateToCurrentVersion(ref modelMeta);
+            if (!ModelMetaMigration.MigrateToCurrentVersion(ref modelMeta))
+            {
+                throw new InvalidOperationException("Model metadata could not be migrated.");
+            }
+
+            if (modelMeta.identity == null || string.IsNullOrWhiteSpace(modelMeta.identity.id))
+            {
+                throw new InvalidOperationException("Model metadata is missing an identity id.");
+            }
+
             modelMeta.ReadSerializedEntries();
             return modelMeta;
+        }
+
+        /// <summary>
+        /// Returns true when <paramref name="json"/> is one complete JSON object.
+        /// </summary>
+        private static bool IsCompleteJsonObject(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return false;
+            }
+
+            int start = 0;
+            while (start < json.Length && char.IsWhiteSpace(json[start]))
+            {
+                start++;
+            }
+
+            if (start >= json.Length || json[start] != '{')
+            {
+                return false;
+            }
+
+            int depth = 0;
+            bool inString = false;
+            bool escaped = false;
+            for (int i = start; i < json.Length; i++)
+            {
+                char current = json[i];
+                if (inString)
+                {
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (current == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (current == '"')
+                    {
+                        inString = false;
+                    }
+
+                    continue;
+                }
+
+                if (current == '"')
+                {
+                    inString = true;
+                }
+                else if (current == '{' || current == '[')
+                {
+                    depth++;
+                }
+                else if (current == '}' || current == ']')
+                {
+                    depth--;
+                    if (depth < 0)
+                    {
+                        return false;
+                    }
+
+                    if (depth == 0)
+                    {
+                        for (int tail = i + 1; tail < json.Length; tail++)
+                        {
+                            if (!char.IsWhiteSpace(json[tail]))
+                            {
+                                return false;
+                            }
+                        }
+
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
