@@ -241,6 +241,8 @@ namespace ModelLibrary.Editor.Services
         /// <param name="id">The unique identifier of the model to download.</param>
         /// <param name="version">The version string to download (e.g., "1.0.0").</param>
         /// <returns>A tuple containing the absolute cache root path and the loaded model metadata.</returns>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="id"/> or <paramref name="version"/> is not a safe identifier.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when a listed file would be written outside the version cache.</exception>
         public async Task<(string versionRoot, ModelMeta meta)> DownloadModelVersionAsync(string id, string version)
         {
             // SECURITY (CRIT-01): Validate id/version before any filesystem operation.
@@ -281,21 +283,25 @@ namespace ModelLibrary.Editor.Services
             // Pull all files present in the repository under id/version (payload, deps, images, etc.)
             string versionRootRel = PathUtils.SanitizePathSeparator(Path.Combine(id, version));
             List<string> files = await _repo.ListFilesAsync(versionRootRel);
-            string prefix = PathUtils.SanitizePathSeparator((id + "/" + version + "/"));
-            foreach (string repoRel in files)
+            string prefix = PathUtils.SanitizePathSeparator(id + "/" + version + "/");
+            for (int i = 0; i < files.Count; i++)
             {
-                string rel = PathUtils.SanitizePathSeparator(repoRel);
-                if (!rel.StartsWith(prefix))
+                string rel = PathUtils.SanitizePathSeparator(files[i]);
+                if (string.IsNullOrEmpty(rel) || !rel.StartsWith(prefix, StringComparison.Ordinal))
                 {
                     continue;
                 }
-                string subRel = rel[prefix.Length..];
+
+                string subRel = rel.Substring(prefix.Length);
                 if (string.Equals(subRel, ModelMeta.MODEL_JSON, StringComparison.OrdinalIgnoreCase))
                 {
-                    continue; // already wrote meta locally
+                    continue;
                 }
-                string localAbs = PathUtils.SanitizePathSeparator(Path.Combine(cacheRoot, subRel));
-                await _repo.DownloadFileAsync(rel, localAbs);
+
+                string safeSubRel = PathUtils.ValidateRelativePathStrict(subRel);
+                string localAbs = Path.Combine(cacheRoot, safeSubRel.Replace('/', Path.DirectorySeparatorChar));
+                string canonicalLocal = PathUtils.AssertInsideRoot(localAbs, cacheRoot);
+                await _repo.DownloadFileAsync(rel, canonicalLocal);
             }
             return (cacheRoot, meta);
         }
