@@ -117,6 +117,27 @@ namespace ModelLibrary.Editor.Repository
             EnsureSuccess(req, "SaveIndex");
         }
 
+        /// <summary>
+        /// Reloads the index and skips the PUT when the revision already changed.
+        /// The PUT itself has no server precondition, so two clients that both
+        /// observed the same revision can still overwrite each other.
+        /// </summary>
+        /// <param name="index">Index to write, including the next revision.</param>
+        /// <param name="expectedRevision">Revision observed before this edit.</param>
+        /// <returns>True when the PUT was sent. False when the reloaded revision differs.</returns>
+        public async Task<bool> TrySaveIndexIfUnchangedAsync(ModelIndex index, long expectedRevision)
+        {
+            ModelIndex current = await LoadIndexAsync();
+            long storedRevision = current != null ? current.revision : 0;
+            if (storedRevision != expectedRevision)
+            {
+                return false;
+            }
+
+            await SaveIndexAsync(index);
+            return true;
+        }
+
         public async Task<ModelMeta> LoadMetaAsync(string modelId, string version)
         {
             using UnityWebRequest req = UnityWebRequest.Get(Url(modelId, version, ModelMeta.MODEL_JSON));

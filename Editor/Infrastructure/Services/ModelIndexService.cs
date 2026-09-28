@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
@@ -15,8 +16,17 @@ namespace ModelLibrary.Editor.Services
     /// </summary>
     internal class ModelIndexService
     {
+        private const int MAX_INDEX_SAVE_ATTEMPTS = 5;
+        private const string INDEX_SAVE_CONFLICT_MESSAGE = "The model index changed repeatedly and the update was not saved.";
+
         private readonly IModelRepository _repo;
         private ModelIndex _indexCache;
+
+        /// <summary>
+        /// Invoked after an edit is applied and before the revision check.
+        /// Tests use this to land another save in that window. Production leaves it unset.
+        /// </summary>
+        internal static Action BeforeIndexSaveAttempt;
 
         public ModelIndexService(IModelRepository repo)
         {
@@ -150,62 +160,129 @@ namespace ModelLibrary.Editor.Services
         /// Updates the cached index to reflect changes immediately.
         /// </summary>
         /// <param name="meta">Model metadata containing the latest version information.</param>
-        public async Task UpdateIndexWithLatestMetaAsync(ModelMeta meta)
+        public Task UpdateIndexWithLatestMetaAsync(ModelMeta meta)
         {
             if (meta == null || meta.identity == null || string.IsNullOrWhiteSpace(meta.identity.id))
             {
                 Debug.LogWarning("[ModelIndexService] Cannot update index: metadata or identity is null or invalid.");
-                return;
+                return Task.CompletedTask;
             }
 
-            ModelIndex index = await GetIndexAsync();
-            if (index == null)
+            return SaveApplyingAsync(index =>
             {
-                index = new ModelIndex();
-                _indexCache = index;
-            }
+                ApplyLatestMeta(index, meta);
+                return true;
+            });
+        }
 
-            if (index.entries == null)
+        /// <summary>
+        /// Removes one model from the index.
+        /// Reloads and retries when another save changed the revision first.
+        /// </summary>
+        /// <param name="modelId">Model id to remove.</param>
+        /// <returns>True when an entry was removed and the index was saved.</returns>
+        public async Task<bool> RemoveFromIndexAsync(string modelId)
+        {
+            bool removed = false;
+            await SaveApplyingAsync(index =>
             {
-                index.entries = new List<ModelIndex.Entry>();
+                removed = RemoveEntry(index, modelId);
+                return removed;
+            });
+            return removed;
+        }
+
+        private async Task SaveApplyingAsync(Func<ModelIndex, bool> apply)
+        {
+            for (int attempt = 0; attempt < MAX_INDEX_SAVE_ATTEMPTS; attempt++)
+            {
+                ModelIndex index = await _repo.LoadIndexAsync();
+                if (index == null)
+                {
+                    index = new ModelIndex();
+                }
+
+                if (index.entries == null)
+                {
+                    index.entries = new List<ModelIndex.Entry>();
+                }
+
+                long seenRevision = index.revision;
+                bool shouldSave = apply(index);
+                if (!shouldSave)
+                {
+                    _indexCache = index;
+                    return;
+                }
+
+                index.revision = seenRevision + 1;
+                Action beforeSave = BeforeIndexSaveAttempt;
+                if (beforeSave != null)
+                {
+                    beforeSave();
+                }
+
+                bool saved = await _repo.TrySaveIndexIfUnchangedAsync(index, seenRevision);
+                if (saved)
+                {
+                    _indexCache = index;
+                    return;
+                }
             }
 
+            throw new IOException(INDEX_SAVE_CONFLICT_MESSAGE);
+        }
+
+        private static void ApplyLatestMeta(ModelIndex index, ModelMeta meta)
+        {
             ModelIndex.Entry entry = index.Get(meta.identity.id);
             if (entry == null)
             {
-                entry = ModelIndexEntryFactory.FromMeta(meta);
-                index.entries.Add(entry);
+                index.entries.Add(ModelIndexEntryFactory.FromMeta(meta));
+                return;
+            }
+
+            bool shouldUpdate = false;
+            if (SemVer.TryParse(meta.version, out SemVer vNew) && SemVer.TryParse(entry.latestVersion, out SemVer vOld))
+            {
+                shouldUpdate = vNew.CompareTo(vOld) >= 0;
             }
             else
             {
-                // Update latest version if the new version is >= the old version
-                bool shouldUpdate = false;
-                if (SemVer.TryParse(meta.version, out SemVer vNew) && SemVer.TryParse(entry.latestVersion, out SemVer vOld))
-                {
-                    shouldUpdate = vNew.CompareTo(vOld) >= 0;
-                }
-                else
-                {
-                    // If version parsing fails, update anyway (fallback behavior)
-                    shouldUpdate = true;
-                }
+                shouldUpdate = true;
+            }
 
-                if (shouldUpdate)
+            if (!shouldUpdate)
+            {
+                return;
+            }
+
+            ModelIndex.Entry updated = ModelIndexEntryFactory.FromMeta(meta);
+            entry.latestVersion = updated.latestVersion;
+            entry.name = updated.name;
+            entry.description = updated.description;
+            entry.updatedTimeTicks = updated.updatedTimeTicks;
+            entry.tags = updated.tags;
+        }
+
+        private static bool RemoveEntry(ModelIndex index, string modelId)
+        {
+            if (index.entries == null)
+            {
+                return false;
+            }
+
+            for (int i = index.entries.Count - 1; i >= 0; i--)
+            {
+                ModelIndex.Entry entry = index.entries[i];
+                if (entry != null && string.Equals(entry.id, modelId, StringComparison.Ordinal))
                 {
-                    ModelIndex.Entry updated = ModelIndexEntryFactory.FromMeta(meta);
-                    entry.latestVersion = updated.latestVersion;
-                    entry.name = updated.name;
-                    entry.description = updated.description;
-                    entry.updatedTimeTicks = updated.updatedTimeTicks;
-                    entry.tags = updated.tags;
+                    index.entries.RemoveAt(i);
+                    return true;
                 }
             }
 
-            // Save the updated index to the repository
-            await AsyncProfiler.MeasureAsync("Service.SaveIndex", async () => await _repo.SaveIndexAsync(index));
-
-            // Update cache to reflect changes
-            _indexCache = index;
+            return false;
         }
     }
 }

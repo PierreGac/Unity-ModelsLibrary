@@ -431,6 +431,51 @@ namespace ModelLibrary.Editor.Repository
         }
 
         /// <summary>
+        /// Writes the index only when the file still has <paramref name="expectedRevision"/>.
+        /// A missing file counts as revision 0. The read and <see cref="SafeFileWriter"/>
+        /// replace are separate steps, so this is not an atomic compare-and-swap.
+        /// </summary>
+        /// <param name="index">Index to write, including the next revision.</param>
+        /// <param name="expectedRevision">Revision observed before this edit.</param>
+        /// <returns>True when the file was replaced. False when another revision is already stored.</returns>
+        public Task<bool> TrySaveIndexIfUnchangedAsync(ModelIndex index, long expectedRevision)
+        {
+            string path = ResolveInsideRoot(INDEX_FILE_NAME);
+            string parentDirectory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(parentDirectory))
+            {
+                Directory.CreateDirectory(parentDirectory);
+            }
+
+            if (ReadStoredRevision(path) != expectedRevision)
+            {
+                return Task.FromResult(false);
+            }
+
+            string json = JsonUtil.ToJson(index);
+            SafeFileWriter.WriteAllText(path, json);
+            InvalidateFileCache(path);
+            return Task.FromResult(true);
+        }
+
+        private static long ReadStoredRevision(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return 0;
+            }
+
+            string json = File.ReadAllText(path);
+            ModelIndex stored = JsonUtil.FromJson<ModelIndex>(json);
+            if (stored == null)
+            {
+                return 0;
+            }
+
+            return stored.revision;
+        }
+
+        /// <summary>
         /// Loads a specific model version's metadata from the repository.
         /// The metadata file is stored at: &lt;root&gt;/&lt;modelId&gt;/&lt;version&gt;/model.json
         /// </summary>

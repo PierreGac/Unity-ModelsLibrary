@@ -97,8 +97,20 @@ namespace ModelLibrary.Editor.Services
                 // and the repository file-existence cache is invalidated.
                 // Writing models_index.json directly left LoadIndexAsync
                 // returning an empty index when the file did not exist before rebuild.
-                ModelIndex newIndex = new ModelIndex { entries = entries };
-                await repo.SaveIndexAsync(newIndex);
+                long seenRevision = existingIndex != null ? existingIndex.revision : 0;
+                ModelIndex newIndex = new ModelIndex
+                {
+                    entries = entries,
+                    revision = seenRevision + 1
+                };
+                bool saved = await repo.TrySaveIndexIfUnchangedAsync(newIndex, seenRevision);
+                if (!saved)
+                {
+                    report.errors.Add("The model index changed while rebuilding. Run the rebuild again.");
+                    report.success = false;
+                    return;
+                }
+
                 report.success = report.errors.Count == 0;
             }
             catch (Exception ex)

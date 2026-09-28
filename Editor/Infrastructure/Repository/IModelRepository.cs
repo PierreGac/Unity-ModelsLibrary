@@ -20,6 +20,18 @@ namespace ModelLibrary.Editor.Repository
         Task SaveIndexAsync(ModelIndex index);
 
         /// <summary>
+        /// Saves the index when the stored revision is still <paramref name="expectedRevision"/>.
+        /// Returns false when another save landed first so the caller can reload and merge.
+        /// The check and the write are not one atomic operation. Two writers that both
+        /// observe the same revision can still overwrite each other. An HTTP PUT stays
+        /// last-write-wins after this client-side check.
+        /// </summary>
+        /// <param name="index">Index to write, including the next revision.</param>
+        /// <param name="expectedRevision">Revision the caller read before editing.</param>
+        /// <returns>True when the index was written. False when the stored revision changed.</returns>
+        Task<bool> TrySaveIndexIfUnchangedAsync(ModelIndex index, long expectedRevision);
+
+        /// <summary>
         /// Load a specific model version's metadata.
         /// </summary>
         Task<ModelMeta> LoadMetaAsync(string modelId, string version);

@@ -106,6 +106,11 @@ namespace ModelLibrary.Editor.Tests
                 throw new NotImplementedException();
             }
 
+            public Task<bool> TrySaveIndexIfUnchangedAsync(ModelIndex index, long expectedRevision)
+            {
+                throw new NotImplementedException();
+            }
+
             public Task<ModelMeta> LoadMetaAsync(string modelId, string version)
             {
                 ModelMeta meta = new ModelMeta();

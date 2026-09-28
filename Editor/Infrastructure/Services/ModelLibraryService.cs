@@ -206,19 +206,11 @@ namespace ModelLibrary.Editor.Services
                     return false;
                 }
 
-                // Remove the model from the index
-                ModelIndex index = await GetIndexAsync();
-                if (index?.entries != null)
+                // Remove the model from the index, reloading if another save landed first.
+                bool removedFromIndex = await _indexService.RemoveFromIndexAsync(modelId);
+                if (removedFromIndex)
                 {
-                    ModelIndex.Entry entryToRemove = index.entries.FirstOrDefault(e => e.id == modelId);
-                    if (entryToRemove != null)
-                    {
-                        index.entries.Remove(entryToRemove);
-                        await _repo.SaveIndexAsync(index);
-                        // Update cache to reflect changes
-                        await _indexService.RefreshIndexAsync();
-                        Debug.Log($"[ModelLibraryService] Removed model {modelId} from index");
-                    }
+                    Debug.Log($"[ModelLibraryService] Removed model {modelId} from index");
                 }
 
                 Debug.Log($"[ModelLibraryService] Successfully deleted model {modelId}");

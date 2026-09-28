@@ -69,6 +69,12 @@ namespace ModelLibrary.Data
         public List<Entry> entries = new List<Entry>();
 
         /// <summary>
+        /// Increments when the index is saved. Older files that omit this field load as 0.
+        /// A writer reloads and merges when the stored revision is no longer the one it read.
+        /// </summary>
+        public long revision = 0;
+
+        /// <summary>
         /// Find a specific model entry by its ID.
         /// This is used when we need to look up a model by its unique identifier.
         /// </summary>
