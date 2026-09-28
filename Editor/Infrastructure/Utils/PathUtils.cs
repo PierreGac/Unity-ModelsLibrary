@@ -436,13 +436,13 @@ namespace ModelLibrary.Editor.Utils
         }
 
         /// <summary>
-        /// Validates that a relative path does not contain parent-directory
-        /// traversal segments ("..") after normalization. Returns the
-        /// normalized form, or throws if the path would escape its base.
+        /// Validates that a relative path stays a relative repository path.
+        /// Rejects parent traversal, rooted or absolute paths, empty segments,
+        /// and path segments that are not safe identifiers.
         /// </summary>
         /// <param name="relativePath">The relative path to validate (e.g., from model.json).</param>
         /// <returns>The sanitized relative path with forward slashes.</returns>
-        /// <exception cref="InvalidOperationException">Thrown if the relative path contains ".." segments.</exception>
+        /// <exception cref="InvalidOperationException">Thrown if the path could escape its base.</exception>
         public static string ValidateRelativePathStrict(string relativePath)
         {
             if (string.IsNullOrWhiteSpace(relativePath))
@@ -451,15 +451,20 @@ namespace ModelLibrary.Editor.Utils
             }
 
             string sanitized = SanitizePathSeparator(relativePath);
-
-            // Reject any ".. segment" — splits on / and checks each segment.
-            string[] segments = sanitized.Split('/');
-            foreach (string segment in segments)
+            if (Path.IsPathRooted(sanitized) || sanitized.StartsWith("/", StringComparison.Ordinal))
             {
-                if (segment == "..")
+                throw new InvalidOperationException(
+                    $"Relative path is rooted or absolute: '{relativePath}'");
+            }
+
+            string[] segments = sanitized.Split('/');
+            for (int i = 0; i < segments.Length; i++)
+            {
+                string segment = segments[i];
+                if (!IsSafeIdentifier(segment))
                 {
                     throw new InvalidOperationException(
-                        $"Relative path contains a parent-directory traversal segment ('..'): '{relativePath}'");
+                        $"Relative path contains an unsafe segment: '{relativePath}'");
                 }
             }
 

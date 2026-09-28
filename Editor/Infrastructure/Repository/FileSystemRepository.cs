@@ -44,6 +44,7 @@ namespace ModelLibrary.Editor.Repository
         private const int ERROR_BAD_NETPATH = 53;
         /// <summary>Windows error code: ERROR_LOGON_FAILURE (1326) - The user name or password is incorrect.</summary>
         private const int ERROR_LOGON_FAILURE = 1326;
+        private const string INDEX_FILE_NAME = "models_index.json";
 
         /// <summary>
         /// Initialize the repository with a root directory path.
@@ -60,6 +61,31 @@ namespace ModelLibrary.Editor.Repository
         /// <param name="b">Second path segment</param>
         /// <returns>Combined path with normalized separators</returns>
         private static string Join(string a, string b) => Path.Combine(a, b).Replace('/', Path.DirectorySeparatorChar);
+
+        /// <summary>
+        /// Rejects a model id or version that is not a single safe path segment.
+        /// </summary>
+        /// <param name="identifier">Candidate model id or version.</param>
+        /// <param name="paramName">Parameter name for the exception.</param>
+        private static void RequireSafeIdentifier(string identifier, string paramName)
+        {
+            if (!PathUtils.IsSafeIdentifier(identifier))
+            {
+                throw new ArgumentException("Unsafe repository identifier rejected.", paramName);
+            }
+        }
+
+        /// <summary>
+        /// Resolves a repository-relative path and refuses any result outside <see cref="Root"/>.
+        /// </summary>
+        /// <param name="relativePath">Repository-relative path.</param>
+        /// <returns>Canonical absolute path inside the repository root.</returns>
+        private string ResolveInsideRoot(string relativePath)
+        {
+            string safeRelative = PathUtils.ValidateRelativePathStrict(relativePath);
+            string combined = Join(Root, safeRelative);
+            return PathUtils.AssertInsideRoot(combined, Root);
+        }
 
         /// <summary>
         /// Cached file existence check to avoid repeated slow File.Exists() calls.
@@ -315,7 +341,7 @@ namespace ModelLibrary.Editor.Repository
         public async Task<ModelIndex> LoadIndexAsync()
         {
             // Build the full path to the models index file
-            string path = Join(Root, "models_index.json");
+            string path = ResolveInsideRoot(INDEX_FILE_NAME);
 
             // If the index file doesn't exist, return an empty index (new repository)
             UnityEngine.Debug.Log($"Loading index from {path}");
@@ -392,7 +418,7 @@ namespace ModelLibrary.Editor.Repository
         public Task SaveIndexAsync(ModelIndex index)
         {
             // Build the full path to the models index file
-            string path = Join(Root, "models_index.json");
+            string path = ResolveInsideRoot(INDEX_FILE_NAME);
 
             // Ensure the directory exists (in case the root directory doesn't exist yet)
             Directory.CreateDirectory(Path.GetDirectoryName(path));
@@ -413,8 +439,9 @@ namespace ModelLibrary.Editor.Repository
         /// <exception cref="FileNotFoundException">Thrown if the metadata file doesn't exist.</exception>
         public async Task<ModelMeta> LoadMetaAsync(string modelId, string version)
         {
-            // Build the path to the model.json file: <root>/<modelId>/<version>/model.json
-            string path = Join(Root, Join(modelId, Join(version, ModelMeta.MODEL_JSON)));
+            RequireSafeIdentifier(modelId, nameof(modelId));
+            RequireSafeIdentifier(version, nameof(version));
+            string path = ResolveInsideRoot(modelId + "/" + version + "/" + ModelMeta.MODEL_JSON);
 
             // If the metadata file doesn't exist, throw an exception
             if (!FileExistsCached(path))
@@ -439,8 +466,9 @@ namespace ModelLibrary.Editor.Repository
         /// <param name="meta">The model metadata to save.</param>
         public async Task SaveMetaAsync(string modelId, string version, ModelMeta meta)
         {
-            // Build the path to the model.json file: <root>/<modelId>/<version>/model.json
-            string path = Join(Root, Join(modelId, Join(version, ModelMeta.MODEL_JSON)));
+            RequireSafeIdentifier(modelId, nameof(modelId));
+            RequireSafeIdentifier(version, nameof(version));
+            string path = ResolveInsideRoot(modelId + "/" + version + "/" + ModelMeta.MODEL_JSON);
 
             // Ensure the directory structure exists
             Directory.CreateDirectory(Path.GetDirectoryName(path));
@@ -464,7 +492,7 @@ namespace ModelLibrary.Editor.Repository
         public Task<bool> DirectoryExistsAsync(string relativePath)
         {
             // Check if the directory exists at the repository-relative path
-            string fullPath = Join(Root, relativePath);
+            string fullPath = ResolveInsideRoot(relativePath);
             return Task.FromResult(DirectoryExistsCached(fullPath));
         }
 
@@ -477,7 +505,7 @@ namespace ModelLibrary.Editor.Repository
         public Task EnsureDirectoryAsync(string relativePath)
         {
             // Create the directory (and any parent directories) if they don't exist
-            string fullPath = Join(Root, relativePath);
+            string fullPath = ResolveInsideRoot(relativePath);
             Directory.CreateDirectory(fullPath);
 
             // Invalidate directory cache since we just created it
@@ -497,21 +525,24 @@ namespace ModelLibrary.Editor.Repository
             Stopwatch stopwatch = AsyncProfiler.Enabled ? Stopwatch.StartNew() : null;
 
             // Build the absolute path to the directory
-            string abs = Join(Root, relativeDir);
+            string abs = ResolveInsideRoot(relativeDir);
+            string canonicalRoot = Path.GetFullPath(Root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             List<string> list = new List<string>();
 
             // Only proceed if the directory actually exists
             if (DirectoryExistsCached(abs))
             {
-                // Get all files recursively (including subdirectories)
-                foreach (string f in Directory.GetFiles(abs, "*", SearchOption.AllDirectories))
+                string[] files = Directory.GetFiles(abs, "*", SearchOption.AllDirectories);
+                for (int i = 0; i < files.Length; i++)
                 {
-                    // Convert absolute path back to repository-relative path
-                    string rel = f[Root.Length..].TrimStart(Path.DirectorySeparatorChar);
+                    string filePath = files[i];
+                    if (!filePath.StartsWith(canonicalRoot, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
 
-                    // Normalize separators to forward slashes for consistency
+                    string rel = filePath.Substring(canonicalRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                     rel = rel.Replace(Path.DirectorySeparatorChar, '/');
-
                     list.Add(rel);
                 }
             }
@@ -529,7 +560,7 @@ namespace ModelLibrary.Editor.Repository
         public async Task UploadFileAsync(string relativePath, string localAbsolutePath)
         {
             // Build the destination path in the repository
-            string dst = Join(Root, relativePath);
+            string dst = ResolveInsideRoot(relativePath);
 
             // Ensure the destination directory exists
             Directory.CreateDirectory(Path.GetDirectoryName(dst));
@@ -545,7 +576,7 @@ namespace ModelLibrary.Editor.Repository
         public async Task DownloadFileAsync(string relativePath, string localAbsolutePath)
         {
             // Build the source path in the repository
-            string src = Join(Root, relativePath);
+            string src = ResolveInsideRoot(relativePath);
 
             // Ensure the destination directory exists
             Directory.CreateDirectory(Path.GetDirectoryName(localAbsolutePath));
@@ -570,8 +601,9 @@ namespace ModelLibrary.Editor.Repository
         /// <returns>True if the version was successfully deleted; false if it didn't exist or deletion failed.</returns>
         public async Task<bool> DeleteVersionAsync(string modelId, string version)
         {
-            string versionDir = Path.Combine(Root, modelId, version);
-            string normalizedVersionDir = PathUtils.NormalizePath(versionDir);
+            RequireSafeIdentifier(modelId, nameof(modelId));
+            RequireSafeIdentifier(version, nameof(version));
+            string normalizedVersionDir = ResolveInsideRoot(modelId + "/" + version);
 
             // Check if the version directory exists
             if (!Directory.Exists(normalizedVersionDir))
@@ -612,8 +644,8 @@ namespace ModelLibrary.Editor.Repository
         /// <returns>True if the model was successfully deleted; false if it didn't exist or deletion failed.</returns>
         public async Task<bool> DeleteModelAsync(string modelId)
         {
-            string modelDir = Path.Combine(Root, modelId);
-            string normalizedModelDir = PathUtils.NormalizePath(modelDir);
+            RequireSafeIdentifier(modelId, nameof(modelId));
+            string normalizedModelDir = ResolveInsideRoot(modelId);
 
             // Check if the model directory exists
             if (!Directory.Exists(normalizedModelDir))

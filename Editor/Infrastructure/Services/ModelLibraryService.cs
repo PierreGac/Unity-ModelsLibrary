@@ -86,7 +86,11 @@ namespace ModelLibrary.Editor.Services
         }
 
         public Task<ModelMeta> GetMetaAsync(string id, string version)
-            => _metadataService.GetMetaAsync(id, version);
+        {
+            RequireSafeIdentifier(id, nameof(id));
+            RequireSafeIdentifier(version, nameof(version));
+            return _metadataService.GetMetaAsync(id, version);
+        }
 
         public Task<Texture2D> GetPreviewTextureAsync(string id, string version, string relativePath)
             => _previewService.GetPreviewTextureAsync(id, version, relativePath);
@@ -141,7 +145,10 @@ namespace ModelLibrary.Editor.Services
         /// <param name="modelId">Model identifier.</param>
         /// <returns>List of available version strings.</returns>
         public Task<List<string>> GetAvailableVersionsAsync(string modelId)
-            => _indexService.GetAvailableVersionsAsync(modelId);
+        {
+            RequireSafeIdentifier(modelId, nameof(modelId));
+            return _indexService.GetAvailableVersionsAsync(modelId);
+        }
 
         /// <summary>
         /// Delete a specific model version from the repository.
@@ -152,6 +159,8 @@ namespace ModelLibrary.Editor.Services
         /// <returns>True if deletion was successful; false otherwise.</returns>
         public async Task<bool> DeleteVersionAsync(string modelId, string version)
         {
+            RequireSafeIdentifier(modelId, nameof(modelId));
+            RequireSafeIdentifier(version, nameof(version));
             try
             {
                 // Check if this is the latest version (warning only - UI handles confirmation)
@@ -187,6 +196,7 @@ namespace ModelLibrary.Editor.Services
         /// <returns>True if deletion was successful; false otherwise.</returns>
         public async Task<bool> DeleteModelAsync(string modelId)
         {
+            RequireSafeIdentifier(modelId, nameof(modelId));
             try
             {
                 // Delete the model from repository
@@ -317,6 +327,9 @@ namespace ModelLibrary.Editor.Services
                 throw new InvalidOperationException("Meta.Version required");
             }
 
+            RequireSafeIdentifier(meta.identity.id, nameof(meta.identity.id));
+            RequireSafeIdentifier(meta.version, nameof(meta.version));
+
             long nowUtc = DateTime.Now.Ticks;
             if (meta.createdTimeTicks <= 0)
             {
@@ -336,6 +349,7 @@ namespace ModelLibrary.Editor.Services
             {
                 string file = files[i];
                 string rel = PathUtils.SanitizePathSeparator(file[localVersionRoot.Length..].TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                PathUtils.ValidateRelativePathStrict(versionRootRel + "/" + rel);
                 if (string.Equals(rel, ModelMeta.MODEL_JSON, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
@@ -543,6 +557,19 @@ namespace ModelLibrary.Editor.Services
         /// <param name="author">Author name for the changelog entry.</param>
         /// <param name="version">Version string for the changelog entry.</param>
         /// <param name="timestamp">Timestamp for the changelog entry (in ticks).</param>
+        /// <summary>
+        /// Rejects a model id or version that is not a single safe path segment.
+        /// </summary>
+        /// <param name="identifier">Candidate model id or version.</param>
+        /// <param name="paramName">Parameter name for the exception.</param>
+        private void RequireSafeIdentifier(string identifier, string paramName)
+        {
+            if (!PathUtils.IsSafeIdentifier(identifier))
+            {
+                throw new ArgumentException("Unsafe repository identifier rejected.", paramName);
+            }
+        }
+
         private static void EnsureChangelogEntry(ModelMeta meta, string summary, string author, string version, long timestamp)
         {
             meta.changelog ??= new List<ModelChangelogEntry>();
