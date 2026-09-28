@@ -418,8 +418,7 @@ namespace ModelLibrary.Editor.Windows
 
                 settings.repositoryKind = _wizardRepoKind;
                 settings.repositoryRoot = _wizardRepoRoot;
-                EditorUtility.SetDirty(settings);
-                AssetDatabase.SaveAssets();
+                settings.SaveProjectCopy();
 
                 // Verify configuration was saved
                 if (!FirstRunWizard.IsConfigured())

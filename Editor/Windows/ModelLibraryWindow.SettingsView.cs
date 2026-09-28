@@ -513,8 +513,7 @@ namespace ModelLibrary.Editor.Windows
                 _settingsRepositoryRoot = _settingsRepositoryRoot?.Trim();
                 _settingsInstance.repositoryRoot = _settingsRepositoryRoot;
                 _settingsInstance.localCacheRoot = _settingsLocalCacheRoot;
-                EditorUtility.SetDirty(_settingsInstance);
-                AssetDatabase.SaveAssets();
+                _settingsInstance.SaveProjectCopy();
 
                 _settingsHasUnsavedChanges = false;
 

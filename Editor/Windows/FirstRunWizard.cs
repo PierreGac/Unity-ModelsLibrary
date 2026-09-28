@@ -100,7 +100,7 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 // Check if repository root is still the default example value
-                if (settings.repositoryRoot == "\\\\SERVER\\ModelLibrary")
+                if (settings.repositoryRoot == ModelLibrarySettings.UNCONFIGURED_REPOSITORY_ROOT)
                 {
                     Debug.Log("[FirstRunWizard] Configuration incomplete: Repository root is still default value");
                     return false;
@@ -208,8 +208,7 @@ namespace ModelLibrary.Editor.Windows
 
                 settings.repositoryKind = _kind;
                 settings.repositoryRoot = _repoRoot;
-                EditorUtility.SetDirty(settings);
-                AssetDatabase.SaveAssets();
+                settings.SaveProjectCopy();
 
                 // Verify configuration was saved
                 if (!IsConfigured())
