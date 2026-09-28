@@ -611,7 +611,7 @@ namespace ModelLibrary.Editor.Services
             // Write meta.json to the folder for debugging
             // Use dot prefix to hide from Unity Project window
             string jsonPath = Path.Combine(destinationAbsoluteFolder, "." + ModelMeta.MODEL_JSON);
-            File.WriteAllText(jsonPath, JsonUtility.ToJson(meta, true));
+            File.WriteAllText(jsonPath, JsonUtil.ToJson(meta));
 
             return await Task.FromResult(destinationAbsoluteFolder);
         }

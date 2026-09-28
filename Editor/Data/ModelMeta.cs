@@ -35,7 +35,7 @@ namespace ModelLibrary.Data
     /// This file is stored at: &lt;repository&gt;/&lt;modelId&gt;/&lt;version&gt;/model.json
     /// </summary>
     [Serializable]
-    public class ModelMeta
+    public partial class ModelMeta
     {
         public const string MODEL_JSON = "model.json";
 
@@ -44,7 +44,7 @@ namespace ModelLibrary.Data
         /// Used for migration when loading older versions of the data.
         /// Increment this when making breaking changes to the data structure.
         /// </summary>
-        public int schemaVersion = 1;
+        public int schemaVersion = 2;
 
         /// <summary>
         /// Basic identity information (ID and name) that identifies this model family.
@@ -154,18 +154,6 @@ namespace ModelLibrary.Data
         /// Detailed dependency info (type and name), complements the raw GUIDs.
         /// </summary>
         public List<DependencyRef> dependenciesDetailed = new List<DependencyRef>();
-
-        /// <summary>
-        /// Extra key-value pairs for future extensibility.
-        /// Allows adding custom metadata without changing the core schema.
-        /// Examples: "polyCount": "1500", "textureSize": "1024x1024", "exportSettings": "FBX2018"
-        /// </summary>
-        public Dictionary<string, string> extra = new Dictionary<string, string>();
-
-        /// <summary>
-        /// Per-FBX/OBJ importer settings captured at submit time, keyed by payload-relative path (e.g., "payload/model.fbx").
-        /// </summary>
-        public Dictionary<string, ModelImporterSettings> modelImporters = new Dictionary<string, ModelImporterSettings>();
 
         /// <summary>
         /// Historical changelog entries describing how this model evolved across versions.

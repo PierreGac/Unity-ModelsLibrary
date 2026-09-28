@@ -28,10 +28,30 @@ namespace ModelLibrary.Editor.Serialization
                 return default;
             }
 
+            if (typeof(T) == typeof(ModelMeta))
+            {
+                json = DictionaryJsonMigration.PrepareModelMeta(json);
+            }
+            else if (typeof(T) == typeof(ModelIndex))
+            {
+                json = DictionaryJsonMigration.PrepareModelIndex(json);
+            }
+
             try
             {
                 // First attempt: Direct deserialization
                 T result = JsonUtility.FromJson<T>(json);
+                if (result is ModelMeta modelMeta)
+                {
+                    return FinishModelMeta(modelMeta, json) as T;
+                }
+
+                if (result is ModelIndex modelIndex)
+                {
+                    modelIndex.ReadSerializedEntries();
+                    return result;
+                }
+
                 if (result != null)
                 {
                     return result;
@@ -68,11 +88,7 @@ namespace ModelLibrary.Editor.Serialization
                 ModelMeta modelMeta = JsonUtility.FromJson<ModelMeta>(json);
                 if (modelMeta != null)
                 {
-                    ApplyLegacyInstallPathMigration(modelMeta, json);
-                    if (ModelMetaMigration.MigrateToCurrentVersion(ref modelMeta))
-                    {
-                        return modelMeta;
-                    }
+                    return FinishModelMeta(modelMeta, json);
                 }
             }
             catch (Exception ex)
@@ -265,6 +281,17 @@ namespace ModelLibrary.Editor.Serialization
         }
 
         /// <summary>
+        /// Applies install-path migration, schema migration, and dictionary entry loading.
+        /// </summary>
+        private static ModelMeta FinishModelMeta(ModelMeta modelMeta, string json)
+        {
+            ApplyLegacyInstallPathMigration(modelMeta, json);
+            ModelMetaMigration.MigrateToCurrentVersion(ref modelMeta);
+            modelMeta.ReadSerializedEntries();
+            return modelMeta;
+        }
+
+        /// <summary>
         /// Migrates legacy relativePath values from older model.json files into installPath.
         /// </summary>
         private static void ApplyLegacyInstallPathMigration(ModelMeta modelMeta, string json)
@@ -289,7 +316,11 @@ namespace ModelLibrary.Editor.Serialization
         /// <summary>
         /// Standard JSON serialization with pretty printing.
         /// </summary>
-        public static string ToJson<T>(T obj) => JsonUtility.ToJson(obj, prettyPrint: true);
+        public static string ToJson<T>(T obj)
+        {
+            JsonUtil.PrepareForSerialization(obj);
+            return JsonUtility.ToJson(obj, prettyPrint: true);
+        }
 
         /// <summary>
         /// Standard JSON deserialization (for backward compatibility).

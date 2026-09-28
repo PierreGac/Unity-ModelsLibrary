@@ -21,7 +21,28 @@ namespace ModelLibrary.Editor.Utils
         /// <typeparam name="t">The type of object to serialize</typeparam>
         /// <param name="obj">The object to convert to JSON</param>
         /// <returns>JSON string representation of the object</returns>
-        public static string ToJson<T>(T obj) => JsonUtility.ToJson(obj, prettyPrint: true);
+        public static string ToJson<T>(T obj)
+        {
+            PrepareForSerialization(obj);
+            return JsonUtility.ToJson(obj, prettyPrint: true);
+        }
+
+        /// <summary>
+        /// Copies dictionary properties into the lists <see cref="JsonUtility"/> can store.
+        /// </summary>
+        /// <typeparam name="T">Serialized model type.</typeparam>
+        /// <param name="obj">Object about to be written.</param>
+        internal static void PrepareForSerialization<T>(T obj)
+        {
+            if (obj is ModelMeta modelMeta)
+            {
+                modelMeta.WriteSerializedEntries();
+            }
+            else if (obj is ModelIndex modelIndex)
+            {
+                modelIndex.WriteSerializedEntries();
+            }
+        }
 
         /// <summary>
         /// Convert a JSON string back to an object of the specified type.
@@ -35,6 +56,11 @@ namespace ModelLibrary.Editor.Utils
             if (typeof(T) == typeof(ModelMeta))
             {
                 return (T)(object)FromJsonWithMigration<ModelMeta>(json);
+            }
+
+            if (typeof(T) == typeof(ModelIndex))
+            {
+                return (T)(object)FromJsonWithMigration<ModelIndex>(json);
             }
 
             return JsonUtility.FromJson<T>(json);

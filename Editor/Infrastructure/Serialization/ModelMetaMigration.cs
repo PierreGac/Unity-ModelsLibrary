@@ -14,7 +14,7 @@ namespace ModelLibrary.Editor.Serialization
         /// <summary>
         /// Current schema version - increment this when making breaking changes.
         /// </summary>
-        public const int CURRENT_SCHEMA_VERSION = 1;
+        public const int CURRENT_SCHEMA_VERSION = 2;
 
         /// <summary>
         /// Migrates a ModelMeta object from an older schema version to the current version.
@@ -71,12 +71,11 @@ namespace ModelLibrary.Editor.Serialization
         {
             switch (fromVersion)
             {
-                case 0: // Migration from version 0 to 1
+                case 0:
                     return MigrateFrom0To1(modelMeta);
 
-                // Add more migration cases here as the schema evolves
-                // case 1: return MigrateFrom1To2(modelMeta);
-                // case 2: return MigrateFrom2To3(modelMeta);
+                case 1:
+                    return MigrateFrom1To2(modelMeta);
 
                 default:
                     Debug.LogWarning($"ModelMetaMigration: No migration defined from version {fromVersion} to {toVersion}");
@@ -142,6 +141,25 @@ namespace ModelLibrary.Editor.Serialization
                 Debug.LogError($"ModelMetaMigration: Error in MigrateFrom0To1: {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Migration from schema version 1 to 2.
+        /// Schema 2 stores dictionary fields as serializable entry lists.
+        /// </summary>
+        private static bool MigrateFrom1To2(ModelMeta modelMeta)
+        {
+            if (modelMeta.extraEntries == null)
+            {
+                modelMeta.extraEntries = new List<ModelMetaExtraEntry>();
+            }
+
+            if (modelMeta.modelImporterEntries == null)
+            {
+                modelMeta.modelImporterEntries = new List<ModelImporterDictionaryEntry>();
+            }
+
+            return true;
         }
 
     }

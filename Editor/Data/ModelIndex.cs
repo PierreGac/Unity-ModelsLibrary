@@ -11,7 +11,7 @@ namespace ModelLibrary.Data
     /// This file is stored at: &lt;repository&gt;/models_index.json
     /// </summary>
     [Serializable]
-    public class ModelIndex
+    public partial class ModelIndex
     {
         /// <summary>
         /// A single entry in the model index representing one model family.
@@ -88,10 +88,5 @@ namespace ModelLibrary.Data
             return null;
         }
 
-        /// <summary>
-        /// Optional map of model ID to known version list (if the repository includes historical versions in index).
-        /// This field may be empty when only the latest version is tracked.
-        /// </summary>
-        public Dictionary<string, List<string>> versions = new Dictionary<string, List<string>>();
     }
 }
