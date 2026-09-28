@@ -116,29 +116,7 @@ namespace ModelLibrary.Editor.Services
             }
 
             List<string> sorted = versions.ToList();
-
-            sorted.Sort((a, b) =>
-            {
-                bool leftParsed = SemVer.TryParse(a, out SemVer left);
-                bool rightParsed = SemVer.TryParse(b, out SemVer right);
-
-                if (leftParsed && rightParsed)
-                {
-                    return right.CompareTo(left); // descending order
-                }
-
-                if (leftParsed)
-                {
-                    return -1;
-                }
-
-                if (rightParsed)
-                {
-                    return 1;
-                }
-
-                return string.Compare(b, a, StringComparison.OrdinalIgnoreCase);
-            });
+            sorted.Sort(CompareVersionsDescending);
 
             if (sorted.Count == 0)
             {
@@ -192,7 +170,39 @@ namespace ModelLibrary.Editor.Services
             return removed;
         }
 
-        private async Task SaveApplyingAsync(Func<ModelIndex, bool> apply)
+        /// <summary>
+        /// Points the index at the highest remaining version folder, or removes the model
+        /// when none remain. Uses the same reload-and-merge save as other index edits.
+        /// </summary>
+        /// <param name="modelId">Model whose version folder was deleted.</param>
+        public Task UpdateIndexAfterVersionDeletedAsync(string modelId)
+        {
+            return SaveApplyingAsync(async index =>
+            {
+                List<string> remaining = await ListVersionFoldersAsync(modelId);
+                ModelMeta latestMeta = null;
+                if (remaining.Count > 0)
+                {
+                    try
+                    {
+                        latestMeta = await _repo.LoadMetaAsync(modelId, remaining[0]);
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        latestMeta = null;
+                    }
+                }
+
+                return ApplyVersionDeletion(index, modelId, remaining, latestMeta);
+            });
+        }
+
+        private Task SaveApplyingAsync(Func<ModelIndex, bool> apply)
+        {
+            return SaveApplyingAsync(index => Task.FromResult(apply(index)));
+        }
+
+        private async Task SaveApplyingAsync(Func<ModelIndex, Task<bool>> apply)
         {
             for (int attempt = 0; attempt < MAX_INDEX_SAVE_ATTEMPTS; attempt++)
             {
@@ -208,7 +218,7 @@ namespace ModelLibrary.Editor.Services
                 }
 
                 long seenRevision = index.revision;
-                bool shouldSave = apply(index);
+                bool shouldSave = await apply(index);
                 if (!shouldSave)
                 {
                     _indexCache = index;
@@ -283,6 +293,103 @@ namespace ModelLibrary.Editor.Services
             }
 
             return false;
+        }
+
+        private async Task<List<string>> ListVersionFoldersAsync(string modelId)
+        {
+            HashSet<string> versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            List<string> paths = await _repo.ListFilesAsync(modelId);
+            string prefix = PathUtils.SanitizePathSeparator(modelId + "/");
+            for (int i = 0; i < paths.Count; i++)
+            {
+                string sanitized = PathUtils.SanitizePathSeparator(paths[i]);
+                if (!sanitized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string remainder = sanitized.Substring(prefix.Length);
+                int slashIndex = remainder.IndexOf('/');
+                if (slashIndex <= 0)
+                {
+                    continue;
+                }
+
+                string versionCandidate = remainder.Substring(0, slashIndex).Trim();
+                if (!string.IsNullOrEmpty(versionCandidate))
+                {
+                    versions.Add(versionCandidate);
+                }
+            }
+
+            List<string> sorted = new List<string>(versions);
+            sorted.Sort(CompareVersionsDescending);
+            return sorted;
+        }
+
+        private static bool ApplyVersionDeletion(ModelIndex index, string modelId, List<string> remaining, ModelMeta latestMeta)
+        {
+            if (remaining == null || remaining.Count == 0)
+            {
+                bool removedEntry = RemoveEntry(index, modelId);
+                bool removedVersions = RemoveKnownVersions(index, modelId);
+                return removedEntry || removedVersions;
+            }
+
+            string highest = remaining[0];
+            ModelIndex.Entry entry = index.Get(modelId);
+            if (entry == null)
+            {
+                entry = new ModelIndex.Entry();
+                entry.id = modelId;
+                index.entries.Add(entry);
+            }
+
+            if (latestMeta != null && latestMeta.identity != null)
+            {
+                ModelIndex.Entry updated = ModelIndexEntryFactory.FromMeta(latestMeta);
+                entry.name = updated.name;
+                entry.description = updated.description;
+                entry.updatedTimeTicks = updated.updatedTimeTicks;
+                entry.tags = updated.tags;
+            }
+
+            entry.latestVersion = highest;
+            index.versions[modelId] = new List<string>(remaining);
+            return true;
+        }
+
+        private static bool RemoveKnownVersions(ModelIndex index, string modelId)
+        {
+            if (index.versions == null || !index.versions.ContainsKey(modelId))
+            {
+                return false;
+            }
+
+            index.versions.Remove(modelId);
+            return true;
+        }
+
+        private static int CompareVersionsDescending(string leftVersion, string rightVersion)
+        {
+            bool leftParsed = SemVer.TryParse(leftVersion, out SemVer left);
+            bool rightParsed = SemVer.TryParse(rightVersion, out SemVer right);
+            if (leftParsed && rightParsed)
+            {
+                return right.CompareTo(left);
+            }
+
+            if (leftParsed)
+            {
+                return -1;
+            }
+
+            if (rightParsed)
+            {
+                return 1;
+            }
+
+            return string.Compare(rightVersion, leftVersion, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

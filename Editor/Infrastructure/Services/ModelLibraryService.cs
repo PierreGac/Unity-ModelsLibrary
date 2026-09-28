@@ -152,7 +152,7 @@ namespace ModelLibrary.Editor.Services
 
         /// <summary>
         /// Delete a specific model version from the repository.
-        /// Note: Deletion of the latest version is not recommended as it requires updating the index.
+        /// After a successful delete, the index points at the highest remaining version, or drops the model when none remain.
         /// </summary>
         /// <param name="modelId">The model ID (GUID).</param>
         /// <param name="version">The version string to delete (e.g., "1.0.0").</param>
@@ -163,21 +163,15 @@ namespace ModelLibrary.Editor.Services
             RequireSafeIdentifier(version, nameof(version));
             try
             {
-                // Check if this is the latest version (warning only - UI handles confirmation)
-                ModelIndex index = await GetIndexAsync();
-                ModelIndex.Entry entry = index != null && index.entries != null ? index.entries.FirstOrDefault(e => e.id == modelId) : null;
-                if (entry != null && entry.latestVersion == version)
+                bool deleted = await _repo.DeleteVersionAsync(modelId, version);
+                if (!deleted)
                 {
-                    Debug.LogWarning($"[ModelLibraryService] Deleting latest version {version} of model {modelId}. The index will still reference this version until manually updated.");
+                    return false;
                 }
 
-                // Delete the version from repository
-                bool deleted = await _repo.DeleteVersionAsync(modelId, version);
-                if (deleted)
-                {
-                    Debug.Log($"[ModelLibraryService] Successfully deleted version {version} of model {modelId}");
-                }
-                return deleted;
+                await _indexService.UpdateIndexAfterVersionDeletedAsync(modelId);
+                Debug.Log($"[ModelLibraryService] Successfully deleted version {version} of model {modelId}");
+                return true;
             }
             catch (Exception ex)
             {
