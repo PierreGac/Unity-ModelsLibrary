@@ -1,8 +1,10 @@
 {
     "name": "com.models-library",
     "displayName": "Models Library",
-    "version": "1.0.11",
+    "version": "1.0.12",
     "unity": "6000.5",
+    "unityRelease": "6f2",
+    "license": "MIT",
     "description": "Editor tools and data for managing a models library in Unity.",
     "keywords": [
         "models",
