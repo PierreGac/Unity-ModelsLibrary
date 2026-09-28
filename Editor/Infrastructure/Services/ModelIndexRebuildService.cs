@@ -93,10 +93,10 @@ namespace ModelLibrary.Editor.Services
                 }
 
                 // STABILITY (MED-08): Persist through SaveIndexAsync so the
-                // write is atomic (SafeFileWriter temp + move) and the
-                // repository file-existence cache is invalidated. Writing
-                // models_index.json directly left LoadIndexAsync returning
-                // an empty index when the file did not exist before rebuild.
+                // previous index stays in place until replacement succeeds
+                // and the repository file-existence cache is invalidated.
+                // Writing models_index.json directly left LoadIndexAsync
+                // returning an empty index when the file did not exist before rebuild.
                 ModelIndex newIndex = new ModelIndex { entries = entries };
                 await repo.SaveIndexAsync(newIndex);
                 report.success = report.errors.Count == 0;

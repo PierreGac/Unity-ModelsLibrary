@@ -411,8 +411,9 @@ namespace ModelLibrary.Editor.Repository
         /// <summary>
         /// Saves the global models index to the repository.
         /// Creates the root directory if it doesn't exist.
-        /// Writes atomically via <see cref="SafeFileWriter"/> and invalidates the
-        /// file-existence cache so the next load observes the new file.
+        /// Writes through <see cref="SafeFileWriter"/> so the previous file stays in place
+        /// until replacement, and invalidates the file-existence cache so the next load
+        /// observes the new file.
         /// </summary>
         /// <param name="index">The model index to save.</param>
         public Task SaveIndexAsync(ModelIndex index)
@@ -476,8 +477,12 @@ namespace ModelLibrary.Editor.Repository
             // Convert the metadata to JSON format
             string json = JsonUtil.ToJson(meta);
 
-            // Write the JSON file asynchronously
-            await AsyncProfiler.MeasureAsync("FileSystemRepository.WriteMeta", () => File.WriteAllTextAsync(path, json));
+            // Replace model.json only after a same-directory temporary file is flushed.
+            await AsyncProfiler.MeasureAsync("FileSystemRepository.WriteMeta", () =>
+            {
+                SafeFileWriter.WriteAllText(path, json);
+                return Task.CompletedTask;
+            });
 
             // Invalidate cache since we just created/updated the file
             InvalidateFileCache(path);
