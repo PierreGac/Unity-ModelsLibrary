@@ -1,10 +1,11 @@
 """Static package checks for the Models Library UPM root.
 
-Checks manifest metadata, changelog alignment, imported-asset .meta pairing,
-and forbidden release content. Documentation~ and Samples~ are Unity-ignored
-folders: files there do not need .meta siblings, and a .meta file inside them
-fails the check. The .git directory is version-control metadata and is not
-release content.
+Checks manifest metadata, imported-asset .meta pairing, and forbidden release
+content. Changelog alignment is not checked: the published repository does not
+ship CHANGELOG.md. Folders whose names end in ~, including Documentation~,
+Samples~, AIAssistantSkills~, and scripts~, are Unity-ignored: files there do
+not need .meta siblings, and a .meta file inside them fails the check. The
+.git directory is version-control metadata and is not release content.
 """
 
 import json
@@ -18,7 +19,6 @@ UNITY_RELEASE = "6f2"
 LICENSE_ID = "MIT"
 REPOSITORY_URL = "https://github.com/PierreGac/Unity-ModelsLibrary.git"
 SUBFOLDER_GIT_QUERY = "?path=Assets/ModelLibrary"
-CHANGELOG_FILE_NAME = "CHANGELOG.md"
 LICENSE_FILE_NAME = "LICENSE"
 LICENSE_MARKDOWN_FILE_NAME = "LICENSE.md"
 META_EXTENSION = ".meta"
@@ -48,8 +48,7 @@ def main():
     package_root = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
     package_root = os.path.abspath(package_root)
     problems = []
-    version = check_manifest(package_root, problems)
-    check_changelog(package_root, version, problems)
+    check_manifest(package_root, problems)
     collect_pairing_problems(package_root, package_root, problems)
     check_forbidden_release_content(package_root, problems)
     if problems:
@@ -102,20 +101,6 @@ def check_manifest(package_root, problems):
         problems.append("LICENSE.md competes with the manifest license; keep LICENSE only")
 
     return version
-
-
-def check_changelog(package_root, version, problems):
-    changelog_path = os.path.join(package_root, CHANGELOG_FILE_NAME)
-    if not os.path.isfile(changelog_path):
-        problems.append("Missing CHANGELOG.md")
-        return
-    if version == "":
-        return
-
-    changelog = read_text(changelog_path)
-    heading = "## [" + version + "]"
-    if heading not in changelog:
-        problems.append("CHANGELOG.md has no heading for package version " + version)
 
 
 def collect_pairing_problems(package_root, directory, problems):

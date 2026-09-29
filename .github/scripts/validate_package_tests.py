@@ -1,7 +1,9 @@
 """Fixture checks for the static package job.
 
-A valid tree with a tilde folder and no .meta files passes.
-The same tree fails when it contains the private UNC path or a missing imported-asset .meta file.
+A valid tree does not need CHANGELOG.md. A folder renamed with a trailing ~
+so Unity ignores it passes when it contains no .meta files. The same tree
+fails when it contains the private UNC path, a missing imported-asset .meta
+file, or a .meta file left inside the renamed folder.
 """
 
 import os
@@ -21,6 +23,7 @@ import validate_package  # noqa: E402
 def main():
     failures = []
     run_case(failures, "tilde folder without meta passes", expect_pass, make_valid_tree)
+    run_case(failures, "renamed skill and script folders pass", expect_pass, make_renamed_ignored_folders_tree)
     run_case(failures, "private UNC path fails", expect_unc_failure, make_unc_tree)
     run_case(failures, "missing imported-asset meta fails", expect_missing_meta_failure, make_missing_meta_tree)
     run_case(failures, "meta inside tilde folder fails", expect_tilde_meta_failure, make_tilde_meta_tree)
@@ -49,8 +52,6 @@ def make_valid_tree():
     root = tempfile.mkdtemp(prefix="package-check-")
     write(root, "package.json", package_json())
     write(root, "package.json.meta", "fileFormatVersion: 2\n")
-    write(root, "CHANGELOG.md", "## [" + package_version() + "] — fixture\n")
-    write(root, "CHANGELOG.md.meta", "fileFormatVersion: 2\n")
     write(root, "LICENSE", "MIT\n")
     write(root, "LICENSE.meta", "fileFormatVersion: 2\n")
     os.makedirs(os.path.join(root, "Editor"))
@@ -61,6 +62,16 @@ def make_valid_tree():
     write(root, os.path.join("Documentation~", "notes.txt"), "docs\n")
     os.makedirs(os.path.join(root, "Samples~"))
     write(root, os.path.join("Samples~", "example.txt"), "sample\n")
+    return root
+
+
+def make_renamed_ignored_folders_tree():
+    root = make_valid_tree()
+    skill_dir = os.path.join("AIAssistantSkills~", "models-library-api")
+    os.makedirs(os.path.join(root, skill_dir))
+    write(root, os.path.join(skill_dir, "SKILL.md"), "skill\n")
+    os.makedirs(os.path.join(root, "scripts~"))
+    write(root, os.path.join("scripts~", "dotnet_format_verify.py"), "print('ok')\n")
     return root
 
 
