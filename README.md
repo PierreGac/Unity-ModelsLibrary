@@ -8,6 +8,8 @@ Editor tools for browsing, versioning, submitting, and importing 3D models from 
 
 Package: `com.models-library` · Display name: **Models Library** · Version: **1.0.1**
 
+The offline guide is [Documentation~/index.md](Documentation~/index.md).
+
 ![Model Library catalog](Documentation~/images/models_details.png)
 
 ## Features
@@ -166,7 +168,7 @@ See `Editor/Infrastructure/Repository/` for the File System and HTTP implementat
 - Roles are client-side UI gating only
 - GUID conflicts on import are common; use Keep when you need to preserve references
 - Cache folders can leave access-denied or stale entries after VCS discard / version delete / 3D preview before import — delete the affected cache folder under `Library/ModelLibraryCache` and retry
-- Submitting models without usable assets is not fully blocked yet
+- A submission must include at least one FBX or OBJ. Metadata-only and image-only folders are rejected
 
 ## Contributing
 
