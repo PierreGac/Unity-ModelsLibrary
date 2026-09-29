@@ -1,0 +1,52 @@
+# Unity release gates.
+#
+# Licensing: these jobs run on a self-hosted Windows runner. Unity Hub on that
+# machine already holds the Editor license. Do not commit a .ulf license file,
+# and do not store UNITY_LICENSE, UNITY_EMAIL, or UNITY_PASSWORD in the
+# repository. GitHub-hosted GameCI activation is not used. A replacement runner
+# must have Unity 6000.2.6f2 and Unity 6000.6.0f1 activated in Hub before it
+# picks up these jobs. GitHub-hosted runners do not satisfy runs-on.
+#
+# Package-origin compiler warnings are not a failure here. Phase 5E owns that
+# gate. Disabled Domain Reload is not exercised here. Phase 5F owns that check.
+
+name: Unity release gates
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  editmode:
+    name: Unity ${{ matrix.version }} Edit Mode
+    runs-on: [self-hosted, Windows, X64]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: 6000.2.6f2
+            artifact: unity-6000.2-editmode
+          - version: 6000.6.0f1
+            artifact: unity-6000.6-editmode
+    steps:
+      - name: Check out the package
+        uses: actions/checkout@v5
+
+      - name: Run Edit Mode tests
+        shell: pwsh
+        run: >
+          ./.github/scripts/run-editmode-tests.ps1
+          -UnityVersion "${{ matrix.version }}"
+          -PackageRoot "${{ github.workspace }}"
+          -ResultsPath "${{ runner.temp }}/results.xml"
+          -LogPath "${{ runner.temp }}/editor.log"
+
+      - name: Retain test results and Editor log
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/results.xml
+            ${{ runner.temp }}/editor.log
