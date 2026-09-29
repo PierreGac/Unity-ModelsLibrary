@@ -20,6 +20,8 @@ Windows refuse to open in play mode. Submit also requires Artist or Admin (UI ch
 ModelLibrary.Editor.Settings.ModelLibrarySettings settings =
     ModelLibrary.Editor.Settings.ModelLibrarySettings.GetOrCreate();
 // settings.repositoryKind, settings.repositoryRoot, settings.localCacheRoot
+// Writable copy: ProjectSettings/ModelLibrarySettings.json
+// Persist edits with settings.SaveProjectCopy();
 
 ModelLibrary.Editor.Repository.IModelRepository repo =
     ModelLibrary.Editor.Utils.RepositoryFactory.CreateRepository();
@@ -52,7 +54,7 @@ ModelLibrary.Editor.Services.ModelLibraryService service =
 | `GetUpdateCountAsync()` | |
 | `RefreshAllUpdatesAsync()` | |
 | `DownloadModelVersionAsync(id, version)` | Cache under `Library/ModelLibraryCache`; returns `(versionRoot, meta)` |
-| `SubmitNewVersionAsync(meta, localVersionRoot, changeSummary)` | Uploads allowlisted files; updates index |
+| `SubmitNewVersionAsync(meta, localVersionRoot, changeSummary)` | Uploads allowlisted files and updates the index. Throws `InvalidOperationException` when the folder has no file `AssetDependencyResolver.IsMeshAssetPath` accepts. |
 | `PublishMetadataUpdateAsync(updatedMeta, baseVersion, changeSummary, author, bumpStrategy)` | Metadata-only new version; `Func<SemVer, SemVer>` optional |
 | `ClearCacheForModelAsync(modelId, version)` | |
 | `DeleteVersionAsync(modelId, version)` | Confirm with the user |
@@ -65,6 +67,7 @@ ModelLibrary.Editor.Services.ModelLibraryService service =
 ```csharp
 Task<ModelIndex> LoadIndexAsync();
 Task SaveIndexAsync(ModelIndex index);
+Task<bool> TrySaveIndexIfUnchangedAsync(ModelIndex index, long expectedRevision);
 Task<ModelMeta> LoadMetaAsync(string modelId, string version);
 Task SaveMetaAsync(string modelId, string version, ModelMeta meta);
 Task<bool> DirectoryExistsAsync(string relativePath);

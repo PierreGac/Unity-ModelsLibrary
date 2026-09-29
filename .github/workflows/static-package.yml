@@ -1,0 +1,21 @@
+name: Static package checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-package:
+    name: Manifest, changelog, meta pairing, and release content
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the package
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run fixture checks and the current package
+        run: python .github/scripts/validate_package_tests.py
