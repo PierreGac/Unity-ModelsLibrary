@@ -26,6 +26,12 @@
     "bugs": {
         "url": "https://github.com/PierreGac/Unity-ModelsLibrary/issues"
     },
-    "samples": [],
+    "samples": [
+        {
+            "displayName": "Example",
+            "description": "A publisher-owned cube and a one-model file-system repository for browse and import.",
+            "path": "Samples~/Example"
+        }
+    ],
     "dependencies": {}
 }

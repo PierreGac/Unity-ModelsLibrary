@@ -1,0 +1,19 @@
+{
+    "entries": [
+        {
+            "id": "sample-cube",
+            "name": "Sample Cube",
+            "latestVersion": "1.0.0",
+            "description": "A publisher-owned cube used to try browse and import."
+        }
+    ],
+    "revision": 1,
+    "versionEntries": [
+        {
+            "key": "sample-cube",
+            "versions": [
+                "1.0.0"
+            ]
+        }
+    ]
+}
