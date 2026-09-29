@@ -336,13 +336,17 @@ namespace ModelLibrary.Editor.Windows
             if (newKind != _kind)
             {
                 _kind = newKind;
-                _repositoryTested = false;
-                _repositoryTestMessage = null;
-                _repositoryTestMessageType = MessageType.None;
+                ClearRepositoryFeedback();
             }
 
             EditorGUILayout.BeginHorizontal();
-            _repoRoot = EditorGUILayout.TextField("Repository Root", _repoRoot);
+            string editedRepositoryRoot = EditorGUILayout.TextField("Repository Root", _repoRoot);
+            if (!string.Equals(editedRepositoryRoot, _repoRoot, StringComparison.Ordinal))
+            {
+                _repoRoot = editedRepositoryRoot;
+                ClearRepositoryFeedback();
+            }
+
             if (_kind == ModelLibrarySettings.RepositoryKind.FileSystem)
             {
                 if (GUILayout.Button("Browse...", GUILayout.Width(90f)))
@@ -352,15 +356,12 @@ namespace ModelLibrary.Editor.Windows
                     if (!string.IsNullOrEmpty(selectedPath))
                     {
                         _repoRoot = selectedPath;
-                        _repositoryTested = false;
-                        _repositoryTestMessage = null;
-                        _repositoryTestMessageType = MessageType.None;
+                        ClearRepositoryFeedback();
                     }
                 }
             }
             EditorGUILayout.EndHorizontal();
 
-            bool repoValid = ValidateRepository(out _repositoryValidationMessage, out _repositoryValidationType);
             if (!string.IsNullOrEmpty(_repositoryValidationMessage))
             {
                 EditorGUILayout.HelpBox(_repositoryValidationMessage, _repositoryValidationType);
@@ -398,6 +399,10 @@ namespace ModelLibrary.Editor.Windows
             EditorGUILayout.LabelField("Repository", EditorStyles.boldLabel);
             EditorGUILayout.LabelField($"Type: {_kind}");
             EditorGUILayout.LabelField($"Location: {_repoRoot}");
+            if (!string.IsNullOrEmpty(_repositoryValidationMessage))
+            {
+                EditorGUILayout.HelpBox(_repositoryValidationMessage, _repositoryValidationType);
+            }
 
             GUILayout.Space(8f);
             _openHelpAfterFinish = EditorGUILayout.ToggleLeft("Open a quick tour after finishing", _openHelpAfterFinish);
@@ -432,6 +437,12 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (GUILayout.Button("Next", GUILayout.Width(110f), GUILayout.Height(26f)))
                         {
+                            if (_currentStep == WizardStep.Repository
+                                && !ValidateRepository(out _repositoryValidationMessage, out _repositoryValidationType))
+                            {
+                                return;
+                            }
+
                             int next = Mathf.Min((int)_currentStep + 1, __TOTAL_STEPS - 1);
                             _currentStep = (WizardStep)next;
                         }
@@ -440,6 +451,12 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (GUILayout.Button("Finish", GUILayout.Width(110f), GUILayout.Height(26f)))
                         {
+                            if (!ValidateRepository(out _repositoryValidationMessage, out _repositoryValidationType))
+                            {
+                                _currentStep = WizardStep.Repository;
+                                return;
+                            }
+
                             SaveConfiguration();
                             if (_openHelpAfterFinish)
                             {
@@ -461,12 +478,21 @@ namespace ModelLibrary.Editor.Windows
                 case WizardStep.Identity:
                     return !string.IsNullOrWhiteSpace(_userName);
                 case WizardStep.Repository:
-                    return ValidateRepository(out _, out _);
+                    return true;
                 case WizardStep.Summary:
-                    return !string.IsNullOrWhiteSpace(_userName) && ValidateRepository(out _, out _);
+                    return !string.IsNullOrWhiteSpace(_userName);
                 default:
                     return false;
             }
+        }
+
+        private void ClearRepositoryFeedback()
+        {
+            _repositoryTested = false;
+            _repositoryTestMessage = null;
+            _repositoryTestMessageType = MessageType.None;
+            _repositoryValidationMessage = null;
+            _repositoryValidationType = MessageType.None;
         }
 
         private bool ValidateRepository(out string message, out MessageType type)

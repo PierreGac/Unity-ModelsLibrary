@@ -148,13 +148,17 @@ namespace ModelLibrary.Editor.Windows
                 if (newKind != _wizardRepoKind)
                 {
                     _wizardRepoKind = newKind;
-                    _wizardRepoTested = false;
-                    _wizardRepoTestMessage = null;
-                    _wizardRepoTestMessageType = MessageType.None;
+                    ClearWizardRepositoryFeedback();
                 }
 
                 EditorGUILayout.BeginHorizontal();
-                _wizardRepoRoot = EditorGUILayout.TextField("Repository Root", _wizardRepoRoot);
+                string editedRepositoryRoot = EditorGUILayout.TextField("Repository Root", _wizardRepoRoot);
+                if (!string.Equals(editedRepositoryRoot, _wizardRepoRoot, StringComparison.Ordinal))
+                {
+                    _wizardRepoRoot = editedRepositoryRoot;
+                    ClearWizardRepositoryFeedback();
+                }
+
                 if (_wizardRepoKind == ModelLibrarySettings.RepositoryKind.FileSystem)
                 {
                     if (GUILayout.Button("Browse...", GUILayout.Width(__WIZARD_BUTTON_BROWSE_WIDTH)))
@@ -164,15 +168,12 @@ namespace ModelLibrary.Editor.Windows
                         if (!string.IsNullOrEmpty(selectedPath))
                         {
                             _wizardRepoRoot = selectedPath;
-                            _wizardRepoTested = false;
-                            _wizardRepoTestMessage = null;
-                            _wizardRepoTestMessageType = MessageType.None;
+                            ClearWizardRepositoryFeedback();
                         }
                     }
                 }
                 EditorGUILayout.EndHorizontal();
 
-                bool repoValid = ValidateWizardRepository(out _wizardRepoValidationMessage, out _wizardRepoValidationType);
                 if (!string.IsNullOrEmpty(_wizardRepoValidationMessage))
                 {
                     EditorGUILayout.HelpBox(_wizardRepoValidationMessage, _wizardRepoValidationType);
@@ -213,6 +214,10 @@ namespace ModelLibrary.Editor.Windows
                 UIStyles.DrawSectionHeader("Repository");
                 EditorGUILayout.LabelField($"Type: {_wizardRepoKind}");
                 EditorGUILayout.LabelField($"Location: {_wizardRepoRoot}");
+                if (!string.IsNullOrEmpty(_wizardRepoValidationMessage))
+                {
+                    EditorGUILayout.HelpBox(_wizardRepoValidationMessage, _wizardRepoValidationType);
+                }
             }
 
             GUILayout.Space(8f);
@@ -248,6 +253,12 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (GUILayout.Button("Next", GUILayout.Width(110f), GUILayout.Height(26f)))
                         {
+                            if (_wizardStep == FirstRunWizard.WizardStep.Repository
+                                && !ValidateWizardRepository(out _wizardRepoValidationMessage, out _wizardRepoValidationType))
+                            {
+                                return;
+                            }
+
                             int next = Mathf.Min((int)_wizardStep + 1, __WIZARD_TOTAL_STEPS - 1);
                             _wizardStep = (FirstRunWizard.WizardStep)next;
                         }
@@ -256,6 +267,12 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (GUILayout.Button("Finish", GUILayout.Width(110f), GUILayout.Height(26f)))
                         {
+                            if (!ValidateWizardRepository(out _wizardRepoValidationMessage, out _wizardRepoValidationType))
+                            {
+                                _wizardStep = FirstRunWizard.WizardStep.Repository;
+                                return;
+                            }
+
                             SaveWizardConfiguration();
                             if (_wizardOpenHelpAfterFinish)
                             {
@@ -284,12 +301,21 @@ namespace ModelLibrary.Editor.Windows
                 case FirstRunWizard.WizardStep.Identity:
                     return !string.IsNullOrWhiteSpace(_wizardUserName);
                 case FirstRunWizard.WizardStep.Repository:
-                    return ValidateWizardRepository(out _, out _);
+                    return true;
                 case FirstRunWizard.WizardStep.Summary:
-                    return !string.IsNullOrWhiteSpace(_wizardUserName) && ValidateWizardRepository(out _, out _);
+                    return !string.IsNullOrWhiteSpace(_wizardUserName);
                 default:
                     return false;
             }
+        }
+
+        private void ClearWizardRepositoryFeedback()
+        {
+            _wizardRepoTested = false;
+            _wizardRepoTestMessage = null;
+            _wizardRepoTestMessageType = MessageType.None;
+            _wizardRepoValidationMessage = null;
+            _wizardRepoValidationType = MessageType.None;
         }
 
         private bool ValidateWizardRepository(out string message, out MessageType type)
