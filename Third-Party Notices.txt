@@ -1,0 +1,11 @@
+Third-Party Notices
+
+This package includes no third-party components.
+
+It distributes no fonts, audio, plugins, or external packages. The package license is the MIT license in LICENSE. Unity Editor is required to use the package and is not included.
+
+Asset Store description
+
+Use this sentence in the Asset Store description:
+
+This package includes no third-party components.

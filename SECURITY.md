@@ -1,23 +1,23 @@
 # Security Policy
 
-TODO
+Models Library (`com.models-library`) is an Editor-only Unity package. The supported release is the version in `package.json`. That version is currently **1.0.12**. Older versions are not supported.
 
-## Supported Versions
+## Reporting a vulnerability
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Report a suspected vulnerability through GitHub private security advisories:
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+https://github.com/PierreGac/Unity-ModelsLibrary/security/advisories/new
 
-## Reporting a Vulnerability
+Do not open a public issue for an unfixed vulnerability. Include the package version, the Unity Editor version, and the steps that show the problem.
 
-Use this section to tell people how to report a vulnerability.
+The maintainer will confirm the report and say whether it is accepted. Please wait for a fix, or for a decline, before publishing the details.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+How-to questions and ordinary bugs belong on the public issue tracker:
+
+https://github.com/PierreGac/Unity-ModelsLibrary/issues
+
+## Scope
+
+Reports are in scope when they concern this package: path handling, import of repository files, settings, or the Editor tools that read and write a model repository.
+
+The package does not operate a hosted model server. A repository you host, including an experimental HTTP server, is your system. Editor roles are not authorization.

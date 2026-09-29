@@ -170,6 +170,10 @@ See `Editor/Infrastructure/Repository/` for the File System and HTTP implementat
 - Cache folders can leave access-denied or stale entries after VCS discard / version delete / 3D preview before import — delete the affected cache folder under `Library/ModelLibraryCache` and retry
 - A submission must include at least one FBX or OBJ. Metadata-only and image-only folders are rejected
 
+## Third-party components
+
+This package includes no third-party components.
+
 ## Contributing
 
 Install [pre-commit](https://pre-commit.com/) hooks so commits enforce `.editorconfig` (and staged C# style via `dotnet format`):

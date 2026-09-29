@@ -83,3 +83,7 @@ HTTP is experimental. Prefer a shared folder.
 ## After import
 
 Each install folder gets a hidden `.modelLibrary.meta.json`. An older `modelLibrary.meta.json` is still recognized. If Unity asks about GUID conflicts, choose **Keep** when existing references must stay.
+
+## Third-party components
+
+This package includes no third-party components.
