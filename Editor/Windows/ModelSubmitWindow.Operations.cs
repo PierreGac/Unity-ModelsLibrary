@@ -235,8 +235,7 @@ namespace ModelLibrary.Editor.Windows
                 string suggestedName = null;
 
                 string fileName = Path.GetFileNameWithoutExtension(firstAsset);
-                string extension = Path.GetExtension(firstAsset).ToLowerInvariant();
-                if ((extension == FileExtensions.FBX || extension == FileExtensions.OBJ) && !string.IsNullOrWhiteSpace(fileName))
+                if (AssetDependencyResolver.IsMeshAssetPath(firstAsset) && !string.IsNullOrWhiteSpace(fileName))
                 {
                     suggestedName = fileName;
                 }
@@ -907,8 +906,7 @@ namespace ModelLibrary.Editor.Windows
                     continue;
                 }
 
-                string extension = Path.GetExtension(assetPath).ToLowerInvariant();
-                if (extension == FileExtensions.FBX || extension == FileExtensions.OBJ)
+                if (AssetDependencyResolver.IsMeshAssetPath(assetPath))
                 {
                     meshFilePath = assetPath;
                     break;
@@ -949,8 +947,7 @@ namespace ModelLibrary.Editor.Windows
                         bool hasMeshFiles = false;
                         for (int i = 0; i < filesInDir.Length; i++)
                         {
-                            string ext = Path.GetExtension(filesInDir[i]).ToLowerInvariant();
-                            if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ)
+                            if (AssetDependencyResolver.IsMeshAssetPath(filesInDir[i]))
                             {
                                 hasMeshFiles = true;
                                 break;

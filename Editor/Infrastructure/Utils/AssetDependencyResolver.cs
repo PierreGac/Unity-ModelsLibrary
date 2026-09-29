@@ -16,6 +16,11 @@ namespace ModelLibrary.Editor.Utils
     internal static class AssetDependencyResolver
     {
         /// <summary>
+        /// Thrown when a submission folder has no file <see cref="IsMeshAssetPath"/> accepts.
+        /// </summary>
+        internal const string PRIMARY_MODEL_REQUIRED_MESSAGE = "A submission must include a supported primary model.";
+
+        /// <summary>
         /// Callback invoked when a dependency mesh path is encountered during meta enrichment.
         /// </summary>
         /// <param name="assetPath">Unity asset path of the dependency mesh.</param>
@@ -40,6 +45,30 @@ namespace ModelLibrary.Editor.Utils
 
             string extension = Path.GetExtension(assetPath).ToLowerInvariant();
             return extension == FileExtensions.FBX || extension == FileExtensions.OBJ;
+        }
+
+        /// <summary>
+        /// Returns whether the directory contains at least one file accepted by <see cref="IsMeshAssetPath"/>.
+        /// </summary>
+        /// <param name="directoryPath">Absolute directory to scan, including subfolders.</param>
+        /// <returns>True when a supported primary model file is present.</returns>
+        public static bool DirectoryContainsPrimaryModel(string directoryPath)
+        {
+            if (string.IsNullOrWhiteSpace(directoryPath) || !Directory.Exists(directoryPath))
+            {
+                return false;
+            }
+
+            string[] files = Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
+            for (int i = 0; i < files.Length; i++)
+            {
+                if (IsMeshAssetPath(files[i]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -320,8 +349,7 @@ namespace ModelLibrary.Editor.Utils
                     continue;
                 }
 
-                string dependencyExtension = Path.GetExtension(dependencyPath).ToLowerInvariant();
-                if (dependencyExtension == FileExtensions.FBX || dependencyExtension == FileExtensions.OBJ)
+                if (IsMeshAssetPath(dependencyPath))
                 {
                     if (accumulateMeshStats != null)
                     {

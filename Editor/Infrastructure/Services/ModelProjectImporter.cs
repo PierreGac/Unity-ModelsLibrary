@@ -206,8 +206,7 @@ namespace ModelLibrary.Editor.Services
             // Restore per-file model importer settings captured in meta (if present)
             foreach (string file in Directory.GetFiles(destAbs, "*", SearchOption.TopDirectoryOnly))
             {
-                string ext = Path.GetExtension(file).ToLowerInvariant();
-                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ)
+                if (AssetDependencyResolver.IsMeshAssetPath(file))
                 {
                     string fileName = Path.GetFileName(file);
                     string payloadRel = $"payload/{fileName}";

@@ -295,6 +295,7 @@ namespace ModelLibrary.Editor.Services
         /// <summary>
         /// Submits a prepared model version folder to the repository and updates the index.
         /// Uploads all files from the local version folder (payload, dependencies, images) to the repository.
+        /// The folder must contain at least one file accepted by <see cref="AssetDependencyResolver.IsMeshAssetPath"/>.
         /// Generates a model ID if not provided, creates changelog entries, and updates the global index.
         /// </summary>
         /// <param name="meta">Complete model metadata ready for submission.</param>
@@ -321,6 +322,12 @@ namespace ModelLibrary.Editor.Services
 
             RequireSafeIdentifier(meta.identity.id, nameof(meta.identity.id));
             RequireSafeIdentifier(meta.version, nameof(meta.version));
+
+            if (string.IsNullOrWhiteSpace(localVersionRoot)
+                || !AssetDependencyResolver.DirectoryContainsPrimaryModel(localVersionRoot))
+            {
+                throw new InvalidOperationException(AssetDependencyResolver.PRIMARY_MODEL_REQUIRED_MESSAGE);
+            }
 
             long nowUtc = DateTime.Now.Ticks;
             if (meta.createdTimeTicks <= 0)

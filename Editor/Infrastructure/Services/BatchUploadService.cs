@@ -74,27 +74,23 @@ namespace ModelLibrary.Editor.Services
             {
                 // Look for subdirectories that might contain model files
                 string[] subdirectories = Directory.GetDirectories(directoryPath);
-                foreach (string subdir in subdirectories)
+                for (int i = 0; i < subdirectories.Length; i++)
                 {
-                    // Check if this directory contains model files (FBX, OBJ)
-                    string[] modelFiles = Directory.GetFiles(subdir, "*.*", SearchOption.TopDirectoryOnly)
-                        .Where(f => {
-                            string ext = Path.GetExtension(f).ToLowerInvariant();
-                            return ext == FileExtensions.FBX || ext == FileExtensions.OBJ;
-                        }).ToArray();
-
-                    if (modelFiles.Length > 0)
+                    string subdir = subdirectories[i];
+                    if (!AssetDependencyResolver.DirectoryContainsPrimaryModel(subdir))
                     {
-                        string folderName = Path.GetFileName(subdir);
-                        items.Add(new BatchUploadItem
-                        {
-                            folderPath = subdir,
-                            modelName = folderName,
-                            version = "1.0.0",
-                            description = $"Model from {folderName}",
-                            selected = true
-                        });
+                        continue;
                     }
+
+                    string folderName = Path.GetFileName(subdir);
+                    items.Add(new BatchUploadItem
+                    {
+                        folderPath = subdir,
+                        modelName = folderName,
+                        version = "1.0.0",
+                        description = "Model from " + folderName,
+                        selected = true
+                    });
                 }
             }
             catch (Exception ex)
@@ -124,6 +120,11 @@ namespace ModelLibrary.Editor.Services
                 try
                 {
                     EditorUtility.DisplayProgressBar("Batch Upload", $"Uploading {item.modelName} ({current}/{total})...", (float)current / total);
+
+                    if (!AssetDependencyResolver.DirectoryContainsPrimaryModel(item.folderPath))
+                    {
+                        throw new InvalidOperationException(AssetDependencyResolver.PRIMARY_MODEL_REQUIRED_MESSAGE);
+                    }
 
                     // Build metadata from folder contents
                     ModelMeta meta = await BuildMetaFromFolderAsync(item);
@@ -190,14 +191,14 @@ namespace ModelLibrary.Editor.Services
             List<string> payloadPaths = new List<string>();
             List<string> imagePaths = new List<string>();
 
-            foreach (string file in files)
+            for (int i = 0; i < files.Length; i++)
             {
+                string file = files[i];
                 string ext = Path.GetExtension(file).ToLowerInvariant();
-                string relativePath = file.Substring(item.folderPath.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ || ext == FileExtensions.MAT)
+                if (AssetDependencyResolver.IsMeshAssetPath(file) || ext == FileExtensions.MAT)
                 {
-                    payloadPaths.Add($"payload/{Path.GetFileName(file)}");
+                    payloadPaths.Add("payload/" + Path.GetFileName(file));
                 }
                 else if (ext == FileExtensions.PNG || ext == FileExtensions.JPG || ext == FileExtensions.JPEG ||
                     ext == FileExtensions.TGA || ext == FileExtensions.PSD)

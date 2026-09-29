@@ -144,7 +144,7 @@ namespace ModelLibrary.Editor.Services
                 }
 
                 string ext = Path.GetExtension(path).ToLowerInvariant();
-                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ ||
+                if (AssetDependencyResolver.IsMeshAssetPath(path) ||
                     ext == FileExtensions.PNG || ext == FileExtensions.TGA || ext == FileExtensions.JPG || ext == FileExtensions.JPEG || ext == FileExtensions.PSD ||
                     ext == FileExtensions.MAT)
                 {
@@ -179,8 +179,8 @@ namespace ModelLibrary.Editor.Services
                     }
                 }
 
-                // Capture model importer settings for FBX/OBJ
-                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ)
+                // Capture model importer settings for a primary model the format policy accepts.
+                if (AssetDependencyResolver.IsMeshAssetPath(path))
                 {
                     ModelImporter imp = AssetImporter.GetAtPath(path) as ModelImporter;
                     if (imp != null)
@@ -309,7 +309,7 @@ namespace ModelLibrary.Editor.Services
                 }
 
                 string ext = Path.GetExtension(path).ToLowerInvariant();
-                if (ext == FileExtensions.FBX || ext == FileExtensions.OBJ || ext == FileExtensions.PREFAB)
+                if (AssetDependencyResolver.IsMeshAssetPath(path) || ext == FileExtensions.PREFAB)
                 {
                     return guid;
                 }

@@ -407,12 +407,12 @@ namespace ModelLibrary.Editor.Windows
                 return "Folder";
             }
 
-            string extension = Path.GetExtension(path).ToLowerInvariant();
-            if (extension == FileExtensions.FBX || extension == FileExtensions.OBJ)
+            if (AssetDependencyResolver.IsMeshAssetPath(path))
             {
                 return "Mesh";
             }
 
+            string extension = Path.GetExtension(path).ToLowerInvariant();
             if (extension == FileExtensions.MAT)
             {
                 return "Material";

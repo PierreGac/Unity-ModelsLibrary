@@ -371,7 +371,7 @@ namespace ModelLibrary.Editor.Utils
                     continue;
                 }
 
-                if (extension == FileExtensions.FBX || extension == FileExtensions.OBJ)
+                if (AssetDependencyResolver.IsMeshAssetPath(files[i]))
                 {
                     return true;
                 }
