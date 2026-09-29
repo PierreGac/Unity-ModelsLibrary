@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
@@ -37,6 +38,7 @@ namespace ModelLibrary.Editor.Windows
             _recentlyUsedManager = new RecentlyUsedManager(__RecentlyUsedPrefKey, __MaxRecentlyUsed);
 
             LoadImportHistory();
+            EnsureOperationCancellation();
 
             if (!FirstRunWizard.IsConfigured())
             {
@@ -615,6 +617,7 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void OnDisable()
         {
+            CancelOperationsOnDisable();
             DisableBackgroundUpdateChecking();
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
             ClearThumbnailCache();
@@ -638,6 +641,65 @@ namespace ModelLibrary.Editor.Windows
                     Debug.LogWarning($"[ModelLibraryWindow] Error cleaning up preview instance in OnDisable: {ex.Message}");
                 }
             }
+        }
+
+        /// <summary>
+        /// Token cancelled when this window is disabled. Download, import, and batch upload observe it.
+        /// </summary>
+        internal CancellationToken OperationCancellationToken
+        {
+            get
+            {
+                EnsureOperationCancellation();
+                return _windowCancellation.Token;
+            }
+        }
+
+        /// <summary>
+        /// Cancels in-flight download, import, and batch work. Does not dispose the sources.
+        /// </summary>
+        internal void CancelOperationsOnDisable()
+        {
+            if (_windowCancellation != null && !_windowCancellation.IsCancellationRequested)
+            {
+                _windowCancellation.Cancel();
+            }
+
+            List<string> importIds = new List<string>(_importCancellationTokens.Keys);
+            for (int i = 0; i < importIds.Count; i++)
+            {
+                string importId = importIds[i];
+                _importCancellation[importId] = true;
+                if (!_importCancellationTokens.TryGetValue(importId, out CancellationTokenSource source) || source == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (!source.IsCancellationRequested)
+                    {
+                        source.Cancel();
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
+                    Debug.Log($"[ModelLibraryWindow] Import cancellation for '{importId}' was already released.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Creates a fresh token after the previous one was cancelled.
+        /// </summary>
+        private void EnsureOperationCancellation()
+        {
+            if (_windowCancellation != null && !_windowCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _windowCancellation = new CancellationTokenSource();
         }
 
         /// <summary>

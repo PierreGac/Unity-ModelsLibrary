@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Services;
@@ -99,6 +100,10 @@ namespace ModelLibrary.Editor.Windows
         private bool _isSubmitting;
         /// <summary>Flag indicating if submission should be cancelled.</summary>
         private bool _cancelSubmission = false;
+        /// <summary>True when the window is closing, so a cancel does not open a dialog.</summary>
+        private bool _suppressCancelDialog;
+        /// <summary>Cancelled when the submit window is disabled.</summary>
+        private CancellationTokenSource _submitCancellation;
         /// <summary>Changelog summary for the submission (required for updates).</summary>
         private string _changeSummary = "Initial submission";
         /// <summary>Cached metadata of the latest version of the selected model (update mode).</summary>

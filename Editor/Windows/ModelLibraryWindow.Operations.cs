@@ -25,7 +25,7 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
-                (string root, ModelMeta meta) = await downloader.DownloadAsync(id, version);
+                (string root, ModelMeta meta) = await downloader.DownloadAsync(id, version, OperationCancellationToken);
 
                 if (EditorUtility.DisplayCancelableProgressBar("Downloading Model", "Download complete", ProgressBarConstants.COMPLETE))
                 {
@@ -35,6 +35,10 @@ namespace ModelLibrary.Editor.Windows
 
                 ShowNotification("Downloaded", $"Cached at: {root}");
                 Debug.Log($"Model cached at: {root}");
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.Log($"Download cancelled: {id}");
             }
             catch (Exception ex)
             {
@@ -59,6 +63,9 @@ namespace ModelLibrary.Editor.Windows
             _importCancellation[id] = false;
             CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
             _importCancellationTokens[id] = cancellationTokenSource;
+            CancellationTokenSource linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationTokenSource.Token,
+                OperationCancellationToken);
             string progressTitle = isUpgrade ? "Updating Model" : "Importing Model";
 
             try
@@ -74,7 +81,7 @@ namespace ModelLibrary.Editor.Windows
                     return;
                 }
 
-                (string root, ModelMeta meta) = await downloader.DownloadAsync(id, version);
+                (string root, ModelMeta meta) = await downloader.DownloadAsync(id, version, linkedCancellation.Token);
 
                 if (_importCancellation.TryGetValue(id, out cancelled) && cancelled)
                 {
@@ -186,7 +193,7 @@ namespace ModelLibrary.Editor.Windows
                 bool cleanDestination = !installPathChanged;
 
                 EditorUtility.DisplayProgressBar(progressTitle, "Copying files to Assets folder...", ProgressBarConstants.COPYING);
-                await ModelProjectImporter.ImportFromCacheAsync(root, meta, cleanDestination, chosenInstallPath, isUpgrade, cancellationTokenSource.Token);
+                await ModelProjectImporter.ImportFromCacheAsync(root, meta, cleanDestination, chosenInstallPath, isUpgrade, linkedCancellation.Token);
 
                 if (installPathChanged && localInstallMeta != null)
                 {
@@ -317,6 +324,8 @@ namespace ModelLibrary.Editor.Windows
                     cts.Dispose();
                     _importCancellationTokens.Remove(id);
                 }
+
+                linkedCancellation.Dispose();
             }
         }
 

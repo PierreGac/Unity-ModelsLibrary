@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Repository;
@@ -55,6 +56,8 @@ namespace ModelLibrary.Editor.Windows
         private ModelLibraryService _service;
         /// <summary>Service instance for batch upload operations.</summary>
         private BatchUploadService _batchService;
+        /// <summary>Cancelled when this window is disabled.</summary>
+        private CancellationTokenSource _uploadCancellation;
 
         /// <summary>
         /// Opens the batch upload window.
@@ -87,6 +90,28 @@ namespace ModelLibrary.Editor.Windows
             IModelRepository repo = RepositoryFactory.CreateRepository();
             _service = new ModelLibraryService(repo);
             _batchService = new BatchUploadService(_service, new SimpleUserIdentityProvider());
+            EnsureUploadCancellation();
+        }
+
+        private void OnDisable()
+        {
+            if (_uploadCancellation != null && !_uploadCancellation.IsCancellationRequested)
+            {
+                _uploadCancellation.Cancel();
+            }
+        }
+
+        /// <summary>
+        /// Creates a fresh upload token after the previous one was cancelled.
+        /// </summary>
+        private void EnsureUploadCancellation()
+        {
+            if (_uploadCancellation != null && !_uploadCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _uploadCancellation = new CancellationTokenSource();
         }
 
         private void OnGUI()
@@ -233,7 +258,8 @@ namespace ModelLibrary.Editor.Windows
             _isUploading = true;
             try
             {
-                BatchUploadService.BatchUploadResult result = await _batchService.UploadBatchAsync(_uploadItems);
+                EnsureUploadCancellation();
+                BatchUploadService.BatchUploadResult result = await _batchService.UploadBatchAsync(_uploadItems, _uploadCancellation.Token);
 
                 // Show results
                 string message = $"Upload Complete!\n\n";
@@ -257,6 +283,10 @@ namespace ModelLibrary.Editor.Windows
                 // Clear selection and refresh
                 _uploadItems.Clear();
                 Repaint();
+            }
+            catch (System.OperationCanceledException)
+            {
+                Debug.Log("[BatchUploadWindow] Batch upload cancelled.");
             }
             catch (System.Exception ex)
             {

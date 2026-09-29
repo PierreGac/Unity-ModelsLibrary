@@ -224,7 +224,7 @@ namespace ModelLibrary.Editor.Windows
                     InitializeBatchUploadState();
                 }
 
-                BatchUploadService.BatchUploadResult result = await _batchUploadService.UploadBatchAsync(_batchUploadItems);
+                BatchUploadService.BatchUploadResult result = await _batchUploadService.UploadBatchAsync(_batchUploadItems, OperationCancellationToken);
 
                 // Show results
                 string message = $"Upload Complete!\n\n";
@@ -258,6 +258,10 @@ namespace ModelLibrary.Editor.Windows
                 // Clear selection and refresh
                 _batchUploadItems.Clear();
                 Repaint();
+            }
+            catch (System.OperationCanceledException)
+            {
+                Debug.Log("[ModelLibrary] Batch upload cancelled.");
             }
             catch (System.Exception ex)
             {

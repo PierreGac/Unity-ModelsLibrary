@@ -78,6 +78,7 @@ namespace ModelLibrary.Editor.Windows
         private readonly HashSet<string> _importsInProgress = new HashSet<string>();
         private readonly Dictionary<string, bool> _importCancellation = new Dictionary<string, bool>();
         private readonly Dictionary<string, CancellationTokenSource> _importCancellationTokens = new Dictionary<string, CancellationTokenSource>();
+        private CancellationTokenSource _windowCancellation;
         private readonly List<ImportHistoryEntry> _importHistory = new List<ImportHistoryEntry>();
 
         private string _authenticationError = null;

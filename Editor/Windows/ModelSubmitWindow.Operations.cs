@@ -653,7 +653,8 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 EditorUtility.DisplayProgressBar(progressTitle, "Uploading to repository...", 0.7f);
-                string remoteRel = await _service.SubmitNewVersionAsync(meta, temp, summary);
+                EnsureSubmitCancellation();
+                string remoteRel = await _service.SubmitNewVersionAsync(meta, temp, summary, _submitCancellation.Token);
 
                 if (_cancelSubmission)
                 {
@@ -719,6 +720,11 @@ namespace ModelLibrary.Editor.Windows
             }
             catch (Exception ex)
             {
+                if (_suppressCancelDialog)
+                {
+                    return;
+                }
+
                 if (!_cancelSubmission)
                 {
                     ErrorHandler.ShowErrorWithRetry("Submission Failed", $"Failed to submit model: {ex.Message}",

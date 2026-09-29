@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Repository;
@@ -89,6 +90,8 @@ namespace ModelLibrary.Editor.Windows
                 : new Repository.HttpRepository(settings.repositoryRoot);
 
             _service = new ModelLibraryService(repo);
+            _suppressCancelDialog = false;
+            EnsureSubmitCancellation();
             _ = LoadIndexAsync();
         }
 
@@ -98,7 +101,27 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         private void OnDisable()
         {
+            _suppressCancelDialog = true;
+            _cancelSubmission = true;
+            if (_submitCancellation != null && !_submitCancellation.IsCancellationRequested)
+            {
+                _submitCancellation.Cancel();
+            }
+
             ClearPreviewTextureCache();
+        }
+
+        /// <summary>
+        /// Creates a fresh submit token after the previous one was cancelled.
+        /// </summary>
+        private void EnsureSubmitCancellation()
+        {
+            if (_submitCancellation != null && !_submitCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _submitCancellation = new CancellationTokenSource();
         }
 
         private void OnGUI()
@@ -215,6 +238,10 @@ namespace ModelLibrary.Editor.Windows
                     if (GUILayout.Button("Cancel", GUILayout.Height(30), GUILayout.Width(100)))
                     {
                         _cancelSubmission = true;
+                        if (_submitCancellation != null && !_submitCancellation.IsCancellationRequested)
+                        {
+                            _submitCancellation.Cancel();
+                        }
                     }
                     GUILayout.Label("Submitting...", EditorStyles.centeredGreyMiniLabel);
                 }

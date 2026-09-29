@@ -54,7 +54,9 @@ ModelLibrary.Editor.Services.ModelLibraryService service =
 | `GetUpdateCountAsync()` | |
 | `RefreshAllUpdatesAsync()` | |
 | `DownloadModelVersionAsync(id, version)` | Cache under `Library/ModelLibraryCache`; returns `(versionRoot, meta)` |
+| `DownloadModelVersionAsync(id, version, cancellationToken)` | Same download. Stops before the next file when cancelled and deletes a partial cache. Throws `OperationCanceledException`. |
 | `SubmitNewVersionAsync(meta, localVersionRoot, changeSummary)` | Uploads allowlisted files and updates the index. Throws `InvalidOperationException` when the folder has no file `AssetDependencyResolver.IsMeshAssetPath` accepts. |
+| `SubmitNewVersionAsync(meta, localVersionRoot, changeSummary, cancellationToken)` | Same submit. Stops before the next upload, metadata save, or index save when cancelled. Throws `OperationCanceledException`. |
 | `PublishMetadataUpdateAsync(updatedMeta, baseVersion, changeSummary, author, bumpStrategy)` | Metadata-only new version; `Func<SemVer, SemVer>` optional |
 | `ClearCacheForModelAsync(modelId, version)` | |
 | `DeleteVersionAsync(modelId, version)` | Confirm with the user |

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Identity;
@@ -108,72 +109,89 @@ namespace ModelLibrary.Editor.Services
         /// </summary>
         /// <param name="items">List of batch upload items (only selected items will be uploaded).</param>
         /// <returns>BatchUploadResult containing lists of successful and failed uploads with error messages.</returns>
-        public async Task<BatchUploadResult> UploadBatchAsync(List<BatchUploadItem> items)
+        public Task<BatchUploadResult> UploadBatchAsync(List<BatchUploadItem> items)
+        {
+            return UploadBatchAsync(items, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Uploads selected models one at a time and stops before the next item when cancelled.
+        /// Cancellation is not recorded as a failed item. Temporary folders are still deleted.
+        /// </summary>
+        /// <param name="items">List of batch upload items (only selected items will be uploaded).</param>
+        /// <param name="cancellationToken">Stops the batch before the next item or the next submit step.</param>
+        /// <returns>BatchUploadResult containing lists of successful and failed uploads with error messages.</returns>
+        public async Task<BatchUploadResult> UploadBatchAsync(List<BatchUploadItem> items, CancellationToken cancellationToken)
         {
             BatchUploadResult result = new BatchUploadResult();
             int total = items.Count(i => i.selected);
             int current = 0;
 
-            foreach (BatchUploadItem item in items.Where(i => i.selected))
+            try
             {
-                current++;
-                try
+                foreach (BatchUploadItem item in items.Where(i => i.selected))
                 {
-                    EditorUtility.DisplayProgressBar("Batch Upload", $"Uploading {item.modelName} ({current}/{total})...", (float)current / total);
-
-                    if (!AssetDependencyResolver.DirectoryContainsPrimaryModel(item.folderPath))
-                    {
-                        throw new InvalidOperationException(AssetDependencyResolver.PRIMARY_MODEL_REQUIRED_MESSAGE);
-                    }
-
-                    // Build metadata from folder contents
-                    ModelMeta meta = await BuildMetaFromFolderAsync(item);
-
-                    // Create temporary version folder
-                    string tempRoot = Path.Combine(Path.GetTempPath(), $"BatchUpload_{Guid.NewGuid():N}");
-                    Directory.CreateDirectory(tempRoot);
-
+                    cancellationToken.ThrowIfCancellationRequested();
+                    current++;
                     try
                     {
-                        // Materialize the version folder structure
-                        await MaterializeFolderToTempAsync(item.folderPath, tempRoot, meta);
+                        EditorUtility.DisplayProgressBar("Batch Upload", $"Uploading {item.modelName} ({current}/{total})...", (float)current / total);
 
-                        // Submit to repository
-                        string remotePath = await _service.SubmitNewVersionAsync(meta, tempRoot, "Batch upload");
-                        result.successfulUploads.Add(new BatchUploadResult.UploadInfo
+                        if (!AssetDependencyResolver.DirectoryContainsPrimaryModel(item.folderPath))
+                        {
+                            throw new InvalidOperationException(AssetDependencyResolver.PRIMARY_MODEL_REQUIRED_MESSAGE);
+                        }
+
+                        ModelMeta meta = await BuildMetaFromFolderAsync(item);
+
+                        string tempRoot = Path.Combine(Path.GetTempPath(), $"BatchUpload_{Guid.NewGuid():N}");
+                        Directory.CreateDirectory(tempRoot);
+
+                        try
+                        {
+                            await MaterializeFolderToTempAsync(item.folderPath, tempRoot, meta);
+
+                            string remotePath = await _service.SubmitNewVersionAsync(meta, tempRoot, "Batch upload", cancellationToken);
+                            result.successfulUploads.Add(new BatchUploadResult.UploadInfo
+                            {
+                                modelName = item.modelName,
+                                version = item.version,
+                                remotePath = remotePath
+                            });
+                        }
+                        finally
+                        {
+                            try
+                            {
+                                Directory.Delete(tempRoot, true);
+                            }
+                            catch (Exception cleanupEx)
+                            {
+                                Debug.LogWarning($"[BatchUploadService] Failed to clean up temporary directory {tempRoot}: {cleanupEx.Message}");
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        result.failedUploads.Add(new BatchUploadResult.UploadInfo
                         {
                             modelName = item.modelName,
                             version = item.version,
-                            remotePath = remotePath
+                            errorMessage = ex.Message
                         });
+                        Debug.LogError($"[BatchUploadService] Failed to upload {item.modelName}: {ex.Message}");
                     }
-                    finally
-                    {
-                        // Cleanup temp folder
-                        try
-                        {
-                            Directory.Delete(tempRoot, true);
-                        }
-                        catch (Exception cleanupEx)
-                        {
-                            // Log cleanup failure but don't throw - upload may have succeeded
-                            Debug.LogWarning($"[BatchUploadService] Failed to clean up temporary directory {tempRoot}: {cleanupEx.Message}");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    result.failedUploads.Add(new BatchUploadResult.UploadInfo
-                    {
-                        modelName = item.modelName,
-                        version = item.version,
-                        errorMessage = ex.Message
-                    });
-                    Debug.LogError($"[BatchUploadService] Failed to upload {item.modelName}: {ex.Message}");
                 }
             }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
 
-            EditorUtility.ClearProgressBar();
             return result;
         }
 

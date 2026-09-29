@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Repository;
@@ -229,7 +230,20 @@ namespace ModelLibrary.Editor.Services
         /// <returns>A tuple containing the absolute cache root path and the loaded model metadata.</returns>
         /// <exception cref="ArgumentException">Thrown when <paramref name="id"/> or <paramref name="version"/> is not a safe identifier.</exception>
         /// <exception cref="InvalidOperationException">Thrown when a listed file would be written outside the version cache.</exception>
-        public async Task<(string versionRoot, ModelMeta meta)> DownloadModelVersionAsync(string id, string version)
+        public Task<(string versionRoot, ModelMeta meta)> DownloadModelVersionAsync(string id, string version)
+        {
+            return DownloadModelVersionAsync(id, version, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Downloads a specific model version from the repository into the local editor cache.
+        /// Stops before the next file when <paramref name="cancellationToken"/> is cancelled and deletes a partial cache.
+        /// </summary>
+        /// <param name="id">The unique identifier of the model to download.</param>
+        /// <param name="version">The version string to download (e.g., "1.0.0").</param>
+        /// <param name="cancellationToken">Stops the download between files.</param>
+        /// <returns>A tuple containing the absolute cache root path and the loaded model metadata.</returns>
+        public async Task<(string versionRoot, ModelMeta meta)> DownloadModelVersionAsync(string id, string version, CancellationToken cancellationToken)
         {
             // SECURITY (CRIT-01): Validate id/version before any filesystem operation.
             // These values originate from models_index.json which is untrusted.
@@ -242,54 +256,82 @@ namespace ModelLibrary.Editor.Services
                 throw new ArgumentException($"Unsafe version rejected: '{version}'", nameof(version));
             }
 
-            // Download all payload & images to local cache folder
-            ModelMeta meta = await _repo.LoadMetaAsync(id, version);
-
-            ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
-            string cacheRoot = EditorPaths.LibraryPath(Path.Combine(settings.localCacheRoot, id, version));
-
-            // SECURITY (CRIT-01): Assert cacheRoot is inside the allowed cache base.
-            string allowedCacheBase = EditorPaths.LibraryPath(settings.localCacheRoot);
-            PathUtils.AssertInsideRoot(cacheRoot, allowedCacheBase);
-
-            await ClearCacheForModelAsync(id, version);
-            Directory.CreateDirectory(cacheRoot);
-
-            // Save meta too (for quick access)
-            // Use dot prefix to hide from Unity Project window
-            string localMetaPath = Path.Combine(cacheRoot, "." + ModelMeta.MODEL_JSON);
-            string metaJson = JsonUtil.ToJson(meta);
-
-            // Use retry logic for file write to handle locked files
-            await RetryFileOperationAsync(async () =>
+            cancellationToken.ThrowIfCancellationRequested();
+            string cacheRoot = null;
+            try
             {
-                await Task.Run(() => SafeFileWriter.WriteAllText(localMetaPath, metaJson));
-            }, maxRetries: 3, initialDelayMs: 200);
+                ModelMeta meta = await _repo.LoadMetaAsync(id, version);
+                cancellationToken.ThrowIfCancellationRequested();
 
-            // Pull all files present in the repository under id/version (payload, deps, images, etc.)
-            string versionRootRel = PathUtils.SanitizePathSeparator(Path.Combine(id, version));
-            List<string> files = await _repo.ListFilesAsync(versionRootRel);
-            string prefix = PathUtils.SanitizePathSeparator(id + "/" + version + "/");
-            for (int i = 0; i < files.Count; i++)
-            {
-                string rel = PathUtils.SanitizePathSeparator(files[i]);
-                if (string.IsNullOrEmpty(rel) || !rel.StartsWith(prefix, StringComparison.Ordinal))
+                ModelLibrarySettings settings = ModelLibrarySettings.GetOrCreate();
+                cacheRoot = EditorPaths.LibraryPath(Path.Combine(settings.localCacheRoot, id, version));
+
+                string allowedCacheBase = EditorPaths.LibraryPath(settings.localCacheRoot);
+                PathUtils.AssertInsideRoot(cacheRoot, allowedCacheBase);
+
+                await ClearCacheForModelAsync(id, version);
+                Directory.CreateDirectory(cacheRoot);
+
+                string localMetaPath = Path.Combine(cacheRoot, "." + ModelMeta.MODEL_JSON);
+                string metaJson = JsonUtil.ToJson(meta);
+                await RetryFileOperationAsync(async () =>
                 {
-                    continue;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await Task.Run(() => SafeFileWriter.WriteAllText(localMetaPath, metaJson));
+                }, maxRetries: 3, initialDelayMs: 200);
+
+                string versionRootRel = PathUtils.SanitizePathSeparator(Path.Combine(id, version));
+                List<string> files = await _repo.ListFilesAsync(versionRootRel);
+                string prefix = PathUtils.SanitizePathSeparator(id + "/" + version + "/");
+                for (int i = 0; i < files.Count; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string rel = PathUtils.SanitizePathSeparator(files[i]);
+                    if (string.IsNullOrEmpty(rel) || !rel.StartsWith(prefix, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    string subRel = rel.Substring(prefix.Length);
+                    if (string.Equals(subRel, ModelMeta.MODEL_JSON, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    string safeSubRel = PathUtils.ValidateRelativePathStrict(subRel);
+                    string localAbs = Path.Combine(cacheRoot, safeSubRel.Replace('/', Path.DirectorySeparatorChar));
+                    string canonicalLocal = PathUtils.AssertInsideRoot(localAbs, cacheRoot);
+                    await _repo.DownloadFileAsync(rel, canonicalLocal);
                 }
 
-                string subRel = rel.Substring(prefix.Length);
-                if (string.Equals(subRel, ModelMeta.MODEL_JSON, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                string safeSubRel = PathUtils.ValidateRelativePathStrict(subRel);
-                string localAbs = Path.Combine(cacheRoot, safeSubRel.Replace('/', Path.DirectorySeparatorChar));
-                string canonicalLocal = PathUtils.AssertInsideRoot(localAbs, cacheRoot);
-                await _repo.DownloadFileAsync(rel, canonicalLocal);
+                return (cacheRoot, meta);
             }
-            return (cacheRoot, meta);
+            catch (OperationCanceledException)
+            {
+                DeletePartialCache(cacheRoot);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Removes a cache folder left behind when a download is cancelled.
+        /// </summary>
+        /// <param name="cacheRoot">Absolute cache directory for the version, if one was created.</param>
+        private static void DeletePartialCache(string cacheRoot)
+        {
+            if (string.IsNullOrEmpty(cacheRoot) || !Directory.Exists(cacheRoot))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.Delete(cacheRoot, true);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[ModelLibraryService] Failed to delete partial cache '{cacheRoot}': {exception.Message}");
+            }
         }
 
         /// <summary>
@@ -302,7 +344,21 @@ namespace ModelLibrary.Editor.Services
         /// <param name="localVersionRoot">Absolute path to the local version folder containing all files.</param>
         /// <param name="changeSummary">Optional changelog summary for this version (defaults to "Initial submission").</param>
         /// <returns>The repository-relative path of the uploaded version root (e.g., "modelId/version").</returns>
-        public async Task<string> SubmitNewVersionAsync(ModelMeta meta, string localVersionRoot, string changeSummary = null)
+        public Task<string> SubmitNewVersionAsync(ModelMeta meta, string localVersionRoot, string changeSummary = null)
+        {
+            return SubmitNewVersionAsync(meta, localVersionRoot, changeSummary, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Submits a prepared model version folder and stops before the next upload when cancelled.
+        /// A cancelled submit does not save metadata or the index.
+        /// </summary>
+        /// <param name="meta">Complete model metadata ready for submission.</param>
+        /// <param name="localVersionRoot">Absolute path to the local version folder containing all files.</param>
+        /// <param name="changeSummary">Optional changelog summary for this version.</param>
+        /// <param name="cancellationToken">Stops the submit before the next file upload.</param>
+        /// <returns>The repository-relative path of the uploaded version root.</returns>
+        public async Task<string> SubmitNewVersionAsync(ModelMeta meta, string localVersionRoot, string changeSummary, CancellationToken cancellationToken)
         {
             if (meta == null)
             {
@@ -329,6 +385,8 @@ namespace ModelLibrary.Editor.Services
                 throw new InvalidOperationException(AssetDependencyResolver.PRIMARY_MODEL_REQUIRED_MESSAGE);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             long nowUtc = DateTime.Now.Ticks;
             if (meta.createdTimeTicks <= 0)
             {
@@ -341,6 +399,7 @@ namespace ModelLibrary.Editor.Services
             EnsureChangelogEntry(meta, string.IsNullOrWhiteSpace(changeSummary) ? "Initial submission" : changeSummary, author, meta.version, nowUtc);
 
             string versionRootRel = PathUtils.SanitizePathSeparator(Path.Combine(meta.identity.id, meta.version));
+            cancellationToken.ThrowIfCancellationRequested();
             await _repo.EnsureDirectoryAsync(versionRootRel);
             string[] files = Directory.GetFiles(localVersionRoot, "*", SearchOption.AllDirectories);
             int rejectedCount = 0;
@@ -371,6 +430,7 @@ namespace ModelLibrary.Editor.Services
                     }
                     // .meta for an allowed asset — keep it. GUID regeneration
                     // for these .meta files is handled in Phase 2 (HIGH-02).
+                    cancellationToken.ThrowIfCancellationRequested();
                     await _repo.UploadFileAsync(versionRootRel + "/" + rel, file);
                     continue;
                 }
@@ -385,6 +445,7 @@ namespace ModelLibrary.Editor.Services
                     continue;
                 }
 
+                cancellationToken.ThrowIfCancellationRequested();
                 await _repo.UploadFileAsync(versionRootRel + "/" + rel, file);
             }
             if (rejectedCount > 0)
@@ -392,7 +453,9 @@ namespace ModelLibrary.Editor.Services
                 Debug.LogWarning($"[ModelLibraryService] Skipped {rejectedCount} file(s) with disallowed extensions during submit.");
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             await _repo.SaveMetaAsync(meta.identity.id, meta.version, meta);
+            cancellationToken.ThrowIfCancellationRequested();
             await UpdateIndexWithLatestMetaAsync(meta);
             return versionRootRel;
         }

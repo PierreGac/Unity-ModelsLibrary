@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 using ModelLibrary.Data;
 using ModelLibrary.Editor.Repository;
 
@@ -28,6 +29,16 @@ namespace ModelLibrary.Editor.Services
         /// <param name="version">The version of the model to download.</param>
         /// <returns>A tuple containing the cache root path and the model metadata.</returns>
         public Task<(string versionRoot, ModelMeta meta)> DownloadAsync(string id, string version)
-            => _service.DownloadModelVersionAsync(id, version);
+            => DownloadAsync(id, version, CancellationToken.None);
+
+        /// <summary>
+        /// Downloads a model version and stops between files when <paramref name="cancellationToken"/> is cancelled.
+        /// </summary>
+        /// <param name="id">The unique identifier of the model to download.</param>
+        /// <param name="version">The version of the model to download.</param>
+        /// <param name="cancellationToken">Stops the download between files.</param>
+        /// <returns>A tuple containing the cache root path and the model metadata.</returns>
+        public Task<(string versionRoot, ModelMeta meta)> DownloadAsync(string id, string version, CancellationToken cancellationToken)
+            => _service.DownloadModelVersionAsync(id, version, cancellationToken);
     }
 }
