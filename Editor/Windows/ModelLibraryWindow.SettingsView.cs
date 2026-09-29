@@ -138,6 +138,16 @@ namespace ModelLibrary.Editor.Windows
                 _ => "Developer role: Can browse, import models, and leave feedback notes."
             };
             EditorGUILayout.HelpBox(roleDescription, MessageType.Info);
+
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Usage Tracking", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(AnalyticsService.LOCAL_ONLY_MESSAGE, MessageType.Info);
+            bool recordUsage = AnalyticsService.IsEnabled();
+            bool recordUsageNext = EditorGUILayout.Toggle("Record usage", recordUsage);
+            if (recordUsageNext != recordUsage)
+            {
+                AnalyticsService.SetEnabled(recordUsageNext);
+            }
         }
 
         /// <summary>

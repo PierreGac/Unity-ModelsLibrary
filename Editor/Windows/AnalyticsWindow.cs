@@ -97,6 +97,14 @@ namespace ModelLibrary.Editor.Windows
         {
             EditorGUILayout.Space(UIConstants.SPACING_DEFAULT);
             UIStyles.DrawPageHeader("Analytics", "Usage insights for imports, views, and activity.");
+            EditorGUILayout.HelpBox(AnalyticsService.LOCAL_ONLY_MESSAGE, MessageType.Info);
+            bool recordUsage = AnalyticsService.IsEnabled();
+            bool recordUsageNext = EditorGUILayout.Toggle("Record usage", recordUsage);
+            if (recordUsageNext != recordUsage)
+            {
+                AnalyticsService.SetEnabled(recordUsageNext);
+                RefreshAnalytics();
+            }
 
             // Toolbar
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))

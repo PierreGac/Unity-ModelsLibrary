@@ -165,6 +165,7 @@ See `Editor/Infrastructure/Repository/` for the File System and HTTP implementat
 ## Known limitations
 
 - HTTP repository is experimental; prefer a shared folder / UNC for team use
+- Usage tracking is off until you turn on Record usage. Counts stay in Editor preferences on this machine and are not sent to a server
 - Roles are client-side UI gating only
 - GUID conflicts on import are common; use Keep when you need to preserve references
 - Cache folders can leave access-denied or stale entries after VCS discard / version delete / 3D preview before import — delete the affected cache folder under `Library/ModelLibraryCache` and retry

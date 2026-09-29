@@ -70,7 +70,7 @@ Use a file-system folder or a UNC share. This is the supported setup.
       images/
 ```
 
-Settings are stored in `ProjectSettings/ModelLibrarySettings.json`. The local cache defaults to `Library/ModelLibraryCache`.
+Settings are stored in `ProjectSettings/ModelLibrarySettings.json`. The local cache defaults to `Library/ModelLibraryCache`. Usage tracking is off until you turn on **Record usage** in settings. Those counts stay in Editor preferences on this machine.
 
 ## HTTP
 
