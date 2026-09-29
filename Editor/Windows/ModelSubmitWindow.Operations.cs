@@ -574,10 +574,6 @@ namespace ModelLibrary.Editor.Windows
                 Debug.LogWarning($"[ModelSubmitWindow] Install path using default value. Consider setting a custom path.");
             }
 
-            #if UNITY_EDITOR && DEVELOPMENT_BUILD
-            Debug.Log($"[ModelSubmitWindow] Submitting with installPath: '{finalInstallPath}'");
-            #endif
-
             try
             {
                 titleContent.text = $"Submit Model - {progressTitle}...";

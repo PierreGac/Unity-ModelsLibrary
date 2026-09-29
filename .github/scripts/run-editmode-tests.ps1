@@ -1,7 +1,7 @@
 # Runs the ModelLibrary.Tests Edit Mode suite.
 # Unity must already be activated in Unity Hub on this machine.
 # Do not pass -quit with -runTests; the test runner exits on its own.
-# Compiler warnings are not failed here. Phase 5E owns that gate.
+# After the suite, package-origin compiler warnings fail the job.
 
 param(
     [Parameter(Mandatory = $true)]
@@ -71,4 +71,18 @@ $argumentList = @(
 
 $process = Start-Process -FilePath $editor -ArgumentList $argumentList -Wait -PassThru
 Write-Output ("EXIT " + $process.ExitCode)
+
+$warningPattern = 'Assets[\\/]ModelLibrary[\\/].*warning (CS|UAC)'
+$packageWarnings = @(Select-String -Path $LogPath -Pattern $warningPattern -ErrorAction SilentlyContinue)
+if ($packageWarnings.Count -gt 0) {
+    Write-Output 'Package-origin compiler warnings:'
+    foreach ($packageWarning in $packageWarnings) {
+        Write-Output $packageWarning.Line
+    }
+
+    if ($process.ExitCode -eq 0) {
+        exit 1
+    }
+}
+
 exit $process.ExitCode

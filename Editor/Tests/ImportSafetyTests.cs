@@ -309,9 +309,6 @@ namespace ModelLibrary.Editor.Tests
         public void TestFileSystemSafety()
         {
             // Test file system safety during import
-            string testPath = "Assets/Models/TestModel";
-
-            // Test path sanitization
             string sanitizedPath = SanitizeFolderNameForTest("Test Model With Spaces");
             Assert.AreEqual("Test_Model_With_Spaces", sanitizedPath);
 

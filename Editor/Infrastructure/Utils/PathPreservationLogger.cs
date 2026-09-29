@@ -12,7 +12,6 @@ namespace ModelLibrary.Editor.Utils
     internal static class PathPreservationLogger
     {
         private const string __LOG_PREFIX = "[PathPreservation]";
-        private const bool __ENABLE_DEBUG_LOGGING = true;
 
         /// <summary>
         /// Logs path resolution decisions with detailed context.
@@ -24,11 +23,6 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="reason">Reason for the path resolution decision</param>
         public static void LogPathResolution(string operation, string modelName, string originalPath, string resolvedPath, string reason)
         {
-            if (!__ENABLE_DEBUG_LOGGING)
-            {
-                return;
-            }
-
             StringBuilder logMessage = new StringBuilder();
             logMessage.AppendLine($"{__LOG_PREFIX} {operation} - Model: '{modelName}'");
             logMessage.AppendLine($"  Original Path: '{originalPath ?? "null"}'");
@@ -48,11 +42,6 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="errors">List of validation errors (if any)</param>
         public static void LogPathValidation(string operation, string modelName, string path, bool isValid, List<string> errors = null)
         {
-            if (!__ENABLE_DEBUG_LOGGING)
-            {
-                return;
-            }
-
             StringBuilder logMessage = new StringBuilder();
             logMessage.AppendLine($"{__LOG_PREFIX} {operation} - Model: '{modelName}'");
             logMessage.AppendLine($"  Path: '{path ?? "null"}'");
@@ -86,11 +75,6 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="changes">List of changes made during sanitization</param>
         public static void LogPathSanitization(string operation, string originalPath, string sanitizedPath, List<string> changes = null)
         {
-            if (!__ENABLE_DEBUG_LOGGING)
-            {
-                return;
-            }
-
             StringBuilder logMessage = new StringBuilder();
             logMessage.AppendLine($"{__LOG_PREFIX} {operation} - Path Sanitization");
             logMessage.AppendLine($"  Original: '{originalPath ?? "null"}'");
@@ -116,11 +100,6 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="details">Additional details about the step</param>
         public static void LogWorkflowStep(string workflowStep, string modelName, string details = null)
         {
-            if (!__ENABLE_DEBUG_LOGGING)
-            {
-                return;
-            }
-
             StringBuilder logMessage = new StringBuilder();
             logMessage.AppendLine($"{__LOG_PREFIX} Workflow - {workflowStep}");
             logMessage.AppendLine($"  Model: '{modelName}'");
@@ -190,11 +169,6 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="finalPaths">Final resolved paths</param>
         public static void LogPathSummary(string modelName, List<string> operations, Dictionary<string, string> finalPaths)
         {
-            if (!__ENABLE_DEBUG_LOGGING)
-            {
-                return;
-            }
-
             StringBuilder logMessage = new StringBuilder();
             logMessage.AppendLine($"{__LOG_PREFIX} SUMMARY - Model: '{modelName}'");
             logMessage.AppendLine($"  Operations Performed ({operations.Count}):");

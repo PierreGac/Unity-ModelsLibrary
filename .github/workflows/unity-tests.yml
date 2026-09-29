@@ -7,8 +7,9 @@
 # must have Unity 6000.2.6f2 and Unity 6000.6.0f1 activated in Hub before it
 # picks up these jobs. GitHub-hosted runners do not satisfy runs-on.
 #
-# Package-origin compiler warnings are not a failure here. Phase 5E owns that
-# gate. Disabled Domain Reload is not exercised here. Phase 5F owns that check.
+# Package-origin compiler warnings fail the job. The script scans the Editor
+# log for Assets/ModelLibrary warnings. Disabled Domain Reload is not exercised
+# here. Phase 5F owns that check.
 
 name: Unity release gates
 

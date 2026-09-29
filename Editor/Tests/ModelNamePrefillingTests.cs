@@ -44,8 +44,6 @@ namespace ModelLibrary.Editor.Tests
 
                 try
                 {
-                    // Create a test asset GUID
-                    string testGuid = "12345678901234567890123456789012";
                     AssetDatabase.Refresh();
 
                     // Test the name extraction logic

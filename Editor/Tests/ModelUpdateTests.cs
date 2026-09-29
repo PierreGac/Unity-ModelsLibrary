@@ -249,7 +249,6 @@ namespace ModelLibrary.Editor.Tests
             };
 
             bool isUpdate = true;
-            string destPath = "Assets/Models/TestModel";
 
             // Simulate the complete workflow
             bool shouldCheckConflicts = !isUpdate && meta?.assetGuids != null && meta.assetGuids.Count > 0;

@@ -23,9 +23,6 @@ namespace ModelLibrary.Editor.Tests
         [Test]
         public void TestVersionComparisonWindowOpen()
         {
-            string modelId = "test-model";
-            string preferredVersion = "1.0.0";
-
             // Test that Open method can be called (static method exists)
             // In actual test, this would open a window, but we verify the method signature
             Assert.IsNotNull(typeof(ModelVersionComparisonWindow).GetMethod("Open",

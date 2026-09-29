@@ -54,7 +54,7 @@ namespace ModelLibrary.Editor.Tests
                 // Simulate import failure
                 throw new Exception("Import failed");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 exceptionThrown = true;
                 // In the actual code, the catch block does NOT schedule window closing

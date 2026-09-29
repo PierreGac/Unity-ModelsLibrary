@@ -529,7 +529,7 @@ namespace ModelLibrary.Editor.Services
                     int delayMs = initialDelayMs * (int)Math.Pow(2, attempt);
                     await Task.Delay(delayMs);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // For non-retryable exceptions or final attempt, propagate immediately
                     throw;
