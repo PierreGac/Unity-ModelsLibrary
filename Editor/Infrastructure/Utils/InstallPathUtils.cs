@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using ModelLibrary.Editor.Utils;
+using UnityEditor;
 
 namespace ModelLibrary.Editor.Utils
 {
@@ -10,6 +11,12 @@ namespace ModelLibrary.Editor.Utils
     /// </summary>
     internal static class InstallPathUtils
     {
+        /// <summary>Project Assets folder name.</summary>
+        private const string ASSETS_ROOT_NAME = "Assets";
+
+        /// <summary>Prefix for project-relative asset paths.</summary>
+        private const string ASSETS_ROOT_PREFIX = "Assets/";
+
         /// <summary>
         /// Sanitizes a folder name by replacing invalid characters with underscores.
         /// </summary>
@@ -104,5 +111,66 @@ namespace ModelLibrary.Editor.Utils
         /// <param name="modelName">The name of the model.</param>
         /// <returns>A default install path in the format "Assets/Models/{sanitizedModelName}".</returns>
         public static string BuildInstallPath(string modelName) => $"Assets/Models/{SanitizeFolderName(modelName)}";
+
+        /// <summary>
+        /// Loads the project folder or asset at an install path.
+        /// </summary>
+        /// <param name="installPath">Project-relative path (Assets/...) or an absolute path inside the project.</param>
+        /// <param name="asset">The loaded folder or asset when the path exists in the project.</param>
+        /// <returns>True when a project object was found.</returns>
+        public static bool TryLoadProjectObject(string installPath, out UnityEngine.Object asset)
+        {
+            asset = null;
+            string projectPath = ResolveProjectAssetPath(installPath);
+            if (string.IsNullOrEmpty(projectPath))
+            {
+                return false;
+            }
+
+            asset = AssetDatabase.LoadMainAssetAtPath(projectPath);
+            if (asset != null)
+            {
+                return true;
+            }
+
+            if (!AssetDatabase.IsValidFolder(projectPath))
+            {
+                return false;
+            }
+
+            asset = AssetDatabase.LoadAssetAtPath<DefaultAsset>(projectPath);
+            return asset != null;
+        }
+
+        /// <summary>
+        /// Converts an install path into a project-relative asset path when it points inside this project.
+        /// </summary>
+        /// <param name="installPath">Project-relative or absolute install path.</param>
+        /// <returns>A project-relative path starting with Assets, or null when the path is outside the project.</returns>
+        private static string ResolveProjectAssetPath(string installPath)
+        {
+            if (string.IsNullOrWhiteSpace(installPath))
+            {
+                return null;
+            }
+
+            if (TryConvertAbsoluteToProjectRelative(installPath, out string relativeFromAbsolute))
+            {
+                return relativeFromAbsolute;
+            }
+
+            string sanitized = PathUtils.SanitizePathSeparator(installPath.Trim());
+            if (string.Equals(sanitized, ASSETS_ROOT_NAME, StringComparison.OrdinalIgnoreCase))
+            {
+                return ASSETS_ROOT_NAME;
+            }
+
+            if (!sanitized.StartsWith(ASSETS_ROOT_PREFIX, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return NormalizeInstallPath(sanitized);
+        }
     }
 }

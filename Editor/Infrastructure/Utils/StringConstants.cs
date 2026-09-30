@@ -35,5 +35,11 @@
 
         /// <summary>Label for choosing a model when Update Existing has no valid selection.</summary>
         public const string SELECT_MODEL_BUTTON_LABEL = "Select Model";
+
+        /// <summary>Label for the button that highlights an install folder in the Project window.</summary>
+        public const string PING_INSTALL_BUTTON_LABEL = "Ping";
+
+        /// <summary>Tooltip for the install-folder ping button.</summary>
+        public const string PING_INSTALL_BUTTON_TOOLTIP = "Highlight this install folder in the Project window";
     }
 }

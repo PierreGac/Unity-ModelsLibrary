@@ -82,4 +82,63 @@ namespace ModelLibrary.Editor.Tests
             Assert.AreEqual(InstallPathUtils.BuildInstallPath("My Ship"), resolved);
         }
     }
+
+    /// <summary>
+    /// Tests for loading a project object from an install path.
+    /// </summary>
+    public class InstallPathUtilsTests
+    {
+        private const string EXISTING_FOLDER_NAME = "ModelLibrary";
+        private const string EXISTING_PROJECT_FOLDER = "Assets/" + EXISTING_FOLDER_NAME;
+        private const string MISSING_PROJECT_FOLDER = "Assets/__ModelLibraryMissingPingTarget__";
+
+        /// <summary>
+        /// An existing project folder can be loaded from a project-relative install path.
+        /// </summary>
+        [Test]
+        public void TryLoadProjectObject_LoadsExistingProjectFolder()
+        {
+            UnityEngine.Object asset;
+            bool found = InstallPathUtils.TryLoadProjectObject(EXISTING_PROJECT_FOLDER, out asset);
+
+            Assert.IsTrue(found);
+            Assert.IsNotNull(asset);
+        }
+
+        /// <summary>
+        /// An existing project folder can be loaded from its absolute path.
+        /// </summary>
+        [Test]
+        public void TryLoadProjectObject_LoadsExistingFolderFromAbsolutePath()
+        {
+            string absolutePath = System.IO.Path.Combine(UnityEngine.Application.dataPath, EXISTING_FOLDER_NAME);
+            UnityEngine.Object asset;
+            bool found = InstallPathUtils.TryLoadProjectObject(absolutePath, out asset);
+
+            Assert.IsTrue(found);
+            Assert.IsNotNull(asset);
+        }
+
+        /// <summary>
+        /// Missing, blank, and null paths do not resolve to a project object.
+        /// </summary>
+        [Test]
+        public void TryLoadProjectObject_ReturnsFalseForMissingOrBlankPaths()
+        {
+            UnityEngine.Object missingAsset;
+            bool missingFound = InstallPathUtils.TryLoadProjectObject(MISSING_PROJECT_FOLDER, out missingAsset);
+            Assert.IsFalse(missingFound);
+            Assert.IsNull(missingAsset);
+
+            UnityEngine.Object blankAsset;
+            bool blankFound = InstallPathUtils.TryLoadProjectObject("   ", out blankAsset);
+            Assert.IsFalse(blankFound);
+            Assert.IsNull(blankAsset);
+
+            UnityEngine.Object nullAsset;
+            bool nullFound = InstallPathUtils.TryLoadProjectObject(null, out nullAsset);
+            Assert.IsFalse(nullFound);
+            Assert.IsNull(nullAsset);
+        }
+    }
 }

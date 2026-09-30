@@ -295,11 +295,17 @@ namespace ModelLibrary.Editor.Windows
         /// Pings an asset in the Project window and selects it.
         /// </summary>
         /// <param name="asset">Project asset to highlight.</param>
-        private static void PingAssetInProject(UnityEngine.Object asset)
+        /// <param name="focusProjectWindow">When true, brings the Project window forward before highlighting the asset.</param>
+        internal static void PingAssetInProject(UnityEngine.Object asset, bool focusProjectWindow = false)
         {
             if (asset == null)
             {
                 return;
+            }
+
+            if (focusProjectWindow)
+            {
+                EditorUtility.FocusProjectWindow();
             }
 
             EditorGUIUtility.PingObject(asset);

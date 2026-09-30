@@ -240,16 +240,35 @@ namespace ModelLibrary.Editor.Windows
             bool hasInstallPathErrors = !installPathValidation.IsValid;
 
             Color originalGuiColor = GUI.color;
-            if (hasInstallPathErrors)
+            UnityEngine.Object installedFolder;
+            bool canPingInstallPath = InstallPathUtils.TryLoadProjectObject(displayInstallPath, out installedFolder);
+            string newInstallPath;
+
+            using (new EditorGUILayout.HorizontalScope())
             {
-                GUI.color = Color.red;
+                if (hasInstallPathErrors)
+                {
+                    GUI.color = Color.red;
+                }
+
+                newInstallPath = EditorGUILayout.TextField(new GUIContent("Install Path",
+                    "The absolute path where the model will be installed in your Unity project (e.g., Assets/Models/MyModel)"),
+                    displayInstallPath);
+
+                GUI.color = originalGuiColor;
+
+                if (canPingInstallPath)
+                {
+                    GUILayout.Space(UIConstants.SPACING_SMALL);
+                    GUIContent pingContent = new GUIContent(
+                        StringConstants.PING_INSTALL_BUTTON_LABEL,
+                        StringConstants.PING_INSTALL_BUTTON_TOOLTIP);
+                    if (GUILayout.Button(pingContent, EditorStyles.miniButton, GUILayout.ExpandWidth(false)))
+                    {
+                        PingAssetInProject(installedFolder, focusProjectWindow: true);
+                    }
+                }
             }
-
-            string newInstallPath = EditorGUILayout.TextField(new GUIContent("Install Path",
-                "The absolute path where the model will be installed in your Unity project (e.g., Assets/Models/MyModel)"),
-                displayInstallPath);
-
-            GUI.color = originalGuiColor;
 
             // Always update the field value to ensure it's captured
             if (newInstallPath != displayInstallPath || string.IsNullOrWhiteSpace(_installPath))

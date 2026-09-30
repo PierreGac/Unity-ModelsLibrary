@@ -305,8 +305,72 @@ namespace ModelLibrary.Editor.Windows
             string installPath = ResolveDisplayInstallPath();
             if (!string.IsNullOrEmpty(installPath))
             {
-                EditorGUILayout.LabelField($"Install Path: {installPath}", UIStyles.MutedLabel);
+                DrawInstallPathRow(installPath);
             }
+        }
+
+        /// <summary>
+        /// Draws the install path and, when the model is installed in the project, a button that pings that folder.
+        /// The path uses the remaining row width and wraps, with the button pinned to the right.
+        /// </summary>
+        /// <param name="installPath">Install path shown in the header.</param>
+        private void DrawInstallPathRow(string installPath)
+        {
+            UnityEngine.Object installedAsset;
+            bool canPing = TryGetInstalledProjectAsset(installPath, out installedAsset);
+            GUIContent labelContent = new GUIContent($"Install Path: {installPath}");
+            GUIStyle labelStyle = UIStyles.MutedLabel;
+            if (!canPing)
+            {
+                GUILayout.Label(labelContent, labelStyle);
+                return;
+            }
+
+            GUIContent pingContent = new GUIContent(
+                StringConstants.PING_INSTALL_BUTTON_LABEL,
+                StringConstants.PING_INSTALL_BUTTON_TOOLTIP);
+            float pingWidth = EditorStyles.miniButton.CalcSize(pingContent).x;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label(
+                    labelContent,
+                    labelStyle,
+                    GUILayout.ExpandWidth(true),
+                    GUILayout.MinWidth(UIConstants.LABEL_WIDTH_LARGE));
+                GUILayout.Space(UIConstants.SPACING_SMALL);
+                if (GUILayout.Button(
+                    pingContent,
+                    EditorStyles.miniButton,
+                    GUILayout.Width(pingWidth),
+                    GUILayout.ExpandWidth(false),
+                    GUILayout.ExpandHeight(false)))
+                {
+                    ModelSubmitWindow.PingAssetInProject(installedAsset, focusProjectWindow: true);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Resolves the installed project folder for the path shown in the header.
+        /// </summary>
+        /// <param name="displayInstallPath">Install path currently shown to the user.</param>
+        /// <param name="asset">Loaded folder or asset when the model is installed in the project.</param>
+        /// <returns>True when the model is installed and the folder can be highlighted.</returns>
+        private bool TryGetInstalledProjectAsset(string displayInstallPath, out UnityEngine.Object asset)
+        {
+            asset = null;
+            if (!_isInstalled)
+            {
+                return false;
+            }
+
+            if (InstallPathUtils.TryLoadProjectObject(displayInstallPath, out asset))
+            {
+                return true;
+            }
+
+            return InstallPathUtils.TryLoadProjectObject(_installPath, out asset);
         }
 
         /// <summary>
