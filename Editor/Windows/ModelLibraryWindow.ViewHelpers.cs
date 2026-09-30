@@ -251,5 +251,68 @@ namespace ModelLibrary.Editor.Windows
             // Render the instance (call OnGUI) - this is called every frame
             return RenderEditorWindowInstance(instance);
         }
+
+        /// <summary>
+        /// Destroys a hidden editor window after its disable callback runs.
+        /// </summary>
+        /// <typeparam name="T">The embedded window type.</typeparam>
+        /// <param name="instance">The instance to release. Cleared before it is destroyed.</param>
+        private void DestroyEmbeddedWindow<T>(ref T instance) where T : EditorWindow
+        {
+            if (instance == null)
+            {
+                return;
+            }
+
+            T embedded = instance;
+            instance = null;
+            DestroyImmediate(embedded);
+        }
+
+        /// <summary>
+        /// Releases the hidden editor window owned by <paramref name="viewType"/>.
+        /// </summary>
+        /// <param name="viewType">The view that is being left or closed.</param>
+        private void ReleaseEmbeddedView(ViewType viewType)
+        {
+            switch (viewType)
+            {
+                case ViewType.Submit:
+                    DestroyEmbeddedWindow(ref _submitWindowInstance);
+                    break;
+                case ViewType.ModelDetails:
+                    DestroyEmbeddedWindow(ref _detailsWindowInstance);
+                    break;
+                case ViewType.ErrorLog:
+                    DestroyEmbeddedWindow(ref _errorLogInstance);
+                    break;
+                case ViewType.PerformanceProfiler:
+                    DestroyEmbeddedWindow(ref _profilerInstance);
+                    break;
+                case ViewType.Analytics:
+                    DestroyEmbeddedWindow(ref _analyticsInstance);
+                    break;
+                case ViewType.VersionComparison:
+                    DestroyEmbeddedWindow(ref _versionComparisonInstance);
+                    break;
+                case ViewType.Preview3D:
+                    DestroyEmbeddedWindow(ref _preview3DInstance);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Releases every hidden editor window embedded in this library window.
+        /// </summary>
+        private void ReleaseAllEmbeddedEditorViews()
+        {
+            ReleaseEmbeddedView(ViewType.Submit);
+            ReleaseEmbeddedView(ViewType.ModelDetails);
+            ReleaseEmbeddedView(ViewType.ErrorLog);
+            ReleaseEmbeddedView(ViewType.PerformanceProfiler);
+            ReleaseEmbeddedView(ViewType.Analytics);
+            ReleaseEmbeddedView(ViewType.VersionComparison);
+            ReleaseEmbeddedView(ViewType.Preview3D);
+        }
     }
 }

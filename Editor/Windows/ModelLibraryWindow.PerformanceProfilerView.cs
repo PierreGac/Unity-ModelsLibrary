@@ -28,15 +28,6 @@ namespace ModelLibrary.Editor.Windows
         }
 
         /// <summary>
-        /// Cleans up profiler state when leaving the PerformanceProfiler view.
-        /// Calls OnDisable on the profiler instance to unsubscribe from update events.
-        /// </summary>
-        private void CleanupPerformanceProfilerState()
-        {
-            CleanupEditorWindowInstance(_profilerInstance);
-        }
-
-        /// <summary>
         /// Draws the PerformanceProfiler view.
         /// Uses a hidden PerformanceProfilerWindow instance to render performance metrics.
         /// </summary>

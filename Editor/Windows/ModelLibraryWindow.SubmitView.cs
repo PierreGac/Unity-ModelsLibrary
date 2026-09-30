@@ -60,6 +60,11 @@ namespace ModelLibrary.Editor.Windows
         /// </summary>
         internal void InitializeSubmitState()
         {
+            if (_submitWindowInstance == null)
+            {
+                _submitWindowInstance = CreateInstance<ModelSubmitWindow>();
+            }
+
             _resetSubmitFormOnNextDraw = true;
             _resolveMeshDependenciesOnNextDraw = GetViewParameter<bool>(__RESOLVE_MESH_DEPENDENCIES_PARAM, false);
             _submitSelectionGuidsOnNextDraw = GetViewParameter<string[]>(__SUBMIT_SELECTION_GUIDS_PARAM, null);

@@ -81,6 +81,11 @@ namespace ModelLibrary.Editor.Windows
         private bool _subscribedToUpdate = false;
 
         /// <summary>
+        /// How many 3D preview windows are currently listening to editor updates.
+        /// </summary>
+        internal static int ActiveUpdateSubscriptions { get; private set; }
+
+        /// <summary>
         /// Information about a mesh in the model.
         /// </summary>
         private class MeshInfo
@@ -157,6 +162,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 EditorApplication.update += OnEditorUpdate;
                 _subscribedToUpdate = true;
+                ActiveUpdateSubscriptions++;
             }
         }
 
@@ -190,6 +196,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 EditorApplication.update -= OnEditorUpdate;
                 _subscribedToUpdate = false;
+                ActiveUpdateSubscriptions--;
             }
 
             CleanupPreviewResources();

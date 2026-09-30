@@ -36,10 +36,34 @@ namespace ModelLibrary.Editor.Windows
         private void OnEnable()
         {
             _lastRefresh = EditorApplication.timeSinceStartup;
+            if (_updateSubscribed)
+            {
+                return;
+            }
+
             EditorApplication.update += OnEditorUpdate;
+            _updateSubscribed = true;
+            ActiveUpdateSubscriptions++;
         }
 
-        private void OnDisable() => EditorApplication.update -= OnEditorUpdate;
+        private void OnDisable()
+        {
+            if (!_updateSubscribed)
+            {
+                return;
+            }
+
+            EditorApplication.update -= OnEditorUpdate;
+            _updateSubscribed = false;
+            ActiveUpdateSubscriptions--;
+        }
+
+        /// <summary>
+        /// How many profiler windows are currently listening to editor updates.
+        /// </summary>
+        internal static int ActiveUpdateSubscriptions { get; private set; }
+
+        private bool _updateSubscribed;
 
         private void OnEditorUpdate()
         {
