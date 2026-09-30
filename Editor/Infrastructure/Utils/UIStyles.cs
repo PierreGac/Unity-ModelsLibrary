@@ -351,13 +351,27 @@ namespace ModelLibrary.Editor.Utils
         /// <summary>
         /// Draws a button with danger styling (red background, white text).
         /// </summary>
+        /// <param name="text">Button label.</param>
+        /// <param name="options">Layout options.</param>
+        /// <returns>True when the button is clicked.</returns>
         public static bool DrawDangerButton(string text, params GUILayoutOption[] options)
+        {
+            return DrawDangerButton(new GUIContent(text), options);
+        }
+
+        /// <summary>
+        /// Draws a button with danger styling (red background, white text).
+        /// </summary>
+        /// <param name="content">Button label and optional tooltip.</param>
+        /// <param name="options">Layout options.</param>
+        /// <returns>True when the button is clicked.</returns>
+        public static bool DrawDangerButton(GUIContent content, params GUILayoutOption[] options)
         {
             Color originalBg = GUI.backgroundColor;
             Color originalColor = GUI.color;
             GUI.backgroundColor = UIConstants.COLOR_BUTTON_DANGER_BG;
             GUI.color = Color.white;
-            bool result = GUILayout.Button(text, ButtonDanger, options);
+            bool result = GUILayout.Button(content, ButtonDanger, options);
             GUI.backgroundColor = originalBg;
             GUI.color = originalColor;
             return result;

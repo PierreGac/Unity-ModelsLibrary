@@ -197,7 +197,7 @@ namespace ModelLibrary.Editor.Windows
                     // Display existing notes
                     if ((_meta.notes?.Count ?? 0) == 0)
                     {
-                        GUILayout.Label("(none)");
+                        GUILayout.Label(StringConstants.EMPTY_NOTES_LABEL);
                     }
                     else
                     {
@@ -450,7 +450,7 @@ namespace ModelLibrary.Editor.Windows
         {
             if (_meta?.changelog == null || _meta.changelog.Count == 0)
             {
-                GUILayout.Label("(none)");
+                GUILayout.Label(StringConstants.EMPTY_CHANGELOG_LABEL);
                 return;
             }
 

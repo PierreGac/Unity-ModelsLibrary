@@ -14,11 +14,13 @@ namespace ModelLibrary.Editor.Windows
     {
         private bool _isExiting = false;
         private const float __TOOLBAR_SEARCH_MIN_WIDTH = 200f;
+        private const float __TOOLBAR_SEARCH_MIN_WIDTH_NARROW = 80f;
         private const float __TOOLBAR_HELP_BUTTON_WIDTH = 24f;
         private const float __TOOLBAR_HISTORY_BUTTON_WIDTH = 20f;
         private const float __TOOLBAR_CLEAR_BUTTON_WIDTH = 60f;
         private const float __TOOLBAR_ACTIONS_BUTTON_WIDTH = 80f;
         private const float __TOOLBAR_UPDATE_BUTTON_WIDTH = 130f;
+        private const float __TOOLBAR_UPDATE_BUTTON_WIDTH_NARROW = 96f;
         private const float __TOOLBAR_UPDATE_BUTTON_HEIGHT = 20f;
         private const float __TOOLBAR_BULK_BUTTON_WIDTH = 70f;
         private const float __TOOLBAR_SETTINGS_BUTTON_WIDTH = 80f;
@@ -436,10 +438,54 @@ namespace ModelLibrary.Editor.Windows
 
         private void DrawToolbar()
         {
+            int rowCount = LibraryToolbarLayout.GetRowCount(position.width);
+            if (rowCount == LibraryToolbarLayout.SINGLE_ROW)
+            {
+                using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+                {
+                    DrawToolbarSearchCluster(__TOOLBAR_SEARCH_MIN_WIDTH);
+                    DrawToolbarCommandCluster(false);
+                    GUILayout.FlexibleSpace();
+                    DrawToolbarViewCluster();
+                }
+                return;
+            }
+
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
+                DrawToolbarSearchCluster(__TOOLBAR_SEARCH_MIN_WIDTH_NARROW);
+            }
+
+            if (rowCount == LibraryToolbarLayout.TWO_ROWS)
+            {
+                using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+                {
+                    DrawToolbarCommandCluster(false);
+                    GUILayout.FlexibleSpace();
+                    DrawToolbarViewCluster();
+                }
+                return;
+            }
+
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+            {
+                DrawToolbarCommandCluster(true);
+            }
+
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+            {
+                DrawToolbarViewCluster();
+            }
+        }
+
+        /// <summary>
+        /// Draws the search field and its history controls.
+        /// </summary>
+        /// <param name="searchMinWidth">Minimum width of the search field.</param>
+        private void DrawToolbarSearchCluster(float searchMinWidth)
+        {
                 GUI.SetNextControlName("SearchField");
-                string newSearch = GUILayout.TextField(_search, EditorStyles.toolbarSearchField, GUILayout.ExpandWidth(true), GUILayout.MinWidth(__TOOLBAR_SEARCH_MIN_WIDTH));
+                string newSearch = GUILayout.TextField(_search, EditorStyles.toolbarSearchField, GUILayout.ExpandWidth(true), GUILayout.MinWidth(searchMinWidth));
                 _search = newSearch;
 
                 GUIContent searchHelpIcon = EditorGUIUtility.IconContent("_Help");
@@ -487,7 +533,14 @@ namespace ModelLibrary.Editor.Windows
                         GUI.FocusControl(null);
                     }
                 }
+        }
 
+        /// <summary>
+        /// Draws actions, updates, bulk, settings, and help.
+        /// </summary>
+        /// <param name="compactUpdate">Use the shorter updates button when the window is on three rows.</param>
+        private void DrawToolbarCommandCluster(bool compactUpdate)
+        {
                 GUIContent actionsMenuContent = new GUIContent("Actions ▼", "Refresh repository data, check for updates, or submit new models");
                 if (GUILayout.Button(actionsMenuContent, UIStyles.ToolbarButton, GUILayout.Width(__TOOLBAR_ACTIONS_BUTTON_WIDTH)))
                 {
@@ -552,8 +605,10 @@ namespace ModelLibrary.Editor.Windows
                         tooltipText += $"... and {_updateCount - 5} more";
                     }
 
-                    GUIContent updateContent = new GUIContent($"🔄 Updates ({_updateCount})", tooltipText);
-                    if (GUILayout.Button(updateContent, updateBadgeStyle, GUILayout.Width(__TOOLBAR_UPDATE_BUTTON_WIDTH), GUILayout.Height(__TOOLBAR_UPDATE_BUTTON_HEIGHT)))
+                    string updateLabel = compactUpdate ? $"Updates ({_updateCount})" : $"🔄 Updates ({_updateCount})";
+                    float updateWidth = compactUpdate ? __TOOLBAR_UPDATE_BUTTON_WIDTH_NARROW : __TOOLBAR_UPDATE_BUTTON_WIDTH;
+                    GUIContent updateContent = new GUIContent(updateLabel, tooltipText);
+                    if (GUILayout.Button(updateContent, updateBadgeStyle, GUILayout.Width(updateWidth), GUILayout.Height(__TOOLBAR_UPDATE_BUTTON_HEIGHT)))
                     {
                         _search = "has:update";
                         GUI.FocusControl(null);
@@ -653,10 +708,15 @@ namespace ModelLibrary.Editor.Windows
                 {
                     NavigateToView(ViewType.Help);
                 }
+        }
 
-                GUILayout.FlexibleSpace();
-
-
+        /// <summary>
+        /// Draws the role, sort, and view-mode controls.
+        /// </summary>
+        private void DrawToolbarViewCluster()
+        {
+                SimpleUserIdentityProvider viewRoleProvider = new SimpleUserIdentityProvider();
+                UserRole currentRole = viewRoleProvider.GetUserRole();
                 string roleLabel = currentRole.ToString();
                 string roleTooltip = GetRoleTooltip(currentRole);
 
@@ -717,7 +777,6 @@ namespace ModelLibrary.Editor.Windows
                     _viewMode = (ViewMode)newViewMode;
                     Repaint();
                 }
-            }
         }
 
         /// <summary>

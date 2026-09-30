@@ -91,7 +91,7 @@ namespace ModelLibrary.Editor.Utils
         {
             if (tags == null || tags.Count == 0)
             {
-                EditorGUILayout.LabelField("(none)", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField(StringConstants.EMPTY_TAGS_LABEL, EditorStyles.miniLabel);
                 return;
             }
 

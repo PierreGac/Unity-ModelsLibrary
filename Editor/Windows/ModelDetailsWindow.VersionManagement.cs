@@ -53,11 +53,11 @@ namespace ModelLibrary.Editor.Windows
             {
                 if (_isLatestVersion)
                 {
-                    EditorGUILayout.HelpBox("You are viewing the latest version. Deleting it will promote the previous version to be the new latest version.", MessageType.Warning);
+                    EditorGUILayout.HelpBox("You are viewing the latest version. Deleting it will promote the previous version to be the new latest version. " + DestructiveActionCopy.LOCAL_INSTALLS_REMAIN, MessageType.Warning);
                 }
                 else
                 {
-                    EditorGUILayout.HelpBox("Deleting removes this version's payload, metadata, and preview files from the repository. Projects that already imported it keep their local copies.", MessageType.Info);
+                    EditorGUILayout.HelpBox("Deleting removes this version's payload, metadata, and preview files from the shared repository. " + DestructiveActionCopy.LOCAL_INSTALLS_REMAIN, MessageType.Info);
                 }
 
                 // Delete version button
@@ -66,7 +66,10 @@ namespace ModelLibrary.Editor.Windows
                     GUILayout.FlexibleSpace();
                     using (new EditorGUI.DisabledScope(!canDeleteVersion))
                     {
-                        if (UIStyles.DrawDangerButton("Delete this version and restore previous", GUILayout.Width(250), GUILayout.Height(26)))
+                        GUIContent deleteVersionContent = new GUIContent(
+                            "Delete this version and restore previous",
+                            DestructiveActionCopy.DELETE_VERSION_BUTTON_TOOLTIP);
+                        if (UIStyles.DrawDangerButton(deleteVersionContent, GUILayout.Width(UIConstants.BUTTON_WIDTH_LARGE), GUILayout.Height(UIConstants.BUTTON_HEIGHT_STANDARD)))
                         {
                             if (ConfirmVersionDeletion())
                             {
@@ -83,13 +86,16 @@ namespace ModelLibrary.Editor.Windows
             if (_isInstalled && !string.IsNullOrEmpty(_installPath))
             {
                 // Show "Remove from project" for installed models
-                EditorGUILayout.HelpBox("Remove this model from your project. This will delete the model files from Assets but will not remove it from the repository.", MessageType.Info);
+                EditorGUILayout.HelpBox(DestructiveActionCopy.REMOVE_FROM_PROJECT_SCOPE, MessageType.Info);
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     GUILayout.FlexibleSpace();
                     using (new EditorGUI.DisabledScope(_deletingModel))
                     {
-                        if (UIStyles.DrawSecondaryButton("Remove from project", GUILayout.Width(200), GUILayout.Height(26)))
+                        GUIContent removeContent = new GUIContent(
+                            "Remove from project",
+                            DestructiveActionCopy.REMOVE_FROM_PROJECT_BUTTON_TOOLTIP);
+                        if (UIStyles.DrawSecondaryButton(removeContent, GUILayout.Width(UIConstants.BUTTON_WIDTH_MEDIUM), GUILayout.Height(UIConstants.BUTTON_HEIGHT_STANDARD)))
                         {
                             if (ConfirmRemoveFromProject())
                             {
@@ -102,13 +108,16 @@ namespace ModelLibrary.Editor.Windows
             else if (offerRepositoryDelete)
             {
                 // Show "Delete this model" for non-installed models (database deletion)
-                EditorGUILayout.HelpBox("⚠️ WARNING: Deleting the entire model will permanently remove all versions, metadata, and files from the repository. This action cannot be undone.", MessageType.Warning);
+                EditorGUILayout.HelpBox("Deleting the entire model permanently removes all versions, metadata, and files from the shared repository. " + DestructiveActionCopy.LOCAL_INSTALLS_REMAIN + " " + DestructiveActionCopy.REMOVE_FROM_PROJECT_IS_SEPARATE, MessageType.Warning);
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     GUILayout.FlexibleSpace();
                     using (new EditorGUI.DisabledScope(!canDeleteModel))
                     {
-                        if (UIStyles.DrawDangerButton("Delete this model", GUILayout.Width(200), GUILayout.Height(26)))
+                        GUIContent deleteModelContent = new GUIContent(
+                            "Delete this model",
+                            DestructiveActionCopy.DELETE_MODEL_BUTTON_TOOLTIP);
+                        if (UIStyles.DrawDangerButton(deleteModelContent, GUILayout.Width(UIConstants.BUTTON_WIDTH_MEDIUM), GUILayout.Height(UIConstants.BUTTON_HEIGHT_STANDARD)))
                         {
                             if (ConfirmModelDeletion())
                             {
@@ -140,8 +149,7 @@ namespace ModelLibrary.Editor.Windows
             string modelName = _meta.identity.name ?? "Unknown Model";
             bool confirmed = EditorUtility.DisplayDialog(
                 "Delete Version",
-                $"Are you sure you want to delete version {_version ?? "Unknown"} of '{modelName}'?\n\n" +
-                "This permanently removes the version folder, payload files, preview images, and metadata from the repository.",
+                DestructiveActionCopy.BuildDeleteVersionMessage(modelName, _version ?? "Unknown"),
                 "Delete",
                 "Cancel");
 
@@ -154,7 +162,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 return EditorUtility.DisplayDialog(
                     "Delete Latest Version",
-                    "This is the latest version. Deleting it will promote an older version to be the new latest version.\n\nContinue?",
+                    DestructiveActionCopy.BuildDeleteLatestVersionMessage(),
                     "Yes, Delete",
                     "Cancel");
             }
@@ -177,12 +185,7 @@ namespace ModelLibrary.Editor.Windows
             string modelName = _meta.identity.name ?? "Unknown Model";
             bool confirmed = EditorUtility.DisplayDialog(
                 "Delete Model",
-                $"⚠️ WARNING: Are you sure you want to delete the entire model '{modelName}'?\n\n" +
-                "This will permanently remove:\n" +
-                "• All versions of this model\n" +
-                "• All payload files, metadata, and preview images\n" +
-                "• The model entry from the index\n\n" +
-                "This action CANNOT be undone!",
+                DestructiveActionCopy.BuildDeleteModelMessage(modelName),
                 "Yes, Delete Model",
                 "Cancel");
 
@@ -195,8 +198,7 @@ namespace ModelLibrary.Editor.Windows
             // Reuse modelName variable from above
             return EditorUtility.DisplayDialog(
                 "Final Confirmation",
-                $"You are about to PERMANENTLY DELETE '{modelName}' and all its versions.\n\n" +
-                "Are you absolutely sure?",
+                DestructiveActionCopy.BuildDeleteModelFinalMessage(modelName),
                 "Yes, I'm Sure",
                 "Cancel");
         }
@@ -432,8 +434,7 @@ namespace ModelLibrary.Editor.Windows
             string modelName = _meta.identity.name ?? "Unknown Model";
             return EditorUtility.DisplayDialog(
                 "Remove from Project",
-                $"Are you sure you want to remove '{modelName}' from your project?\n\n" +
-                "This will delete the model files from the Assets folder, but the model will remain in the repository.",
+                DestructiveActionCopy.BuildRemoveFromProjectMessage(modelName),
                 "Remove",
                 "Cancel");
         }

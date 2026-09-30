@@ -41,5 +41,14 @@
 
         /// <summary>Tooltip for the install-folder ping button.</summary>
         public const string PING_INSTALL_BUTTON_TOOLTIP = "Highlight this install folder in the Project window";
+
+        /// <summary>Empty tags label in details.</summary>
+        public const string EMPTY_TAGS_LABEL = "No tags";
+
+        /// <summary>Empty notes label in details.</summary>
+        public const string EMPTY_NOTES_LABEL = "No notes yet";
+
+        /// <summary>Empty changelog label in details.</summary>
+        public const string EMPTY_CHANGELOG_LABEL = "No changelog entries";
     }
 }
