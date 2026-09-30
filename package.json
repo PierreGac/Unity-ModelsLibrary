@@ -1,7 +1,7 @@
 {
     "name": "com.models-library",
     "displayName": "Models Library",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "unity": "6000.2",
     "unityRelease": "6f2",
     "license": "MIT",
