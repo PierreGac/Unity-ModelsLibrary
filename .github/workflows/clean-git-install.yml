@@ -1,8 +1,8 @@
 # Clean Git UPM install.
 #
-# Licensing matches unity-tests.yml: a self-hosted Windows runner uses the
-# Unity Hub license already on that machine. No license file is committed.
-# GitHub-hosted runners cannot run this job.
+# A self-hosted Windows runner uses the Unity Hub license already on that
+# machine. No license file is committed. GitHub-hosted runners cannot run
+# this job.
 #
 # The install URL is the repository root. Tag v1.0.12 is not created, so the
 # URL resolves to the default branch. The old ?path=Assets/ModelLibrary query
