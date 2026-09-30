@@ -47,9 +47,9 @@ namespace ModelLibrary.Editor.Windows
             bool onlyVersion = !_hasOlderVersions;
             bool canDeleteVersion = !onlyVersion && !_deletingVersion && !_deletingModel;
             bool canDeleteModel = !_deletingVersion && !_deletingModel;
+            bool offerRepositoryDelete = RepositoryKindChooser.OffersRepositoryDelete(ModelLibrarySettings.GetOrCreate().repositoryKind);
 
-            // Only show version deletion UI if there are older versions available
-            if (!onlyVersion)
+            if (offerRepositoryDelete && !onlyVersion)
             {
                 if (_isLatestVersion)
                 {
@@ -99,7 +99,7 @@ namespace ModelLibrary.Editor.Windows
                     }
                 }
             }
-            else
+            else if (offerRepositoryDelete)
             {
                 // Show "Delete this model" for non-installed models (database deletion)
                 EditorGUILayout.HelpBox("⚠️ WARNING: Deleting the entire model will permanently remove all versions, metadata, and files from the repository. This action cannot be undone.", MessageType.Warning);
@@ -117,6 +117,10 @@ namespace ModelLibrary.Editor.Windows
                         }
                     }
                 }
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(RepositoryKindChooser.REPOSITORY_DELETE_UNAVAILABLE_MESSAGE, MessageType.Info);
             }
         }
 

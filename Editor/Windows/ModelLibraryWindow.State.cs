@@ -136,6 +136,8 @@ namespace ModelLibrary.Editor.Windows
         private string _wizardRepoRoot;
         /// <summary>Repository kind for wizard.</summary>
         private ModelLibrarySettings.RepositoryKind _wizardRepoKind;
+        /// <summary>True when the wizard may select the experimental HTTP repository.</summary>
+        private bool _wizardExperimentalHttp;
         /// <summary>Repository validation message.</summary>
         private string _wizardRepoValidationMessage;
         /// <summary>Repository validation message type.</summary>
@@ -204,6 +206,8 @@ namespace ModelLibrary.Editor.Windows
         private ModelLibrarySettings _settingsInstance;
         /// <summary>Repository kind in settings form.</summary>
         private ModelLibrarySettings.RepositoryKind _settingsRepositoryKind;
+        /// <summary>True when settings may select the experimental HTTP repository.</summary>
+        private bool _settingsExperimentalHttp;
         /// <summary>Repository root in settings form.</summary>
         private string _settingsRepositoryRoot;
         /// <summary>Local cache root in settings form.</summary>

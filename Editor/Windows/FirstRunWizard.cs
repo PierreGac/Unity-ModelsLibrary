@@ -44,6 +44,8 @@ namespace ModelLibrary.Editor.Windows
         private string _repoRoot;
         /// <summary>Selected repository type (FileSystem or HTTP).</summary>
         private ModelLibrarySettings.RepositoryKind _kind;
+        /// <summary>True when the wizard may select the experimental HTTP repository.</summary>
+        private bool _experimentalHttp;
         /// <summary>Current wizard step.</summary>
         private WizardStep _currentStep = WizardStep.Welcome;
 
@@ -168,6 +170,7 @@ namespace ModelLibrary.Editor.Windows
             _userRole = identityProvider.GetUserRole();
             _repoRoot = settings.repositoryRoot;
             _kind = settings.repositoryKind;
+            _experimentalHttp = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.Http;
             _currentStep = WizardStep.Welcome;
             _repositoryTested = false;
             _saveWithoutTesting = false;
@@ -295,7 +298,7 @@ namespace ModelLibrary.Editor.Windows
             GUILayout.Space(6f);
             EditorGUILayout.LabelField("This quick setup will:", EditorStyles.boldLabel);
             DrawBullet("Capture who you are so notes and submissions display your name.");
-            DrawBullet("Point the browser at your shared repository or HTTP endpoint.");
+            DrawBullet("Point the browser at your shared repository.");
             DrawBullet("Offer a short tour of key features after configuration.");
 
             GUILayout.Space(8f);
@@ -337,7 +340,18 @@ namespace ModelLibrary.Editor.Windows
             EditorGUILayout.HelpBox("Choose the storage type and location for shared models.", MessageType.Info);
             GUILayout.Space(4f);
 
-            ModelLibrarySettings.RepositoryKind newKind = (ModelLibrarySettings.RepositoryKind)EditorGUILayout.EnumPopup("Repository Kind", _kind);
+            bool experimentalHttp = RepositoryKindChooser.DrawExperimentalHttpToggle(_experimentalHttp);
+            if (experimentalHttp != _experimentalHttp)
+            {
+                _experimentalHttp = experimentalHttp;
+                if (!_experimentalHttp && _kind == ModelLibrarySettings.RepositoryKind.Http)
+                {
+                    _kind = ModelLibrarySettings.RepositoryKind.FileSystem;
+                    ClearRepositoryFeedback();
+                }
+            }
+
+            ModelLibrarySettings.RepositoryKind newKind = RepositoryKindChooser.DrawKindPopup("Repository Kind", _kind, _experimentalHttp);
             if (newKind != _kind)
             {
                 _kind = newKind;
@@ -392,7 +406,8 @@ namespace ModelLibrary.Editor.Windows
             }
 
             GUILayout.Space(6f);
-            EditorGUILayout.HelpBox("Examples:\n• File System: C\\\\Models or \\\\server\\share\\ModelLibrary\n• HTTP: https://models.example.com/api", MessageType.None);
+            bool showHttpExample = RepositoryKindChooser.IsHttpSelectable(_experimentalHttp, _kind);
+            EditorGUILayout.HelpBox(RepositoryKindChooser.GetConnectionExamples(showHttpExample), MessageType.None);
         }
 
         private void DrawSummaryStep()

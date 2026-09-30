@@ -33,6 +33,7 @@ namespace ModelLibrary.Editor.Windows
             // Load repository settings
             _settingsInstance = ModelLibrarySettings.GetOrCreate();
             _settingsRepositoryKind = _settingsInstance.repositoryKind;
+            _settingsExperimentalHttp = _settingsInstance.repositoryKind == ModelLibrarySettings.RepositoryKind.Http;
             _settingsRepositoryRoot = _settingsInstance.repositoryRoot;
             _settingsLocalCacheRoot = _settingsInstance.localCacheRoot;
 
@@ -159,7 +160,19 @@ namespace ModelLibrary.Editor.Windows
             EditorGUILayout.Space(5);
 
             // Repository Kind
-            ModelLibrarySettings.RepositoryKind newKind = (ModelLibrarySettings.RepositoryKind)EditorGUILayout.EnumPopup("Repository Type", _settingsRepositoryKind);
+            bool experimentalHttp = RepositoryKindChooser.DrawExperimentalHttpToggle(_settingsExperimentalHttp);
+            if (experimentalHttp != _settingsExperimentalHttp)
+            {
+                _settingsExperimentalHttp = experimentalHttp;
+                if (!_settingsExperimentalHttp && _settingsRepositoryKind == ModelLibrarySettings.RepositoryKind.Http)
+                {
+                    _settingsRepositoryKind = ModelLibrarySettings.RepositoryKind.FileSystem;
+                    _settingsHasUnsavedChanges = true;
+                    _settingsConnectionTestResult = null;
+                }
+            }
+
+            ModelLibrarySettings.RepositoryKind newKind = RepositoryKindChooser.DrawKindPopup("Repository Type", _settingsRepositoryKind, _settingsExperimentalHttp);
             if (newKind != _settingsRepositoryKind)
             {
                 _settingsRepositoryKind = newKind;
@@ -171,8 +184,8 @@ namespace ModelLibrary.Editor.Windows
             // Repository Root
             EditorGUILayout.LabelField("Repository Root", EditorStyles.boldLabel);
             string tooltip = _settingsRepositoryKind == ModelLibrarySettings.RepositoryKind.FileSystem
-                ? "Absolute path or UNC path to the repository (e.g., C:\\Models or \\\\server\\Models)"
-                : "Base URL for the HTTP repository (e.g., https://api.example.com/models)";
+                ? RepositoryKindChooser.FILE_SYSTEM_ROOT_TOOLTIP
+                : RepositoryKindChooser.HTTP_ROOT_TOOLTIP;
             EditorGUILayout.HelpBox(tooltip, MessageType.None);
 
             string newRepoRoot = EditorGUILayout.TextField("Path/URL", _settingsRepositoryRoot);

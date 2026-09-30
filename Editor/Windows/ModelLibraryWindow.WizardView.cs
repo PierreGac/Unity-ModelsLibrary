@@ -37,6 +37,7 @@ namespace ModelLibrary.Editor.Windows
             _wizardUserRole = identityProvider.GetUserRole();
             _wizardRepoRoot = settings.repositoryRoot;
             _wizardRepoKind = settings.repositoryKind;
+            _wizardExperimentalHttp = settings.repositoryKind == ModelLibrarySettings.RepositoryKind.Http;
             _wizardStep = FirstRunWizard.WizardStep.Welcome;
             _wizardRepoTested = false;
             _wizardSaveWithoutTesting = false;
@@ -93,7 +94,7 @@ namespace ModelLibrary.Editor.Windows
                 GUILayout.Space(UIConstants.SPACING_STANDARD);
                 UIStyles.DrawSectionHeader("This quick setup will");
                 DrawWizardBullet("Capture who you are so notes and submissions display your name.");
-                DrawWizardBullet("Point the browser at your shared repository or HTTP endpoint.");
+                DrawWizardBullet("Point the browser at your shared repository.");
                 DrawWizardBullet("Offer a short tour of key features after configuration.");
             }
 
@@ -145,7 +146,18 @@ namespace ModelLibrary.Editor.Windows
                 EditorGUILayout.HelpBox("Choose the storage type and location for shared models.", MessageType.Info);
                 GUILayout.Space(UIConstants.SPACING_SMALL);
 
-                ModelLibrarySettings.RepositoryKind newKind = (ModelLibrarySettings.RepositoryKind)EditorGUILayout.EnumPopup("Repository Kind", _wizardRepoKind);
+                bool experimentalHttp = RepositoryKindChooser.DrawExperimentalHttpToggle(_wizardExperimentalHttp);
+                if (experimentalHttp != _wizardExperimentalHttp)
+                {
+                    _wizardExperimentalHttp = experimentalHttp;
+                    if (!_wizardExperimentalHttp && _wizardRepoKind == ModelLibrarySettings.RepositoryKind.Http)
+                    {
+                        _wizardRepoKind = ModelLibrarySettings.RepositoryKind.FileSystem;
+                        ClearWizardRepositoryFeedback();
+                    }
+                }
+
+                ModelLibrarySettings.RepositoryKind newKind = RepositoryKindChooser.DrawKindPopup("Repository Kind", _wizardRepoKind, _wizardExperimentalHttp);
                 if (newKind != _wizardRepoKind)
                 {
                     _wizardRepoKind = newKind;
@@ -200,7 +212,8 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 GUILayout.Space(UIConstants.SPACING_STANDARD);
-                EditorGUILayout.HelpBox("Examples:\n• File System: C\\\\Models or \\\\server\\share\\ModelLibrary\n• HTTP: https://models.example.com/api", MessageType.None);
+                bool showHttpExample = RepositoryKindChooser.IsHttpSelectable(_wizardExperimentalHttp, _wizardRepoKind);
+                EditorGUILayout.HelpBox(RepositoryKindChooser.GetConnectionExamples(showHttpExample), MessageType.None);
             }
         }
 
