@@ -142,6 +142,8 @@ namespace ModelLibrary.Editor.Windows
         private MessageType _wizardRepoValidationType = MessageType.Info;
         /// <summary>Whether repository has been tested.</summary>
         private bool _wizardRepoTested;
+        /// <summary>True after the user chooses save-without-testing for a missing folder.</summary>
+        private bool _wizardSaveWithoutTesting;
         /// <summary>Repository test message.</summary>
         private string _wizardRepoTestMessage;
         /// <summary>Repository test message type.</summary>

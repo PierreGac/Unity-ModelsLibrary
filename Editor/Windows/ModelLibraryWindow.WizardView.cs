@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Settings;
 using ModelLibrary.Editor.Utils;
@@ -17,6 +16,7 @@ namespace ModelLibrary.Editor.Windows
         private const int __WIZARD_TOTAL_STEPS = 4;
         private const float __WIZARD_BUTTON_HELP_WIDTH = 150f;
         private const float __WIZARD_BUTTON_TEST_WIDTH = 140f;
+        private const float __WIZARD_BUTTON_SAVE_UNTESTED_WIDTH = 160f;
         private const float __WIZARD_BUTTON_BROWSE_WIDTH = 90f;
         private static readonly string[] __WizardStepTitles =
         {
@@ -39,6 +39,7 @@ namespace ModelLibrary.Editor.Windows
             _wizardRepoKind = settings.repositoryKind;
             _wizardStep = FirstRunWizard.WizardStep.Welcome;
             _wizardRepoTested = false;
+            _wizardSaveWithoutTesting = false;
             _wizardRepoTestMessage = null;
             _wizardRepoValidationMessage = null;
             _wizardOpenHelpAfterFinish = true;
@@ -182,6 +183,11 @@ namespace ModelLibrary.Editor.Windows
                 GUILayout.Space(UIConstants.SPACING_SMALL);
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.FlexibleSpace();
+                if (GUILayout.Button(RepositoryConnectionValidator.SAVE_WITHOUT_TESTING_LABEL, GUILayout.Width(__WIZARD_BUTTON_SAVE_UNTESTED_WIDTH), GUILayout.Height(UIConstants.BUTTON_HEIGHT_STANDARD)))
+                {
+                    SaveWizardRepositoryWithoutTesting();
+                }
+
                 if (GUILayout.Button("Test Connection", GUILayout.Width(__WIZARD_BUTTON_TEST_WIDTH), GUILayout.Height(UIConstants.BUTTON_HEIGHT_STANDARD)))
                 {
                     RunWizardRepositoryTest();
@@ -254,7 +260,7 @@ namespace ModelLibrary.Editor.Windows
                         if (GUILayout.Button("Next", GUILayout.Width(110f), GUILayout.Height(26f)))
                         {
                             if (_wizardStep == FirstRunWizard.WizardStep.Repository
-                                && !ValidateWizardRepository(out _wizardRepoValidationMessage, out _wizardRepoValidationType))
+                                && !RepositoryConnectionValidator.TryValidate(_wizardRepoKind, _wizardRepoRoot, _wizardSaveWithoutTesting, out _wizardRepoValidationMessage, out _wizardRepoValidationType))
                             {
                                 return;
                             }
@@ -267,7 +273,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (GUILayout.Button("Finish", GUILayout.Width(110f), GUILayout.Height(26f)))
                         {
-                            if (!ValidateWizardRepository(out _wizardRepoValidationMessage, out _wizardRepoValidationType))
+                            if (!RepositoryConnectionValidator.TryValidate(_wizardRepoKind, _wizardRepoRoot, _wizardSaveWithoutTesting, out _wizardRepoValidationMessage, out _wizardRepoValidationType))
                             {
                                 _wizardStep = FirstRunWizard.WizardStep.Repository;
                                 return;
@@ -312,83 +318,43 @@ namespace ModelLibrary.Editor.Windows
         private void ClearWizardRepositoryFeedback()
         {
             _wizardRepoTested = false;
+            _wizardSaveWithoutTesting = false;
             _wizardRepoTestMessage = null;
             _wizardRepoTestMessageType = MessageType.None;
             _wizardRepoValidationMessage = null;
             _wizardRepoValidationType = MessageType.None;
         }
 
-        private bool ValidateWizardRepository(out string message, out MessageType type)
+        private void SaveWizardRepositoryWithoutTesting()
         {
-            message = string.Empty;
-            type = MessageType.None;
-
-            if (string.IsNullOrWhiteSpace(_wizardRepoRoot))
-            {
-                message = "Repository root is required.";
-                type = MessageType.Error;
-                return false;
-            }
-
-            if (_wizardRepoKind == ModelLibrarySettings.RepositoryKind.FileSystem)
-            {
-                if (!Path.IsPathRooted(_wizardRepoRoot) && !_wizardRepoRoot.StartsWith("\\\\", StringComparison.Ordinal))
-                {
-                    message = "File system paths should be absolute (e.g., C\\\\Models or \\\\server\\share).";
-                    type = MessageType.Error;
-                    return false;
-                }
-
-                if (!Directory.Exists(_wizardRepoRoot))
-                {
-                    message = "Directory not found. You can still proceed, but double-check the network share.";
-                    type = MessageType.Warning;
-                    return true;
-                }
-            }
-            else
-            {
-                if (!Uri.TryCreate(_wizardRepoRoot, UriKind.Absolute, out Uri uriResult) ||
-                    (uriResult.Scheme != Uri.UriSchemeHttp && uriResult.Scheme != Uri.UriSchemeHttps))
-                {
-                    message = "Please provide a valid HTTP or HTTPS URL.";
-                    type = MessageType.Error;
-                    return false;
-                }
-            }
-
-            return true;
+            _wizardSaveWithoutTesting = true;
+            _wizardRepoTested = false;
+            string message;
+            MessageType messageType;
+            RepositoryConnectionValidator.TrySaveRepository(
+                _wizardRepoKind,
+                _wizardRepoRoot,
+                true,
+                out message,
+                out messageType);
+            _wizardRepoValidationMessage = message;
+            _wizardRepoValidationType = messageType;
         }
 
         private void RunWizardRepositoryTest()
         {
+            _wizardSaveWithoutTesting = false;
             _wizardRepoTested = true;
-
-            if (!ValidateWizardRepository(out string validationMessage, out MessageType validationType))
-            {
-                _wizardRepoTestMessage = validationMessage;
-                _wizardRepoTestMessageType = validationType;
-                return;
-            }
-
-            if (_wizardRepoKind == ModelLibrarySettings.RepositoryKind.FileSystem)
-            {
-                if (Directory.Exists(_wizardRepoRoot))
-                {
-                    _wizardRepoTestMessage = "Directory located successfully.";
-                    _wizardRepoTestMessageType = MessageType.Info;
-                }
-                else
-                {
-                    _wizardRepoTestMessage = "Directory not found. Ensure the path exists and you have access.";
-                    _wizardRepoTestMessageType = MessageType.Warning;
-                }
-            }
-            else
-            {
-                _wizardRepoTestMessage = "URL format looks valid. Remember to verify credentials and server availability.";
-                _wizardRepoTestMessageType = MessageType.Info;
-            }
+            string message;
+            MessageType messageType;
+            RepositoryConnectionValidator.TryValidate(
+                _wizardRepoKind,
+                _wizardRepoRoot,
+                false,
+                out message,
+                out messageType);
+            _wizardRepoTestMessage = message;
+            _wizardRepoTestMessageType = messageType;
         }
 
         private string GetWizardRoleDescription(UserRole role)

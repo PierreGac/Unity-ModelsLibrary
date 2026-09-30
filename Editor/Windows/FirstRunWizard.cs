@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using ModelLibrary.Editor.Identity;
 using ModelLibrary.Editor.Settings;
 using ModelLibrary.Editor.Utils;
@@ -26,6 +25,9 @@ namespace ModelLibrary.Editor.Windows
         }
 
         private const int __TOTAL_STEPS = 4;
+        private const float __BUTTON_SAVE_UNTESTED_WIDTH = 160f;
+        private const float __BUTTON_TEST_WIDTH = 140f;
+        private const float __BUTTON_HEIGHT = 24f;
         private static readonly string[] __StepTitles =
         {
             "Welcome",
@@ -52,6 +54,8 @@ namespace ModelLibrary.Editor.Windows
 
         /// <summary>Flag indicating if the repository check/test has been performed.</summary>
         private bool _repositoryTested;
+        /// <summary>True after the user chooses save-without-testing for a missing folder.</summary>
+        private bool _saveWithoutTesting;
         /// <summary>Latest repository test result message.</summary>
         private string _repositoryTestMessage;
         /// <summary>Latest repository test result type.</summary>
@@ -166,6 +170,7 @@ namespace ModelLibrary.Editor.Windows
             _kind = settings.repositoryKind;
             _currentStep = WizardStep.Welcome;
             _repositoryTested = false;
+            _saveWithoutTesting = false;
             _repositoryTestMessage = null;
             _repositoryValidationMessage = null;
         }
@@ -370,7 +375,12 @@ namespace ModelLibrary.Editor.Windows
             GUILayout.Space(4f);
             EditorGUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Test Connection", GUILayout.Width(140f), GUILayout.Height(24f)))
+            if (GUILayout.Button(RepositoryConnectionValidator.SAVE_WITHOUT_TESTING_LABEL, GUILayout.Width(__BUTTON_SAVE_UNTESTED_WIDTH), GUILayout.Height(__BUTTON_HEIGHT)))
+            {
+                SaveRepositoryWithoutTesting();
+            }
+
+            if (GUILayout.Button("Test Connection", GUILayout.Width(__BUTTON_TEST_WIDTH), GUILayout.Height(__BUTTON_HEIGHT)))
             {
                 RunRepositoryTest();
             }
@@ -438,7 +448,7 @@ namespace ModelLibrary.Editor.Windows
                         if (GUILayout.Button("Next", GUILayout.Width(110f), GUILayout.Height(26f)))
                         {
                             if (_currentStep == WizardStep.Repository
-                                && !ValidateRepository(out _repositoryValidationMessage, out _repositoryValidationType))
+                                && !RepositoryConnectionValidator.TryValidate(_kind, _repoRoot, _saveWithoutTesting, out _repositoryValidationMessage, out _repositoryValidationType))
                             {
                                 return;
                             }
@@ -451,7 +461,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (GUILayout.Button("Finish", GUILayout.Width(110f), GUILayout.Height(26f)))
                         {
-                            if (!ValidateRepository(out _repositoryValidationMessage, out _repositoryValidationType))
+                            if (!RepositoryConnectionValidator.TryValidate(_kind, _repoRoot, _saveWithoutTesting, out _repositoryValidationMessage, out _repositoryValidationType))
                             {
                                 _currentStep = WizardStep.Repository;
                                 return;
@@ -489,83 +499,43 @@ namespace ModelLibrary.Editor.Windows
         private void ClearRepositoryFeedback()
         {
             _repositoryTested = false;
+            _saveWithoutTesting = false;
             _repositoryTestMessage = null;
             _repositoryTestMessageType = MessageType.None;
             _repositoryValidationMessage = null;
             _repositoryValidationType = MessageType.None;
         }
 
-        private bool ValidateRepository(out string message, out MessageType type)
+        private void SaveRepositoryWithoutTesting()
         {
-            message = string.Empty;
-            type = MessageType.None;
-
-            if (string.IsNullOrWhiteSpace(_repoRoot))
-            {
-                message = "Repository root is required.";
-                type = MessageType.Error;
-                return false;
-            }
-
-            if (_kind == ModelLibrarySettings.RepositoryKind.FileSystem)
-            {
-                if (!Path.IsPathRooted(_repoRoot) && !_repoRoot.StartsWith("\\\\", StringComparison.Ordinal))
-                {
-                    message = "File system paths should be absolute (e.g., C\\\\Models or \\\\server\\share).";
-                    type = MessageType.Error;
-                    return false;
-                }
-
-                if (!Directory.Exists(_repoRoot))
-                {
-                    message = "Directory not found. You can still proceed, but double-check the network share.";
-                    type = MessageType.Warning;
-                    return true;
-                }
-            }
-            else
-            {
-                if (!Uri.TryCreate(_repoRoot, UriKind.Absolute, out Uri uriResult) ||
-                    (uriResult.Scheme != Uri.UriSchemeHttp && uriResult.Scheme != Uri.UriSchemeHttps))
-                {
-                    message = "Please provide a valid HTTP or HTTPS URL.";
-                    type = MessageType.Error;
-                    return false;
-                }
-            }
-
-            return true;
+            _saveWithoutTesting = true;
+            _repositoryTested = false;
+            string message;
+            MessageType messageType;
+            RepositoryConnectionValidator.TrySaveRepository(
+                _kind,
+                _repoRoot,
+                true,
+                out message,
+                out messageType);
+            _repositoryValidationMessage = message;
+            _repositoryValidationType = messageType;
         }
 
         private void RunRepositoryTest()
         {
+            _saveWithoutTesting = false;
             _repositoryTested = true;
-
-            if (!ValidateRepository(out string validationMessage, out MessageType validationType))
-            {
-                _repositoryTestMessage = validationMessage;
-                _repositoryTestMessageType = validationType;
-                return;
-            }
-
-            if (_kind == ModelLibrarySettings.RepositoryKind.FileSystem)
-            {
-                if (Directory.Exists(_repoRoot))
-                {
-                    _repositoryTestMessage = "Directory located successfully.";
-                    _repositoryTestMessageType = MessageType.Info;
-                }
-                else
-                {
-                    _repositoryTestMessage = "Directory not found. Ensure the path exists and you have access.";
-                    _repositoryTestMessageType = MessageType.Warning;
-                }
-            }
-            else
-            {
-                _repositoryTestMessage = "URL format looks valid. Remember to verify credentials and server availability.";
-                _repositoryTestMessageType = MessageType.Info;
-            }
+            string message;
+            MessageType messageType;
+            RepositoryConnectionValidator.TryValidate(
+                _kind,
+                _repoRoot,
+                false,
+                out message,
+                out messageType);
+            _repositoryTestMessage = message;
+            _repositoryTestMessageType = messageType;
         }
 
         private string GetRoleDescription(UserRole role)
