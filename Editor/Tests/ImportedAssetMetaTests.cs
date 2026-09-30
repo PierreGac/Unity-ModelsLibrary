@@ -12,9 +12,13 @@ namespace ModelLibrary.Editor.Tests
     public class ImportedAssetMetaTests
     {
         private const string DOCUMENTATION_FOLDER_NAME = "Documentation~";
-        private const string BROWSER_IMAGE_NAME = "browser.jpg";
-        private const string DETAILS_IMAGE_NAME = "existing_model_details.jpg";
-        private const string SUBMIT_IMAGE_NAME = "submit_01.jpg";
+        private const string IMAGES_FOLDER_NAME = "images";
+        private const string INDEX_FILE_NAME = "index.md";
+        private const string MODELS_DETAILS_IMAGE_NAME = "models_details.png";
+        private const string IMPORT_WINDOW_IMAGE_NAME = "import_window.png";
+        private const string SUBMIT_WINDOW_IMAGE_NAME = "submit_window.png";
+        private const string SUBMIT_ASSETS_IMAGE_NAME = "submit_window_assets_tab.png";
+        private const string CONTEXTUAL_MENU_IMAGE_NAME = "contextual_menu.png";
         private const string META_EXTENSION = ".meta";
         private const string TILDE_SUFFIX = "~";
         private const char DOT_PREFIX = '.';
@@ -33,9 +37,13 @@ namespace ModelLibrary.Editor.Tests
             string documentationRoot = Path.Combine(packageRoot, DOCUMENTATION_FOLDER_NAME);
             Assert.IsTrue(Directory.Exists(documentationRoot));
             Assert.IsFalse(Directory.Exists(Path.Combine(packageRoot, "Editor", DOCUMENTATION_FOLDER_NAME)));
-            Assert.IsTrue(File.Exists(Path.Combine(documentationRoot, BROWSER_IMAGE_NAME)));
-            Assert.IsTrue(File.Exists(Path.Combine(documentationRoot, DETAILS_IMAGE_NAME)));
-            Assert.IsTrue(File.Exists(Path.Combine(documentationRoot, SUBMIT_IMAGE_NAME)));
+            Assert.IsTrue(File.Exists(Path.Combine(documentationRoot, INDEX_FILE_NAME)));
+            string imagesRoot = Path.Combine(documentationRoot, IMAGES_FOLDER_NAME);
+            Assert.IsTrue(File.Exists(Path.Combine(imagesRoot, MODELS_DETAILS_IMAGE_NAME)));
+            Assert.IsTrue(File.Exists(Path.Combine(imagesRoot, IMPORT_WINDOW_IMAGE_NAME)));
+            Assert.IsTrue(File.Exists(Path.Combine(imagesRoot, SUBMIT_WINDOW_IMAGE_NAME)));
+            Assert.IsTrue(File.Exists(Path.Combine(imagesRoot, SUBMIT_ASSETS_IMAGE_NAME)));
+            Assert.IsTrue(File.Exists(Path.Combine(imagesRoot, CONTEXTUAL_MENU_IMAGE_NAME)));
             AssertNoMetaFiles(documentationRoot, problems);
             Assert.AreEqual(0, problems.Count, string.Join(Environment.NewLine, problems));
         }
