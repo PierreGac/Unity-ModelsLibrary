@@ -38,7 +38,7 @@ namespace ModelLibrary.Editor.Services
                 Task<ModelMeta> loadTask =
                     AsyncProfiler.MeasureAsync("Service.GetMeta", () => _repo.LoadMetaAsync(id, version));
                 _inFlightLoads[key] = loadTask;
-                _ = RemoveInFlightWhenCompleteAsync(key, loadTask);
+                RemoveInFlightWhenCompleteAsync(key, loadTask).FireAndForget();
                 return loadTask;
             }
         }

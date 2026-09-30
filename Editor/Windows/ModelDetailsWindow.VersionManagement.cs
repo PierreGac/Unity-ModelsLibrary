@@ -70,7 +70,7 @@ namespace ModelLibrary.Editor.Windows
                         {
                             if (ConfirmVersionDeletion())
                             {
-                                _ = DeleteVersionAsync();
+                                DeleteVersionAsync().FireAndForget();
                             }
                         }
                     }
@@ -93,7 +93,7 @@ namespace ModelLibrary.Editor.Windows
                         {
                             if (ConfirmRemoveFromProject())
                             {
-                                _ = RemoveFromProjectAsync();
+                                RemoveFromProjectAsync().FireAndForget();
                             }
                         }
                     }
@@ -112,7 +112,7 @@ namespace ModelLibrary.Editor.Windows
                         {
                             if (ConfirmModelDeletion())
                             {
-                                _ = DeleteModelAsync();
+                                DeleteModelAsync().FireAndForget();
                             }
                         }
                     }
@@ -653,7 +653,7 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 // Refresh installation status after import
-                _ = CheckInstallationStatusAsync();
+                CheckInstallationStatusAsync().FireAndForget();
 
                 // Store values for use in delayCall (capture before closing window)
 

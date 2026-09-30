@@ -95,7 +95,7 @@ namespace ModelLibrary.Editor.Windows
                 && _manifestCacheInitialized
                 && (DateTime.Now - _lastUpdateCheck) > BACKGROUND_UPDATE_CHECK_INTERVAL)
             {
-                _ = CheckForUpdatesAsync();
+                CheckForUpdatesAsync().FireAndForget();
             }
         }
 
@@ -106,8 +106,8 @@ namespace ModelLibrary.Editor.Windows
         {
             IModelRepository repository = RepositoryFactory.CreateRepository();
             _service = new ModelLibraryService(repository);
-            _ = LoadIndexAsync();
-            _ = RefreshManifestCacheAsync();
+            LoadIndexAsync().FireAndForget();
+            RefreshManifestCacheAsync().FireAndForget();
         }
 
         /// <summary>
@@ -160,8 +160,8 @@ namespace ModelLibrary.Editor.Windows
             // Clear local install cache to force re-check of installation status
             _localInstallCache.Clear();
             _negativeCache.Clear();
-            _ = LoadIndexAsync();
-            _ = RefreshManifestCacheAsync();
+            LoadIndexAsync().FireAndForget();
+            RefreshManifestCacheAsync().FireAndForget();
         }
 
         /// <summary>
@@ -175,7 +175,7 @@ namespace ModelLibrary.Editor.Windows
             _negativeCache.Clear();
             _manifestCache.Clear();
             _manifestCacheInitialized = false;
-            _ = RefreshManifestCacheAsync();
+            RefreshManifestCacheAsync().FireAndForget();
         }
 
         private void DrawConfigurationRequired()
@@ -270,7 +270,7 @@ namespace ModelLibrary.Editor.Windows
                 TriggerCacheWarming();
 
                 EditorUtility.DisplayProgressBar("Loading Model Library", "Processing models...", 0.5f);
-                _ = CheckForUpdatesAsync();
+                CheckForUpdatesAsync().FireAndForget();
 
                 Repaint();
                 titleContent.text = "Model Library";

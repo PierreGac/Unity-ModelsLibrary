@@ -96,7 +96,7 @@ namespace ModelLibrary.Editor.Windows
                 : new Repository.HttpRepository(settings.repositoryRoot);
 
             _service = new ModelLibraryService(repo);
-            _ = LoadVersionsAsync();
+            LoadVersionsAsync().FireAndForget();
         }
 
         private async Task LoadVersionsAsync()
@@ -242,7 +242,7 @@ namespace ModelLibrary.Editor.Windows
                 if (newLeftIndex != leftIndex)
                 {
                     _leftVersion = _availableVersions[newLeftIndex];
-                    _ = LoadSelectedVersionsAsync();
+                    LoadSelectedVersionsAsync().FireAndForget();
                 }
 
                 GUILayout.Space(UIConstants.SPACING_DEFAULT);
@@ -253,7 +253,7 @@ namespace ModelLibrary.Editor.Windows
                 if (newRightIndex != rightIndex)
                 {
                     _rightVersion = _availableVersions[newRightIndex];
-                    _ = LoadSelectedVersionsAsync();
+                    LoadSelectedVersionsAsync().FireAndForget();
                 }
 
                 GUILayout.Space(UIConstants.SPACING_SMALL);
@@ -264,7 +264,7 @@ namespace ModelLibrary.Editor.Windows
                         string temp = _leftVersion;
                         _leftVersion = _rightVersion;
                         _rightVersion = temp;
-                        _ = LoadSelectedVersionsAsync();
+                        LoadSelectedVersionsAsync().FireAndForget();
                     }
                 }
             }

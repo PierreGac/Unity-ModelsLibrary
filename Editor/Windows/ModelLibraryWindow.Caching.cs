@@ -64,7 +64,7 @@ namespace ModelLibrary.Editor.Windows
             // Trigger immediate reload of metadata to get updated notes
             if (_service != null && !_loadingMeta.Contains(key))
             {
-                _ = LoadMetaAsync(modelId, version);
+                LoadMetaAsync(modelId, version).FireAndForget();
             }
 
             // Coalesce notification/title work with any in-flight metadata loads.
@@ -100,7 +100,7 @@ namespace ModelLibrary.Editor.Windows
                     string thumbKey = key + "#thumb";
                     if (!_thumbnailCache.ContainsKey(thumbKey) && !_loadingThumbnails.Contains(thumbKey))
                     {
-                        _ = LoadThumbnailAsync(thumbKey, id, version, previewPath);
+                        LoadThumbnailAsync(thumbKey, id, version, previewPath).FireAndForget();
                     }
                 }
 
@@ -350,7 +350,7 @@ namespace ModelLibrary.Editor.Windows
                 string key = entry.id + "@" + entry.latestVersion;
                 if (!_metaCache.ContainsKey(key) && !_loadingMeta.Contains(key))
                 {
-                    _ = LoadMetaAsync(entry.id, entry.latestVersion);
+                    LoadMetaAsync(entry.id, entry.latestVersion).FireAndForget();
                 }
                 else
                 {
@@ -366,7 +366,7 @@ namespace ModelLibrary.Editor.Windows
 
                         if (!_loadingThumbnails.Contains(thumbKey))
                         {
-                            _ = LoadThumbnailAsync(thumbKey, entry.id, entry.latestVersion, warmedMeta.previewImagePath);
+                            LoadThumbnailAsync(thumbKey, entry.id, entry.latestVersion, warmedMeta.previewImagePath).FireAndForget();
                         }
                     }
                 }
@@ -408,7 +408,7 @@ namespace ModelLibrary.Editor.Windows
                 // Only trigger refresh if not already refreshing to avoid duplicate calls
                 if (!_refreshingManifest)
                 {
-                    _ = RefreshManifestCacheAsync();
+                    RefreshManifestCacheAsync().FireAndForget();
                 }
                 // Don't return false immediately - check manifest cache first
                 // The cache might be populated by the time we check it
@@ -447,7 +447,7 @@ namespace ModelLibrary.Editor.Windows
             _localInstallCache.Remove(modelId);
             _negativeCache.Remove(modelId);
             _manifestCache.Remove(modelId);
-            _ = CheckForUpdatesAsync();
+            CheckForUpdatesAsync().FireAndForget();
         }
 
         /// <summary>
@@ -474,7 +474,7 @@ namespace ModelLibrary.Editor.Windows
             }
 
             // Recompute the update badge from the cache we just changed.
-            _ = CheckForUpdatesAsync();
+            CheckForUpdatesAsync().FireAndForget();
 
             // Force repaint if viewing browser to show updated status
             if (_currentView == ViewType.Browser)
@@ -673,7 +673,7 @@ namespace ModelLibrary.Editor.Windows
                 }
 
                 _manifestCacheInitialized = true;
-                _ = CheckForUpdatesAsync();
+                CheckForUpdatesAsync().FireAndForget();
                 Repaint();
             }
             catch (Exception ex)

@@ -132,7 +132,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (UIStyles.DrawSuccessButton("Save Metadata Changes", GUILayout.Width(180)))
                         {
-                            _ = SaveMetadataChangesAsync();
+                            SaveMetadataChangesAsync().FireAndForget();
                         }
                     }
                 }
@@ -188,7 +188,7 @@ namespace ModelLibrary.Editor.Windows
 
                     if (UIStyles.DrawPrimaryButton("Submit Note") && !string.IsNullOrWhiteSpace(_newNoteMessage))
                     {
-                        _ = SubmitNote();
+                        SubmitNote().FireAndForget();
                         _newNoteMessage = string.Empty;
                         GUI.FocusControl(null);
                     }
@@ -268,7 +268,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (UIStyles.DrawPrimaryButton(buttonLabel, GUILayout.Width(160)))
                         {
-                            _ = ImportToProject();
+                            ImportToProject().FireAndForget();
                         }
                     }
 
@@ -447,7 +447,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 if (_service != null && _meta != null)
                 {
-                    _ = Load();
+                    Load().FireAndForget();
                     currentEvent.Use();
                 }
             }

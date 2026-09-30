@@ -344,7 +344,7 @@ namespace ModelLibrary.Editor.Windows
             if (resolved)
             {
                 _selectedModelIndex = selectedIndex;
-                _ = LoadBaseMetaForSelection();
+                LoadBaseMetaForSelection().FireAndForget();
             }
             else
             {
@@ -434,7 +434,7 @@ namespace ModelLibrary.Editor.Windows
             _targetUpdateModelId = entry.id;
             _updateModelIdMissing = false;
             _hasValidUpdateSelection = true;
-            _ = LoadBaseMetaForSelection();
+            LoadBaseMetaForSelection().FireAndForget();
             Repaint();
         }
 
@@ -711,7 +711,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     _version = SuggestNextVersion(meta.version);
                     _changeSummary = string.Empty;
-                    _ = LoadIndexAsync();
+                    LoadIndexAsync().FireAndForget();
                 }
                 else
                 {
@@ -800,7 +800,7 @@ namespace ModelLibrary.Editor.Windows
                 return false;
             }
 
-            _ = Submit();
+            Submit().FireAndForget();
             return true;
         }
 

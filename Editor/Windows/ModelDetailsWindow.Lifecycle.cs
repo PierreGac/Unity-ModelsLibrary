@@ -64,7 +64,7 @@ namespace ModelLibrary.Editor.Windows
         {
             IModelRepository repo = RepositoryFactory.CreateRepository();
             _service = new ModelLibraryService(repo);
-            _ = Load();
+            Load().FireAndForget();
         }
 
         /// <summary>
@@ -100,8 +100,8 @@ namespace ModelLibrary.Editor.Windows
                 Repaint();
 
                 await LoadVersionListAsync();
-                _ = CheckInstallationStatusAsync();
-                _ = LoadCatalogTagsAsync();
+                CheckInstallationStatusAsync().FireAndForget();
+                LoadCatalogTagsAsync().FireAndForget();
             }
             catch (Exception ex)
             {

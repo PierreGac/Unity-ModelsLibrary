@@ -500,7 +500,7 @@ namespace ModelLibrary.Editor.Windows
                             FullRefresh();
                         });
                     }
-                    actionsMenu.AddItem(new GUIContent("Check Updates", "Run an immediate update check for all models"), false, () => _ = CheckForUpdatesAsync());
+                    actionsMenu.AddItem(new GUIContent("Check Updates", "Run an immediate update check for all models"), false, () => CheckForUpdatesAsync().FireAndForget());
 
                     SimpleUserIdentityProvider identityProvider = new SimpleUserIdentityProvider();
                     if (identityProvider.GetUserRole() == UserRole.Artist)
@@ -584,8 +584,8 @@ namespace ModelLibrary.Editor.Windows
                     bulkMenu.AddSeparator(string.Empty);
                     using (new EditorGUI.DisabledScope(_selectedModels.Count == 0))
                     {
-                        bulkMenu.AddItem(new GUIContent($"Import ({_selectedModels.Count})"), false, () => _ = BulkImportAsync());
-                        bulkMenu.AddItem(new GUIContent($"Update ({_selectedModels.Count})"), false, () => _ = BulkUpdateAsync());
+                        bulkMenu.AddItem(new GUIContent($"Import ({_selectedModels.Count})"), false, () => BulkImportAsync().FireAndForget());
+                        bulkMenu.AddItem(new GUIContent($"Update ({_selectedModels.Count})"), false, () => BulkUpdateAsync().FireAndForget());
                         bulkMenu.AddSeparator("Tags/");
                         if (_selectedModels.Count == 0)
                         {
@@ -1255,7 +1255,7 @@ namespace ModelLibrary.Editor.Windows
                     {
                         if (GUILayout.Button("Download", GUILayout.Width(__LIST_BUTTON_DOWNLOAD_WIDTH)))
                         {
-                            _ = Download(entry.id, entry.latestVersion);
+                            Download(entry.id, entry.latestVersion).FireAndForget();
                         }
                     }
 
@@ -1265,7 +1265,7 @@ namespace ModelLibrary.Editor.Windows
                         if (GUILayout.Button(actionLabel, GUILayout.Width(__LIST_BUTTON_IMPORT_WIDTH)))
                         {
                             string previousVersion = properlyInstalled ? localVersion : null;
-                            _ = Import(entry.id, entry.latestVersion, needsUpgrade, previousVersion);
+                            Import(entry.id, entry.latestVersion, needsUpgrade, previousVersion).FireAndForget();
                         }
                     }
                 }
@@ -1279,7 +1279,7 @@ namespace ModelLibrary.Editor.Windows
                 bool isLoadingMeta = _loadingMeta.Contains(key);
                 if (!_metaCache.ContainsKey(key) && !isLoadingMeta)
                 {
-                    _ = LoadMetaAsync(entry.id, entry.latestVersion);
+                    LoadMetaAsync(entry.id, entry.latestVersion).FireAndForget();
                 }
 
                 if (TryGetMetaFromCache(key, out ModelMeta meta))
@@ -1364,7 +1364,7 @@ namespace ModelLibrary.Editor.Windows
                 string key = entry.id + "@" + entry.latestVersion;
                 if (!_metaCache.ContainsKey(key) && !_loadingMeta.Contains(key))
                 {
-                    _ = LoadMetaAsync(entry.id, entry.latestVersion);
+                    LoadMetaAsync(entry.id, entry.latestVersion).FireAndForget();
                 }
 
                 string thumbKey = key + "#thumb";
@@ -1578,7 +1578,7 @@ namespace ModelLibrary.Editor.Windows
             string key = entry.id + "@" + entry.latestVersion;
             if (!_metaCache.ContainsKey(key) && !_loadingMeta.Contains(key))
             {
-                _ = LoadMetaAsync(entry.id, entry.latestVersion);
+                LoadMetaAsync(entry.id, entry.latestVersion).FireAndForget();
             }
 
             string thumbKey = key + "#thumb";
@@ -1950,7 +1950,7 @@ namespace ModelLibrary.Editor.Windows
                     bool installed = TryGetLocalInstall(importEntry, out ModelMeta localMeta);
                     string previousVersion = installed ? localMeta?.version : null;
                     bool needsUpgrade = installed && !string.IsNullOrEmpty(previousVersion) && ModelVersionUtils.NeedsUpgrade(previousVersion, importEntry.latestVersion);
-                    _ = Import(importEntry.id, importEntry.latestVersion, needsUpgrade, previousVersion);
+                    Import(importEntry.id, importEntry.latestVersion, needsUpgrade, previousVersion).FireAndForget();
                     Repaint();
                 }
                 else
@@ -1969,7 +1969,7 @@ namespace ModelLibrary.Editor.Windows
                     if (canUpdate && TryGetLocalInstall(updateEntry, out ModelMeta localMeta))
                     {
                         string previousVersion = localMeta?.version;
-                        _ = Import(updateEntry.id, updateEntry.latestVersion, true, previousVersion);
+                        Import(updateEntry.id, updateEntry.latestVersion, true, previousVersion).FireAndForget();
                         Repaint();
                     }
                     else

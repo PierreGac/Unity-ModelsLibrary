@@ -92,7 +92,7 @@ namespace ModelLibrary.Editor.Windows
             _service = new ModelLibraryService(repo);
             _suppressCancelDialog = false;
             EnsureSubmitCancellation();
-            _ = LoadIndexAsync();
+            LoadIndexAsync().FireAndForget();
         }
 
         /// <summary>
@@ -248,7 +248,7 @@ namespace ModelLibrary.Editor.Windows
             }
             else if (UIStyles.DrawPrimaryButton("Submit", GUILayout.Height(30)))
             {
-                _ = Submit();
+                Submit().FireAndForget();
             }
         }
     }

@@ -44,7 +44,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 ErrorHandler.ShowErrorWithRetry("Download Failed",
                     "The model could not be downloaded from the repository.",
-                    () => _ = Download(id, version), ex);
+                    () => Download(id, version).FireAndForget(), ex);
             }
             finally
             {
@@ -271,7 +271,7 @@ namespace ModelLibrary.Editor.Windows
                 // Trigger a background refresh of the manifest cache to ensure it's up to date
                 // This will pick up any other manifest files and ensure consistency
                 // Use delayCall to avoid clearing the cache we just added
-                EditorApplication.delayCall += () => _ = RefreshManifestCacheAsync();
+                EditorApplication.delayCall += () => RefreshManifestCacheAsync().FireAndForget();
 
                 AddToImportHistory(new ImportHistoryEntry
                 {
@@ -310,7 +310,7 @@ namespace ModelLibrary.Editor.Windows
                     string operationLower = operation.ToLowerInvariant();
                     ErrorHandler.ShowErrorWithRetry($"{operation} Failed",
                         $"The model could not be {operationLower}ed into your project.",
-                        () => _ = Import(id, version, isUpgrade, previousVersion), ex);
+                        () => Import(id, version, isUpgrade, previousVersion).FireAndForget(), ex);
                 }
             }
             finally
@@ -553,7 +553,7 @@ namespace ModelLibrary.Editor.Windows
                 // the async work in a proper try/catch via RefreshAfterBulkTagAsync.
                 EditorApplication.delayCall += () =>
                 {
-                    _ = RefreshAfterBulkTagAsync();
+                    RefreshAfterBulkTagAsync().FireAndForget();
                 };
             });
         }

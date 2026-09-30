@@ -144,7 +144,7 @@ namespace ModelLibrary.Editor
             // Open Model Library window and focus on the model
             ModelLibraryWindow.Open();
             ModelLibraryWindow window = EditorWindow.GetWindow<ModelLibraryWindow>();
-            _ = FocusModelInLibraryAsync(window, modelId);
+            FocusModelInLibraryAsync(window, modelId).FireAndForget();
         }
 
         /// <summary>
@@ -185,7 +185,7 @@ namespace ModelLibrary.Editor
                 return;
             }
 
-            _ = CheckModelUpdatesAsync(modelId);
+            CheckModelUpdatesAsync(modelId).FireAndForget();
         }
 
         /// <summary>

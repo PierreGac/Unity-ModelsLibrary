@@ -194,7 +194,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     if (GUILayout.Button($"Upload Selected ({selectedCount})", GUILayout.Height(__UPLOAD_BUTTON_HEIGHT)))
                     {
-                        _ = UploadSelectedAsync();
+                        UploadSelectedAsync().FireAndForget();
                     }
                 }
             }

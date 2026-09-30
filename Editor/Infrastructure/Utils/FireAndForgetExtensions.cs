@@ -9,19 +9,16 @@ namespace ModelLibrary.Editor.Utils
     /// Helpers for safely executing fire-and-forget async operations.
     /// </summary>
     /// <remarks>
-    /// STABILITY (audit LOW-01): The codebase has 30+ sites where async methods
-    /// are started with <c>_ = SomeAsync()</c> and the returned <see cref="Task"/>
-    /// is discarded. Any exception thrown after the first <c>await</c> becomes
-    /// <c>UnobservedTaskException</c> — which Unity may or may not surface.
-    /// These helpers wrap fire-and-forget calls so exceptions are at least
-    /// logged to the Unity console (and <see cref="ErrorLogger"/> if available).
+    /// Call <c>SomeAsync().FireAndForget()</c> when the caller cannot await the task.
+    /// Exceptions after the first await are logged to the Unity console and
+    /// <see cref="ErrorLogger"/>. Cancellation is ignored.
     /// </remarks>
     internal static class FireAndForgetExtensions
     {
         /// <summary>
         /// Awaits the given task and logs any exception to the Unity console
         /// and <see cref="ErrorLogger"/>. Safe to call as
-        /// <c>_ = someTask.FireAndForget()</c>.
+        /// <c>someTask.FireAndForget()</c>.
         /// </summary>
         /// <param name="task">The task to observe. May be null.</param>
         /// <param name="operationName">Name to use in the error log. Defaults to the caller member name.</param>

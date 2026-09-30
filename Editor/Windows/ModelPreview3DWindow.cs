@@ -870,7 +870,7 @@ namespace ModelLibrary.Editor.Windows
                 // Attempt to clean up cache if it's in a bad state
                 if (_cacheRoot != null)
                 {
-                    _ = TryCleanupCacheFolderAsync(_cacheRoot);
+                    TryCleanupCacheFolderAsync(_cacheRoot).FireAndForget();
                 }
             }
             catch (IOException ex) when (ex.Message.IndexOf("access denied", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -889,7 +889,7 @@ namespace ModelLibrary.Editor.Windows
                 // Attempt to clean up cache if it's in a bad state
                 if (_cacheRoot != null)
                 {
-                    _ = TryCleanupCacheFolderAsync(_cacheRoot);
+                    TryCleanupCacheFolderAsync(_cacheRoot).FireAndForget();
                 }
             }
             catch (Exception ex)
@@ -899,7 +899,7 @@ namespace ModelLibrary.Editor.Windows
                 // Attempt to clean up cache on any error to prevent locked state
                 if (_cacheRoot != null)
                 {
-                    _ = TryCleanupCacheFolderAsync(_cacheRoot);
+                    TryCleanupCacheFolderAsync(_cacheRoot).FireAndForget();
                 }
             }
             finally
@@ -929,7 +929,7 @@ namespace ModelLibrary.Editor.Windows
                 EditorGUILayout.HelpBox("Failed to load model metadata. Please check your repository connection and try again.", MessageType.Error);
                 if (GUILayout.Button("Retry"))
                 {
-                    _ = LoadModelAsync();
+                    LoadModelAsync().FireAndForget();
                 }
                 return;
             }

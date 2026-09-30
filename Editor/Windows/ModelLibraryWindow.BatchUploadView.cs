@@ -153,7 +153,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     if (GUILayout.Button($"Upload Selected ({selectedCount})", GUILayout.Height(__BATCH_UPLOAD_UPLOAD_HEIGHT)))
                     {
-                        _ = UploadBatchSelectedAsync();
+                        UploadBatchSelectedAsync().FireAndForget();
                     }
                 }
             }

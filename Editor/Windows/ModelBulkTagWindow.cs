@@ -119,7 +119,7 @@ namespace ModelLibrary.Editor.Windows
                 return;
             }
 
-            _ = ApplyBulkTagsAsync(add, remove);
+            ApplyBulkTagsAsync(add, remove).FireAndForget();
         }
 
         private async Task ApplyBulkTagsAsync(string[] addTags, string[] removeTags)

@@ -258,7 +258,7 @@ namespace ModelLibrary.Editor.Windows
                 {
                     if (GUILayout.Button("Test Connection", GUILayout.Width(120), GUILayout.Height(25)))
                     {
-                        _ = TestSettingsConnectionAsync();
+                        TestSettingsConnectionAsync().FireAndForget();
                     }
                 }
             }
@@ -329,7 +329,7 @@ namespace ModelLibrary.Editor.Windows
             {
                 if (GUILayout.Button("Rebuild Index from Repository", GUILayout.Height(28)))
                 {
-                    _ = RebuildIndexFromRepositoryAsync();
+                    RebuildIndexFromRepositoryAsync().FireAndForget();
                 }
             }
         }
